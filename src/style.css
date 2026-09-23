@@ -1,0 +1,743 @@
+/* ==========================================================================
+   Factio -- style.css
+   Dark industrial DOM UI overlay for the canvas game.
+   Per ARCHITECTURE.md §20 and GDD.md §9 (UI/UX).
+   No external resources (fonts, images, CDNs). Plain CSS, no preprocessor.
+   Load order note: this file is concatenated as-is into the single build
+   output's inline <style> tag, in <head>, before any JS runs.
+
+   IMPORTANT — two stylesheets style the UI:
+   1. This file (loaded first, in <head>).
+   2. A small stylesheet 70-ui.js injects at runtime (F.ui.init(), tag
+      id="f-ui-style") that owns the generic window chrome (.f-window,
+      .f-titlebar, .f-close, .f-body, .f-slot, .f-tooltip, the whole
+      always-on HUD, etc.) — see that file's header comment. Because it is
+      injected AFTER this file, at equal selector specificity it wins the
+      cascade. This file therefore:
+        - styles the WINDOW CONTENT classes 71-ui-windows.js renders (crafting
+          grid, recipe/tech cards, entity panels, help/menu/death layout —
+          70-ui.js knows nothing about these), which is most of this file, and
+        - only touches the shared chrome classes where a real override is
+          needed, in which case the rule is written as `#ui .selector` (id +
+          class beats a plain class regardless of source order) instead of
+          fighting the cascade.
+   The two sheets share the same dark-industrial token palette on purpose so
+   they read as one design even though they come from different modules.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   0. Design tokens
+   -------------------------------------------------------------------------- */
+:root {
+  /* base surfaces */
+  --f-bg: #1b1b1b;
+  --f-panel: #313031;
+  --f-panel-light: #3a3a3a;
+  --f-panel-border: #0f0f0f;
+  --f-panel-edge: #4a4a4a;
+  --f-slot-bg: #262626;
+  --f-slot-hover: #3a3a3a;
+  --f-slot-border: #141414;
+  --f-slot-inset: #404040;
+
+  /* text */
+  --f-text: #e0dcd3;
+  --f-text-dim: #9a958c;
+  --f-caption: #ffe6c0;
+
+  /* accents / status */
+  --f-orange: #ffa500;
+  --f-orange-dark: #e39827;
+  --f-progress: #faa838;
+  --f-green: #5eb663;
+  --f-green-bright: #00ff00;
+  --f-red: #ff3f3f;
+  --f-red-soft: #ff8e8e;
+  --f-blue: #80cef0;
+  --f-yellow: #e0c840;
+  --f-grey: #8a8a8a;
+
+  /* misc */
+  --f-shadow: rgba(0, 0, 0, 0.55);
+  --f-overlay: rgba(10, 10, 10, 0.72);
+  --f-radius: 3px;
+  --f-slot-size: 40px;
+  --f-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial,
+    sans-serif;
+}
+
+/* --------------------------------------------------------------------------
+   1. Reset & base layout
+   -------------------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--f-bg);
+  color: var(--f-text);
+  font-family: var(--f-font);
+  font-size: 13px;
+  line-height: 1.35;
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: var(--f-bg);
+  touch-action: none;
+}
+
+/* The UI overlay lets clicks fall through to the canvas by default; any
+   interactive widget (panels, windows, HUD) opts back in (70-ui.js's own
+   stylesheet declares this base rule on #ui/.f-auto — restated here only as
+   documentation, not re-declared, to avoid a redundant competing rule). */
+
+/* --------------------------------------------------------------------------
+   2. Scrollbars (dark, thin) -- applies inside every window/HUD panel
+   -------------------------------------------------------------------------- */
+#ui * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--f-panel-edge) var(--f-panel);
+}
+
+#ui *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+#ui *::-webkit-scrollbar-track {
+  background: var(--f-panel-border);
+}
+#ui *::-webkit-scrollbar-thumb {
+  background: var(--f-panel-edge);
+  border-radius: 5px;
+  border: 2px solid var(--f-panel-border);
+}
+#ui *::-webkit-scrollbar-thumb:hover {
+  background: var(--f-orange-dark);
+}
+
+.hidden { display: none !important; }
+
+/* --------------------------------------------------------------------------
+   3. Window chrome overrides
+   70-ui.js's injected stylesheet already builds .f-window/.f-panel/
+   .f-titlebar/.f-close/.f-body (centred via F.ui's centerWindow(), 40px
+   .f-slot, dark tooltip with orange title, etc.) — this section only adds
+   the few guarantees that file doesn't make: a hard viewport cap so no
+   window (the ~900px inventory window, the 3-column tech tree, ...) can
+   ever exceed the screen, especially at 1366x768 and below.
+   -------------------------------------------------------------------------- */
+#ui .f-window {
+  max-width: 96vw;
+  max-height: 90vh;
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 var(--f-panel-edge), 0 6px 24px var(--f-shadow);
+}
+
+/* .f-icon is shared by both stylesheets: 70-ui.js uses it for slot/HUD
+   icons (block context, centred by its own `margin:3px auto 0`), while
+   71-ui-windows.js's buildIcon() reuses the same class inside flex rows
+   (entity header, recipe rows, tech cards, ...) where that auto-margin
+   fights the flex layout. Neutralise the margin at higher specificity and
+   let each flex container below centre its icon with align-items instead;
+   .f-slot (the one context that wants the original block-centring) is
+   turned into a flex box here too so centring still works without margin.
+   image-rendering:pixelated matches GDD icon guidance. */
+#ui .f-icon {
+  margin: 0;
+  flex: none;
+  position: relative;
+  image-rendering: pixelated;
+}
+#ui .f-icon-abbrev {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 0 2px #000;
+  pointer-events: none;
+}
+.f-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#ui .f-count { font-weight: 700; }
+
+/* fallback slot markup (only used if F.ui.slot() is ever missing — see
+   71-ui-windows.js's fallbackSlot()); kept for completeness/robustness. */
+.f-slot-count {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000, -1px -1px 0 #000;
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   4. Generic content building blocks
+   Shared across the inventory/entity/tech/help/menu window content
+   (71-ui-windows.js's small DOM helpers: el/addRow/button/sectionTitle/bar).
+   -------------------------------------------------------------------------- */
+.f-win-content { font-size: 13px; }
+
+.f-section-title {
+  color: var(--f-caption);
+  font-weight: 700;
+  font-size: 13px;
+  margin: 10px 0 6px;
+}
+.f-section-title:first-child { margin-top: 0; }
+
+.f-hint {
+  color: var(--f-text-dim);
+  font-size: 11px;
+  margin: 4px 0;
+}
+
+.f-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 4px 0;
+  font-size: 12px;
+}
+.f-row-label { color: var(--f-text-dim); }
+.f-row-value { color: var(--f-text); font-weight: 600; }
+.f-row-btns { display: flex; gap: 4px; flex: none; }
+
+.f-clickable { cursor: pointer; }
+.f-clickable:hover .f-row-value { color: var(--f-orange); }
+
+/* button variants layered on top of 70-ui.js's base .f-btn look
+   (background/border/hover/active are already defined there). */
+.f-btn-wide {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 8px;
+  font-size: 13px;
+  margin: 4px 0;
+}
+.f-btn-small { padding: 2px 8px; font-size: 11px; }
+.f-btn-active {
+  background: var(--f-orange-dark);
+  color: #241a02;
+  border-color: #8a5c10;
+  font-weight: 700;
+}
+.f-btn-danger { background: #5a2323; border-color: #2a0f0f; color: #ffd9d9; }
+.f-btn-danger:hover { background: #7a2f2f; }
+
+.f-input,
+.f-textarea {
+  background: var(--f-slot-bg);
+  border: 1px solid var(--f-slot-border);
+  box-shadow: inset 0 0 0 1px var(--f-slot-inset);
+  color: var(--f-text);
+  padding: 4px 6px;
+  border-radius: var(--f-radius);
+  font-family: inherit;
+  font-size: 12px;
+}
+.f-input { flex: 1 1 auto; min-width: 0; }
+.f-textarea {
+  display: block;
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  background: #141414;
+  color: var(--f-green-bright);
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 11px;
+  margin: 4px 0;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.f-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--f-text-dim);
+  font-size: 12px;
+  margin-top: 8px;
+  cursor: pointer;
+}
+.f-checkbox-row input[type="checkbox"] { width: 14px; height: 14px; }
+
+/* Tabs (crafting groups, entity recipe picker tabs, help sections) */
+.f-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 2px solid var(--f-panel-border);
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.f-tab {
+  padding: 5px 10px;
+  background: #262626;
+  border: 1px solid var(--f-panel-border);
+  border-bottom: none;
+  border-radius: var(--f-radius) var(--f-radius) 0 0;
+  color: var(--f-text-dim);
+  cursor: pointer;
+  font-size: 12px;
+}
+.f-tab:hover { color: var(--f-text); background: #2f2f2f; }
+.f-tab-active {
+  background: var(--f-panel);
+  color: var(--f-caption);
+  border-color: var(--f-orange-dark);
+  box-shadow: inset 0 2px 0 var(--f-orange);
+}
+
+/* Progress / meter bars: bar(fraction, colorCls, labelText) ->
+   <div class="f-bar {colorCls}"><div class="f-bar-fill"/>[<span
+   class="f-bar-label"/>]</div> — colour comes from the wrapper's extra
+   class (f-bar-orange/blue/green/grey), applied to the descendant fill. */
+.f-bar {
+  position: relative;
+  width: 100%;
+  height: 12px;
+  background: #1c1c1c;
+  border: 1px solid var(--f-panel-border);
+  border-radius: 5px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+.f-bar-fill {
+  position: absolute;
+  inset: 0;
+  width: 0%;
+  background: var(--f-progress);
+  transition: width 0.08s linear;
+}
+.f-bar-blue .f-bar-fill { background: var(--f-blue); }
+.f-bar-green .f-bar-fill { background: var(--f-green); }
+.f-bar-grey .f-bar-fill { background: var(--f-grey); }
+.f-bar-orange .f-bar-fill { background: var(--f-progress); }
+.f-bar-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+  pointer-events: none;
+}
+
+/* Status line: <div class="f-status"><span class="f-dot f-dot-green"/>
+   <span class="f-status-text"/></div> (GDD §9.6: green working / yellow
+   output-full,low-power,idle / red no-power,no-fuel,...). */
+.f-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--f-text-dim);
+}
+.f-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.6);
+  background: var(--f-text-dim);
+}
+.f-dot-green { background: var(--f-green); }
+.f-dot-yellow { background: var(--f-yellow); }
+.f-dot-red { background: var(--f-red); }
+
+/* --------------------------------------------------------------------------
+   5. Slot grids (inventory / chest / lab packs / corpse / filter rows)
+   slotGrid() sets `grid-template-columns: repeat(cols, 1fr)` inline per
+   call (variable column count); inline styles always win over this
+   stylesheet, so we only need to make the container an (inline-)grid and
+   let the 1fr tracks shrink-to-fit the 40px .f-slot children.
+   -------------------------------------------------------------------------- */
+.f-slot-grid {
+  display: inline-grid;
+  gap: 4px;
+}
+
+/* --------------------------------------------------------------------------
+   6. Inventory window (left: 10-col slot grid, right: crafting panel)
+   -------------------------------------------------------------------------- */
+.f-win-inventory { width: 900px; max-width: 94vw; }
+
+.f-window-inventory {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.f-panel-left,
+.f-panel-right { padding: 10px; }
+.f-panel-left { flex: 0 0 auto; }
+.f-panel-right { flex: 1 1 auto; min-width: 340px; display: flex; flex-direction: column; min-height: 0; }
+
+.f-craft-panel { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+
+.f-recipe-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 6px;
+  max-height: 440px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+/* Recipe buttons: icon + name (see 71-ui-windows.js buildCraftingPanel).
+   States per GDD §9.4: craftable now (normal/green), missing ingredients
+   (dimmed, red-tinted), not unlocked (hidden). */
+.f-recipe {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 170px;
+  padding: 5px 8px;
+  background: var(--f-slot-bg);
+  border: 1px solid var(--f-slot-border);
+  border-radius: var(--f-radius);
+  box-shadow: inset 0 0 0 1px var(--f-slot-inset);
+  cursor: pointer;
+}
+.f-recipe:hover { background: var(--f-slot-hover); }
+.f-recipe-name {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.f-recipe-craftable { box-shadow: inset 0 0 0 1px var(--f-green); }
+.f-recipe-missing {
+  opacity: 0.55;
+  filter: grayscale(35%);
+  box-shadow: inset 0 0 0 1px var(--f-red);
+}
+.f-recipe-missing .f-recipe-name { color: var(--f-red-soft); }
+.f-recipe-locked { display: none; }
+
+/* --------------------------------------------------------------------------
+   7. Entity windows (furnace/assembler/chest/lab/drill/turret/boiler/
+   engine/offshore/pole/inserter/splitter/accumulator/solar/corpse)
+   -------------------------------------------------------------------------- */
+.f-win-entity { width: 460px; max-width: 92vw; }
+
+.f-entity-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.f-entity-name { font-weight: 700; color: var(--f-caption); font-size: 14px; }
+
+.f-row-slots {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+.f-progress-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 90px;
+}
+.f-progress-col .f-bar { width: 90px; }
+
+.f-labeled { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.f-labeled-title { font-size: 11px; color: var(--f-text-dim); }
+.f-labeled-bar { min-width: 180px; flex: 1 1 180px; }
+.f-labeled-bar .f-bar { width: 100%; }
+
+.f-recipe-current { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+
+.f-recipe-picker { display: flex; flex-direction: column; gap: 4px; }
+.f-tab-label { font-size: 11px; color: var(--f-text-dim); margin-top: 8px; }
+.f-recipe-grid { display: flex; flex-wrap: wrap; gap: 4px; }
+.f-recipe-cell {
+  width: 36px;
+  height: 36px;
+  background: var(--f-slot-bg);
+  border: 1px solid var(--f-slot-border);
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px var(--f-slot-inset);
+  cursor: pointer;
+}
+.f-recipe-cell:hover { background: var(--f-slot-hover); }
+
+.f-filter-grid { display: flex; gap: 4px; margin: 4px 0 8px; }
+.f-filter-cell {
+  width: 36px;
+  height: 36px;
+  background: var(--f-slot-bg);
+  border: 1px solid var(--f-slot-border);
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px var(--f-slot-inset);
+  cursor: pointer;
+  opacity: 0.85;
+}
+.f-filter-cell:hover { opacity: 1; background: var(--f-slot-hover); }
+
+/* --------------------------------------------------------------------------
+   8. Technology window — cards in tiers/columns (GDD §9.7)
+   -------------------------------------------------------------------------- */
+.f-win-tech { width: 880px; max-width: 94vw; }
+
+.f-tech-head { margin-bottom: 12px; }
+.f-tech-head > div:first-child { margin-bottom: 6px; color: var(--f-caption); font-weight: 600; font-size: 13px; }
+
+.f-tech-tree { display: flex; gap: 14px; align-items: flex-start; }
+.f-tech-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.f-tech-col-title {
+  color: var(--f-caption);
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 2px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--f-panel-border);
+}
+
+.f-tech-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  background: #262626;
+  border: 2px solid var(--f-panel-border);
+  box-shadow: inset 0 0 0 1px var(--f-slot-inset);
+  border-radius: var(--f-radius);
+  cursor: pointer;
+}
+.f-tech-card:hover { background: #2c2c2c; }
+.f-tech-card .f-icon { align-self: center; }
+.f-tech-name {
+  display: flex;
+  align-items: center;
+  font-weight: 700;
+  color: var(--f-caption);
+  font-size: 12px;
+}
+.f-tech-cost { font-size: 11px; color: var(--f-text-dim); }
+
+.f-tech-available { box-shadow: inset 0 0 0 1px var(--f-green); }
+.f-tech-current {
+  box-shadow: inset 0 0 0 2px var(--f-orange);
+  animation: f-tech-pulse 1.4s ease-in-out infinite;
+}
+.f-tech-queued { box-shadow: inset 0 0 0 2px var(--f-orange-dark); }
+.f-tech-done { opacity: 0.6; cursor: default; }
+.f-tech-done .f-tech-name::after {
+  content: "\2713";
+  margin-left: auto;
+  color: var(--f-green-bright);
+}
+.f-tech-locked { opacity: 0.4; filter: grayscale(70%); cursor: default; }
+
+@keyframes f-tech-pulse {
+  0%, 100% { box-shadow: inset 0 0 0 2px var(--f-orange); }
+  50% { box-shadow: inset 0 0 0 2px #ffcf7a; }
+}
+
+@media (max-width: 1100px) {
+  .f-tech-tree { flex-direction: column; }
+  .f-tech-col { width: 100%; }
+}
+
+/* --------------------------------------------------------------------------
+   9. Help window ("Navodila") — GDD §9.13
+   -------------------------------------------------------------------------- */
+.f-win-help { width: 720px; max-width: 92vw; }
+
+.f-help-lang-row {
+  margin: 0 0 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--f-panel-border);
+}
+
+.f-help-body {
+  max-width: 70ch;
+  line-height: 1.5;
+  font-size: 13px;
+  white-space: pre-wrap;
+  margin: 10px 0;
+}
+.f-help-line { min-height: 1.5em; }
+.f-scroll-box { max-height: 380px; overflow-y: auto; padding-right: 6px; }
+
+/* --------------------------------------------------------------------------
+   10. Menu (Esc pause menu) — centred ~520px window with clear sections.
+   Rendered once (see 71-ui-windows.js `poll:false` on the 'menu' window) so
+   the live <input>/<textarea> fields below are never clobbered by a timer.
+   -------------------------------------------------------------------------- */
+.f-win-menu { width: 520px; max-width: 90vw; display: flex; flex-direction: column; }
+
+.f-menu-section {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--f-panel-border);
+}
+.f-menu-section:last-child { border-bottom: none; }
+
+.f-slot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+  margin: 6px 0;
+}
+
+/* --------------------------------------------------------------------------
+   11. Map window
+   -------------------------------------------------------------------------- */
+.f-map-wrap { display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.f-map-canvas {
+  border: 2px solid var(--f-panel-border);
+  box-shadow: inset 0 0 0 1px var(--f-slot-inset);
+  image-rendering: pixelated;
+  background: #0c0c0c;
+}
+
+/* --------------------------------------------------------------------------
+   12. Death overlay window
+   -------------------------------------------------------------------------- */
+.f-win-death { text-align: center; padding: 12px 24px; }
+.f-death-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--f-red-soft);
+  text-shadow: 0 2px 4px #000;
+  margin-bottom: 10px;
+}
+.f-death-timer { font-size: 14px; color: var(--f-text); }
+
+/* --------------------------------------------------------------------------
+   13. HUD — most of the always-visible HUD (minimap, quickbar, research
+   bar, alerts, crafting queue, HP bar) is built AND styled entirely by
+   70-ui.js's injected stylesheet via .f-hud-region/.f-panel/.f-minimap/
+   .f-quickbar/.f-qslot/.f-hpbar/.f-queue/.f-alert etc. This section only
+   adds the defensive caps needed to guarantee nothing overlaps at
+   1366x768 and smaller, per the task brief.
+   -------------------------------------------------------------------------- */
+#ui .f-queue { max-width: 260px; overflow-x: auto; overflow-y: hidden; }
+
+@media (max-width: 1300px) {
+  #ui .f-minimap { width: 150px; height: 150px; }
+  #ui .f-minimap-buttons { width: 150px; }
+}
+
+/* --------------------------------------------------------------------------
+   15. Factorio-like bevel polish — layered on top of 70-ui.js's plain-flat
+   .f-panel/.f-btn/.f-slot/.f-titlebar (see file header: `#ui .selector`
+   always wins the cascade over that stylesheet's plain classes, regardless
+   of load order, so these are safe additive overrides, not a fight). Goal:
+   dark grey bevelled frames with a visible light-top/dark-bottom edge,
+   deeper inset slots, an orange accent on hover/selection, and a slightly
+   more "machined" heading style — without touching layout or classnames.
+   -------------------------------------------------------------------------- */
+#ui .f-panel {
+  background: linear-gradient(#38373a, #2a292b 55%, #232224);
+  border: 2px solid var(--f-panel-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 1px #202020,
+    inset 0 -10px 14px -10px rgba(0, 0, 0, 0.5),
+    0 4px 10px rgba(0, 0, 0, 0.45);
+}
+
+#ui .f-titlebar {
+  background: linear-gradient(#48464a, #353436);
+  border-bottom: 2px solid var(--f-panel-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+  letter-spacing: 0.02em;
+}
+
+#ui .f-btn {
+  background: linear-gradient(#454448, #333235);
+  border: 1px solid var(--f-panel-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 -2px 0 rgba(0, 0, 0, 0.35);
+  transition: background-color 0.05s, box-shadow 0.05s;
+}
+#ui .f-btn:hover {
+  background: linear-gradient(#4e4d51, #38373a);
+  box-shadow: inset 0 0 0 1px var(--f-orange-dark), inset 0 -2px 0 rgba(0, 0, 0, 0.35);
+}
+#ui .f-btn:active { background: #262626; box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6); }
+
+/* Deeper inset "machined socket" look for every slot (inventory/chest/recipe/filter cells
+   all reuse .f-slot / share this box-shadow recipe) + a crisp orange ring on hover/selection
+   (task brief "orange accent on selection"). */
+#ui .f-slot {
+  background: radial-gradient(circle at 35% 30%, #2c2c2c, #1c1c1c 70%);
+  border: 1px solid var(--f-panel-border);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.8),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    0 1px 0 rgba(255, 255, 255, 0.04);
+}
+#ui .f-slot:hover {
+  background: radial-gradient(circle at 35% 30%, #363636, #202020 70%);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.8),
+    inset 0 0 0 2px var(--f-orange),
+    0 0 6px rgba(255, 165, 0, 0.35);
+}
+#ui .f-slot.selected,
+#ui .f-slot[data-selected="true"] {
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8), inset 0 0 0 2px var(--f-orange);
+}
+
+.f-recipe-cell,
+.f-filter-cell { box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.75), inset 0 0 0 1px #3a3a3a; }
+.f-recipe-cell:hover,
+.f-filter-cell:hover { box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.75), inset 0 0 0 2px var(--f-orange); }
+
+.f-section-title,
+.f-tech-col-title { letter-spacing: 0.02em; }
+
+/* --------------------------------------------------------------------------
+   14. Responsive: keep every window usable at 1366x768 and smaller
+   -------------------------------------------------------------------------- */
+@media (max-width: 1400px), (max-height: 800px) {
+  .f-win-inventory { width: 820px; }
+  .f-win-tech { width: 760px; }
+  .f-tech-tree { gap: 8px; }
+}
+
+@media (max-width: 960px) {
+  .f-win-inventory { width: 94vw; }
+  .f-window-inventory { flex-direction: column; }
+  .f-panel-right { min-width: 0; width: 100%; }
+  .f-win-tech { width: 94vw; }
+}

@@ -1,0 +1,5 @@
+build/Factio.html
+build/gallery.js
+test/*-out.json
+node_modules/
+.claude/
