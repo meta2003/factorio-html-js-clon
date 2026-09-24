@@ -37,7 +37,11 @@
   // Camera smoothing / player animation bookkeeping.
   var camInited = false;
   var playerPrev = null;   // { x, y }
-  var playerAnimT = 0;
+  // Walk animation is driven by distance walked, so it keeps pace with the movement speed:
+  // one 8-frame cycle (two steps) per WALK_CYCLE_TILES, ~5 steps/s at full running speed.
+  var WALK_CYCLE_TILES = 3.5;
+  var playerAnimDist = 0;
+  var playerStillMs = 1e9; // time since the player last moved (starts standing)
 
   // Damage flashes / destruction puffs, keyed by entity id (never on F.state).
   var damageFlash = new Map(); // id -> tick of last damage
@@ -1113,9 +1117,14 @@
   // =====================================================================
   function drawPlayer(dtMs) {
     var p = F.state && F.state.player; if (!p) return;
-    var moving = false;
-    if (playerPrev) { var dx = p.x - playerPrev.x, dy = p.y - playerPrev.y; moving = (dx * dx + dy * dy) > 1e-8; }
-    playerAnimT = moving ? playerAnimT + dtMs : 0;
+    var dist = 0;
+    if (playerPrev) { var dx = p.x - playerPrev.x, dy = p.y - playerPrev.y; dist = Math.sqrt(dx * dx + dy * dy); }
+    // (a jump of 2+ tiles is a teleport, not walking)
+    if (dist > 1e-4 && dist < 2) { playerAnimDist += dist; playerStillMs = 0; } else playerStillMs += dtMs;
+    // Stay in the walk cycle across frames that ran no simulation tick (refresh rates above
+    // 60 Hz), so it doesn't flicker to the standing pose mid-stride.
+    var moving = playerStillMs < 120;
+    if (!moving) playerAnimDist = 0;
     playerPrev = { x: p.x, y: p.y };
     // F.render.hidePlayerWhen (design/EXPANSION.md §6.5, e.g. hidden while riding a train). Bail
     // out after the animation/position bookkeeping above so a later un-hide resumes smoothly.
@@ -1123,7 +1132,7 @@
     var scr = toScreen(p.x, p.y);
     var size = F.C.TILE * camera.zoom * 1.5; // sprite height (the figure is ~1.4 tiles tall)
     // Frame 0 is the standing pose, 1..8 the walk cycle.
-    var frame = moving ? 1 + Math.floor(playerAnimT / 90) % 8 : 0;
+    var frame = moving ? 1 + Math.floor(playerAnimDist / WALK_CYCLE_TILES * 8) % 8 : 0;
     var spr = (F.sprites && F.sprites.player) ? F.sprites.player(p.dir || 0, frame) : null;
     if (spr && spr.height) {
       // Keep the sprite's aspect ratio (drawing it into a square stretched the figure) and put
