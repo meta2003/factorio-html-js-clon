@@ -100,7 +100,14 @@ byId('game').tagName = 'CANVAS'; byId('game').width = 1280; byId('game').height 
 vm.createContext(window);
 const t0 = Date.now();
 try {
-  scripts.forEach((s, i) => vm.runInContext(s, window, { filename: 'Factio.html#script' + i, timeout: 60000 }));
+  // Inside a vm context every free-variable lookup (F, Math, ...) goes through the contextified
+  // global's interceptors, which made the game ~15x slower here than in a browser. Running the
+  // page's scripts as one function whose parameters shadow the hottest globals (same values the
+  // lookups resolved to before) makes those plain local reads; `var F` becomes a local as well
+  // and stays reachable as window.F, which 00-core.js assigns explicitly.
+  const HOT = ['window', 'document', 'Math', 'JSON', 'Object', 'Array', 'Number', 'String', 'Map', 'Set', 'performance'];
+  const code = '(function (' + HOT.join(', ') + ') {' + scripts.join('\n;\n') + '\n}).call(this, ' + HOT.join(', ') + ');';
+  vm.runInContext(code, window, { filename: 'Factio.html#script0', timeout: 60000 });
 } catch (e) { console.error('LOAD ERROR:', (e && e.stack) || e); process.exit(3); }
 const F = window.F;
 if (!F) { console.error('window.F namespace missing'); process.exit(4); }

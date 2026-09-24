@@ -37,7 +37,11 @@
   // Camera smoothing / player animation bookkeeping.
   var camInited = false;
   var playerPrev = null;   // { x, y }
-  var playerAnimT = 0;
+  // Walk animation is driven by distance walked, so it keeps pace with the movement speed:
+  // one 8-frame cycle (two steps) per WALK_CYCLE_TILES, ~5 steps/s at full running speed.
+  var WALK_CYCLE_TILES = 3.5;
+  var playerAnimDist = 0;
+  var playerStillMs = 1e9; // time since the player last moved (starts standing)
 
   // Damage flashes / destruction puffs, keyed by entity id (never on F.state).
   var damageFlash = new Map(); // id -> tick of last damage
@@ -250,11 +254,22 @@
     }
     return groundRGB;
   }
-  function vnoise(x, y, seed) {
+  // `slot` (0-3, one per call site) memoises the last lattice cell's corner values:
+  // neighbouring ground samples mostly share a cell, so their hashes are reused. The
+  // cached corners are exactly what the hashes return, so the ground is unchanged.
+  var vnKey = new Float64Array(12).fill(NaN), vnCorner = new Float64Array(16);
+  function vnoise(x, y, seed, slot) {
     var xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
     var u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
-    var h = F.util.hash2, k = 1 / 4294967296;
-    var a = h(xi, yi, seed) * k, b = h(xi + 1, yi, seed) * k, c = h(xi, yi + 1, seed) * k, d = h(xi + 1, yi + 1, seed) * k;
+    var kk = slot * 3, o = slot * 4, a, b, c, d;
+    if (vnKey[kk] === xi && vnKey[kk + 1] === yi && vnKey[kk + 2] === seed) {
+      a = vnCorner[o]; b = vnCorner[o + 1]; c = vnCorner[o + 2]; d = vnCorner[o + 3];
+    } else {
+      var h = F.util.hash2, k = 1 / 4294967296;
+      a = vnCorner[o] = h(xi, yi, seed) * k; b = vnCorner[o + 1] = h(xi + 1, yi, seed) * k;
+      c = vnCorner[o + 2] = h(xi, yi + 1, seed) * k; d = vnCorner[o + 3] = h(xi + 1, yi + 1, seed) * k;
+      vnKey[kk] = xi; vnKey[kk + 1] = yi; vnKey[kk + 2] = seed;
+    }
     var top = a + (b - a) * u, bot = c + (d - c) * u;
     return top + (bot - top) * v;
   }
@@ -298,8 +313,8 @@
       var ly = (py + 0.5) * step;
       for (var px = 0; px < N; px++) {
         var lx = (px + 0.5) * step, wx = ox + lx, wy = oy + ly;
-        var qx = lx - 0.5 + (vnoise(wx * 0.45, wy * 0.45, seed + 11) - 0.5) * 0.8;
-        var qy = ly - 0.5 + (vnoise(wx * 0.45, wy * 0.45, seed + 23) - 0.5) * 0.8;
+        var qx = lx - 0.5 + (vnoise(wx * 0.45, wy * 0.45, seed + 11, 0) - 0.5) * 0.8;
+        var qy = ly - 0.5 + (vnoise(wx * 0.45, wy * 0.45, seed + 23, 1) - 0.5) * 0.8;
         var ix = Math.floor(qx), iy = Math.floor(qy), fx = qx - ix, fy = qy - iy;
         fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
         var bi = (iy + 1) * W2 + ix + 1;
@@ -313,7 +328,7 @@
         }
         if (lw > 0) { lr /= lw; lg /= lw; lb /= lw; } else { lr = sand[0] * 0.8; lg = sand[1] * 0.8; lb = sand[2] * 0.8; }
         if (ww > 0) { wr /= ww; wg /= ww; wb /= ww; }
-        var n1 = vnoise(wx * 0.16, wy * 0.16, seed + 5), n2 = vnoise(wx * 0.8, wy * 0.8, seed + 7);
+        var n1 = vnoise(wx * 0.16, wy * 0.16, seed + 5, 2), n2 = vnoise(wx * 0.8, wy * 0.8, seed + 7, 3);
         var edge = ww + (n2 - 0.5) * 0.14;
         var R, Gc, B, k = (py * N + px) * 4;
         // land colour
@@ -381,6 +396,34 @@
     }
   }
 
+  // Terrain chunk canvases are 1024 px; drawing them far below that size is slow (at zoom
+  // 0.3 each visible chunk cost ~0.1 ms per frame, and the big sources also make Chrome
+  // flush and rasterise mid-frame, which showed up as slow belt/entity draws at zoom 0.5).
+  // When zoomed out, draw from a cached half-size copy while that copy still covers the
+  // target (in device pixels), so the source is never scaled up. At zoom >= 1 (or 0.5 on a
+  // 2x display) the full canvas is used exactly as before.
+  var mipCache = new WeakMap(); // canvas -> [half, quarter, ...]; buildChunkCanvas drops stale ones
+  function mipFor(img, dw, dh) {
+    var tw = dw * dpr, th = dh * dpr;
+    if (!(img.width >= 2 * tw && img.height >= 2 * th)) return img;
+    var levels = mipCache.get(img);
+    if (!levels) { levels = []; mipCache.set(img, levels); }
+    var src = img;
+    for (var lvl = 0; src.width >= 2 * tw && src.height >= 2 * th && src.width >= 4 && src.height >= 4; lvl++) {
+      var next = levels[lvl];
+      if (!next) {
+        next = document.createElement('canvas');
+        next.width = Math.ceil(src.width / 2); next.height = Math.ceil(src.height / 2);
+        var nctx = next.getContext('2d');
+        nctx.imageSmoothingEnabled = true;
+        nctx.drawImage(src, 0, 0, next.width, next.height);
+        levels[lvl] = next;
+      }
+      src = next;
+    }
+    return src;
+  }
+
   function buildChunkCanvas(entry, chunk) {
     var px = F.C.CHUNK * F.C.TILE; // 1024
     if (!entry.canvas) {
@@ -389,6 +432,7 @@
       entry.ctx = entry.canvas.getContext('2d');
     }
     var c = entry.ctx, T = F.C.TILE;
+    mipCache.delete(entry.canvas); // repainted in place: drop its now-stale mip levels
     c.clearRect(0, 0, px, px);
     var waterRects = [];
     var ly, lx, i;
@@ -446,7 +490,20 @@
     }
   }
 
-  function getChunkEntry(cx, cy) {
+  // Painting a chunk canvas costs 10-20 ms, so drawTerrain spends at most one paint per frame
+  // on anything that can wait. getChunkEntry() paints a chunk with no canvas yet right away
+  // (it is on screen and would otherwise be missing), but a repaint of one that already has
+  // a canvas (ore mined, border fix-up) waits for a frame with no paint yet and draws the
+  // stale canvas meanwhile. With `prefetch` it only ever paints within that budget.
+  var chunkPaintsThisFrame = 0;
+  function neighboursGenerated(cx, cy) {
+    for (var ny = -1; ny <= 1; ny++) for (var nx = -1; nx <= 1; nx++) {
+      if ((nx || ny) && !F.world.chunkAt((cx + nx) * F.C.CHUNK, (cy + ny) * F.C.CHUNK)) return false;
+    }
+    return true;
+  }
+
+  function getChunkEntry(cx, cy, prefetch) {
     var chunk = (F.world && F.world.chunkAt) ? F.world.chunkAt(cx * F.C.CHUNK, cy * F.C.CHUNK) : null;
     if (!chunk) return null; // not generated yet — nothing to draw (never generate here)
     var key = chunkKey(cx, cy);
@@ -456,17 +513,32 @@
     // A chunk built before its neighbours existed guessed their border terrain; rebuild it
     // once all 8 neighbours are generated so shared borders match exactly.
     if (entry.borderMissing && !entry.dirty && ((entry.borderCheck = (entry.borderCheck || 0) + 1) % 30 === 0)) {
-      var all = true;
-      for (var ny = -1; ny <= 1 && all; ny++) for (var nx = -1; nx <= 1 && all; nx++) {
-        if ((nx || ny) && !F.world.chunkAt((cx + nx) * F.C.CHUNK, (cy + ny) * F.C.CHUNK)) all = false;
-      }
-      if (all) { entry.dirty = true; entry.groundStale = true; }
+      if (neighboursGenerated(cx, cy)) { entry.dirty = true; entry.groundStale = true; }
     }
-    if (entry.dirty || !entry.canvas) {
+    if ((entry.dirty || !entry.canvas) && ((!entry.canvas && !prefetch) || chunkPaintsThisFrame === 0)) {
+      chunkPaintsThisFrame++;
       try { buildChunkCanvas(entry, chunk); } catch (err) { F.log.error('F.render: buildChunkCanvas', cx, cy, err); }
       entry.dirty = false;
     }
     return entry;
+  }
+
+  // Paints at most one chunk of the ring just outside the view per frame, so chunks are ready
+  // before they scroll in instead of 2-3 being painted in the frame that reveals them (a
+  // 40-60 ms hitch every chunk boundary while walking). Chunks whose neighbours are not
+  // generated yet are skipped: they would need a repaint once those appear.
+  function prefetchChunkRing(cx0, cy0, cx1, cy1) {
+    var now = F.util.now();
+    for (var cy = cy0 - 1; cy <= cy1 + 1; cy++) {
+      for (var cx = cx0 - 1; cx <= cx1 + 1; cx++) {
+        if (cy >= cy0 && cy <= cy1 && cx >= cx0 && cx <= cx1) continue; // visible: already drawn
+        var entry = chunkCache.get(chunkKey(cx, cy));
+        if (entry && entry.canvas && !entry.dirty) { entry.lastUsed = now; continue; } // keep it cached
+        if (chunkPaintsThisFrame || chunkCache.size >= CHUNK_CACHE_CAP) continue;
+        if (!F.world.chunkAt(cx * F.C.CHUNK, cy * F.C.CHUNK) || !neighboursGenerated(cx, cy)) continue;
+        getChunkEntry(cx, cy, true);
+      }
+    }
   }
 
   function invalidateChunk(cx, cy) {
@@ -522,16 +594,18 @@
     var cy0 = F.util.floorDiv(rect.y0, F.C.CHUNK), cy1 = F.util.floorDiv(rect.y1, F.C.CHUNK);
     var chunkPx = F.C.CHUNK * F.C.TILE;
     var shimmer = camera.zoom >= 0.75; // GDD §11.7 "zoomed out: skip [cheap extras]"
+    chunkPaintsThisFrame = 0;
     for (var cy = cy0; cy <= cy1; cy++) {
       for (var cx = cx0; cx <= cx1; cx++) {
         var entry = getChunkEntry(cx, cy);
         if (!entry || !entry.canvas) continue;
         var p0 = toScreen(cx * F.C.CHUNK, cy * F.C.CHUNK);
         var size = chunkPx * camera.zoom;
-        ctx.drawImage(entry.canvas, p0[0], p0[1], size, size);
+        ctx.drawImage(mipFor(entry.canvas, size, size), p0[0], p0[1], size, size);
         if (shimmer) drawWaterShimmer(entry, p0, size, chunkPx);
       }
     }
+    prefetchChunkRing(cx0, cy0, cx1, cy1);
   }
 
   // =====================================================================
@@ -1043,19 +1117,28 @@
   // =====================================================================
   function drawPlayer(dtMs) {
     var p = F.state && F.state.player; if (!p) return;
-    var moving = false;
-    if (playerPrev) { var dx = p.x - playerPrev.x, dy = p.y - playerPrev.y; moving = (dx * dx + dy * dy) > 1e-8; }
-    playerAnimT = moving ? playerAnimT + dtMs : 0;
+    var dist = 0;
+    if (playerPrev) { var dx = p.x - playerPrev.x, dy = p.y - playerPrev.y; dist = Math.sqrt(dx * dx + dy * dy); }
+    // (a jump of 2+ tiles is a teleport, not walking)
+    if (dist > 1e-4 && dist < 2) { playerAnimDist += dist; playerStillMs = 0; } else playerStillMs += dtMs;
+    // Stay in the walk cycle across frames that ran no simulation tick (refresh rates above
+    // 60 Hz), so it doesn't flicker to the standing pose mid-stride.
+    var moving = playerStillMs < 120;
+    if (!moving) playerAnimDist = 0;
     playerPrev = { x: p.x, y: p.y };
     // F.render.hidePlayerWhen (design/EXPANSION.md §6.5, e.g. hidden while riding a train). Bail
     // out after the animation/position bookkeeping above so a later un-hide resumes smoothly.
     if (playerHidden()) return;
     var scr = toScreen(p.x, p.y);
-    var size = F.C.TILE * camera.zoom * 1.4;
-    var frame = Math.floor(playerAnimT / 100) % 8;
+    var size = F.C.TILE * camera.zoom * 1.5; // sprite height (the figure is ~1.4 tiles tall)
+    // Frame 0 is the standing pose, 1..8 the walk cycle.
+    var frame = moving ? 1 + Math.floor(playerAnimDist / WALK_CYCLE_TILES * 8) % 8 : 0;
     var spr = (F.sprites && F.sprites.player) ? F.sprites.player(p.dir || 0, frame) : null;
-    if (spr) {
-      ctx.drawImage(spr, scr[0] - size / 2, scr[1] - size, size, size);
+    if (spr && spr.height) {
+      // Keep the sprite's aspect ratio (drawing it into a square stretched the figure) and put
+      // its feet (93% down the canvas) on the player's position.
+      var w = size * spr.width / spr.height;
+      ctx.drawImage(spr, scr[0] - w / 2, scr[1] - size * 0.93, w, size);
     } else {
       ctx.fillStyle = '#DE8021';
       ctx.fillRect(scr[0] - size * 0.22, scr[1] - size, size * 0.44, size);
@@ -1468,22 +1551,24 @@
     return MINIMAP_ENTITY_COLOR_DEFAULT;
   }
 
-  function drawChunkOnMap(mctx, chunk, tx0, ty0, pxPerTile) {
-    var step = Math.max(1, Math.round(1 / Math.max(pxPerTile, 0.0001)));
-    var s = Math.max(1, pxPerTile * step);
-    for (var ly = 0; ly < F.C.CHUNK; ly += step) {
-      for (var lx = 0; lx < F.C.CHUNK; lx += step) {
-        var i = ly * F.C.CHUNK + lx;
-        var wtx = chunk.cx * F.C.CHUNK + lx, wty = chunk.cy * F.C.CHUNK + ly;
-        var mx = (wtx - tx0) * pxPerTile, my = (wty - ty0) * pxPerTile;
-        var terrain = chunk.terrain[i];
-        var color = (F.world && F.world.TERRAIN_COLOR && F.world.TERRAIN_COLOR[terrain]) || '#274233';
-        var res = chunk.res[i];
-        if (res) color = (F.world && F.world.RES_COLOR && F.world.RES_COLOR[res]) || color;
-        mctx.fillStyle = color;
-        mctx.fillRect(mx, my, s, s);
-      }
+  // '#rrggbb' -> [r, g, b] (colour tables are parsed once and cached).
+  function hexRgb(hex) {
+    var n = parseInt(String(hex).slice(1, 7), 16) || 0;
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  var mapRgb = null;
+  function mapColors() {
+    if (mapRgb) return mapRgb;
+    var tc = (F.world && F.world.TERRAIN_COLOR) || [], rc = (F.world && F.world.RES_COLOR) || [];
+    mapRgb = { terrain: [], res: [], fallback: hexRgb('#274233'), empty: hexRgb('#111111') };
+    for (var i = 0; i < 256; i++) {
+      mapRgb.terrain.push(tc[i] ? hexRgb(tc[i]) : mapRgb.fallback);
+      mapRgb.res.push(rc[i] ? hexRgb(rc[i]) : null);
     }
+    return mapRgb;
+  }
+
+  function drawPollutionOnMap(mctx, chunk, tx0, ty0, pxPerTile) {
     if (chunk.pollution > 15) {
       var mx0 = (chunk.cx * F.C.CHUNK - tx0) * pxPerTile, my0 = (chunk.cy * F.C.CHUNK - ty0) * pxPerTile;
       var s0 = F.C.CHUNK * pxPerTile;
@@ -1505,16 +1590,40 @@
 
   function buildMapImage(canvasTarget, sizePx, chunkRadius) {
     var mctx = canvasTarget.getContext('2d');
-    mctx.clearRect(0, 0, sizePx, sizePx);
-    mctx.fillStyle = '#111'; mctx.fillRect(0, 0, sizePx, sizePx);
     var w = mapWindow(sizePx, chunkRadius);
-    var cx0 = F.util.floorDiv(w.tx0, F.C.CHUNK), cx1 = F.util.floorDiv(w.tx0 + w.tilesSpan, F.C.CHUNK);
-    var cy0 = F.util.floorDiv(w.ty0, F.C.CHUNK), cy1 = F.util.floorDiv(w.ty0 + w.tilesSpan, F.C.CHUNK);
-    for (var cy = cy0; cy <= cy1; cy++) {
-      for (var cx = cx0; cx <= cx1; cx++) {
-        var chunk = (F.world && F.world.chunkAt) ? F.world.chunkAt(cx * F.C.CHUNK, cy * F.C.CHUNK) : null;
-        if (!chunk) continue;
-        drawChunkOnMap(mctx, chunk, w.tx0, w.ty0, w.pxPerTile);
+    // Terrain/ore: one pixel write per map pixel into an ImageData (sampling the tile under
+    // the pixel centre) instead of one fillRect per tile block — the latter was ~40k canvas
+    // calls per minimap refresh, a visible hitch every 30 frames.
+    var CH = F.C.CHUNK, col = mapColors();
+    var img = mctx.createImageData(sizePx, sizePx), d = img.data;
+    var inv = 1 / w.pxPerTile;
+    for (var py = 0, o = 0; py < sizePx; py++) {
+      var ty = Math.floor(w.ty0 + (py + 0.5) * inv);
+      var cy = F.util.floorDiv(ty, CH), rowBase = (ty - cy * CH) * CH;
+      var lastCx = NaN, chunk = null, cx0 = 0;
+      for (var px = 0; px < sizePx; px++, o += 4) {
+        var tx = Math.floor(w.tx0 + (px + 0.5) * inv);
+        var cxx = F.util.floorDiv(tx, CH);
+        if (cxx !== lastCx) {
+          lastCx = cxx; cx0 = cxx * CH;
+          chunk = (F.world && F.world.chunkAt) ? F.world.chunkAt(tx, ty) : null;
+        }
+        var rgb;
+        if (!chunk) rgb = col.empty;
+        else {
+          var i = rowBase + (tx - cx0);
+          rgb = (chunk.res[i] && col.res[chunk.res[i]]) || col.terrain[chunk.terrain[i]];
+        }
+        d[o] = rgb[0]; d[o + 1] = rgb[1]; d[o + 2] = rgb[2]; d[o + 3] = 255;
+      }
+    }
+    mctx.putImageData(img, 0, 0);
+    var cx0c = F.util.floorDiv(w.tx0, CH), cx1c = F.util.floorDiv(w.tx0 + w.tilesSpan, CH);
+    var cy0c = F.util.floorDiv(w.ty0, CH), cy1c = F.util.floorDiv(w.ty0 + w.tilesSpan, CH);
+    for (var ccy = cy0c; ccy <= cy1c; ccy++) {
+      for (var ccx = cx0c; ccx <= cx1c; ccx++) {
+        var pc = (F.world && F.world.chunkAt) ? F.world.chunkAt(ccx * CH, ccy * CH) : null;
+        if (pc) drawPollutionOnMap(mctx, pc, w.tx0, w.ty0, w.pxPerTile);
       }
     }
     var ents = F.state && F.state.entities;

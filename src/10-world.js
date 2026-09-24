@@ -89,31 +89,55 @@
   // interpolation + fBm. Deterministic from F.util.hash2 (no Math.random).
   // ---------------------------------------------------------------------
 
+  const hash2 = F.util.hash2;
+
   function latticeValue(ix, iy, seed) {
     // hash2 -> uint32 -> [-1, 1]
-    return (F.util.hash2(ix, iy, seed) / 4294967296) * 2 - 1;
+    return (hash2(ix, iy, seed) / 4294967296) * 2 - 1;
   }
 
-  function noise2D(x, y, seed) {
+  // Lattice-corner memo, one slot per (noise channel, octave). Chunk
+  // generation walks tiles in scanline order, so every octave coarser than a
+  // tile keeps landing in the same lattice cell for many consecutive calls;
+  // the cached corners are exactly what latticeValue() would return, so the
+  // generated world is bit-for-bit unchanged — only the hashing is skipped.
+  const CH = { ELEV: 0, LAKE: 1, MOIST: 2, AUX: 3, FOREST: 4, BLOB: 5, SANDV: 6, DIRTV: 7, GRASSDV: 8, GRASSV: 9 };
+  const MAX_OCTAVES = 4;
+  const CELL_SLOTS = 10 * MAX_OCTAVES;
+  const cellIx = new Float64Array(CELL_SLOTS);
+  const cellIy = new Float64Array(CELL_SLOTS);
+  const cellSeed = new Float64Array(CELL_SLOTS).fill(-1); // seeds are uint32, so -1 = empty
+  const cellV = new Float64Array(CELL_SLOTS * 4);
+
+  function noise2D(x, y, seed, slot) {
     const ix = Math.floor(x), iy = Math.floor(y);
     const fx = x - ix, fy = y - iy;
     const sx = fx * fx * (3 - 2 * fx);
     const sy = fy * fy * (3 - 2 * fy);
-    const v00 = latticeValue(ix, iy, seed);
-    const v10 = latticeValue(ix + 1, iy, seed);
-    const v01 = latticeValue(ix, iy + 1, seed);
-    const v11 = latticeValue(ix + 1, iy + 1, seed);
+    const c = slot * 4;
+    let v00, v10, v01, v11;
+    if (cellIx[slot] === ix && cellIy[slot] === iy && cellSeed[slot] === seed) {
+      v00 = cellV[c]; v10 = cellV[c + 1]; v01 = cellV[c + 2]; v11 = cellV[c + 3];
+    } else {
+      v00 = cellV[c] = latticeValue(ix, iy, seed);
+      v10 = cellV[c + 1] = latticeValue(ix + 1, iy, seed);
+      v01 = cellV[c + 2] = latticeValue(ix, iy + 1, seed);
+      v11 = cellV[c + 3] = latticeValue(ix + 1, iy + 1, seed);
+      cellIx[slot] = ix; cellIy[slot] = iy; cellSeed[slot] = seed;
+    }
     const x0 = v00 + (v10 - v00) * sx;
     const x1 = v01 + (v11 - v01) * sx;
     return x0 + (x1 - x0) * sy;
   }
 
-  // fbm(x,y,octaves,persistence,saltHash,seed) — normalised to roughly [-1,1].
-  function fbm(x, y, octaves, persistence, saltHash, seed) {
+  // fbm(x,y,octaves,persistence,saltHash,seed,channel) — normalised to
+  // roughly [-1,1]. `channel` (a CH id) only picks the memo slots.
+  function fbm(x, y, octaves, persistence, saltHash, seed, channel) {
     let sum = 0, amp = 1, maxAmp = 0, freq = 1;
     const base = (seed ^ saltHash) >>> 0;
+    const slot0 = channel * MAX_OCTAVES;
     for (let o = 0; o < octaves; o++) {
-      sum += amp * noise2D(x * freq, y * freq, (base + o * 2654435761) >>> 0);
+      sum += amp * noise2D(x * freq, y * freq, (base + o * 2654435761) >>> 0, slot0 + o);
       maxAmp += amp;
       amp *= persistence;
       freq *= 2;
@@ -125,10 +149,10 @@
     return tx >= -MAP_LIMIT && tx <= MAP_LIMIT && ty >= -MAP_LIMIT && ty <= MAP_LIMIT;
   }
 
-  function variant(tx, ty, seed, saltHash, n) {
+  function variant(tx, ty, seed, saltHash, n, channel) {
     // Low-frequency patches (~7-tile blobs) with a little per-tile jitter, so terrain
     // variants form natural-looking patches instead of per-tile checkerboard noise.
-    const v = 0.5 + 0.5 * fbm(tx / 7, ty / 7, 2, 0.5, saltHash, seed) + (F.util.hash2(tx, ty, (seed ^ saltHash) >>> 0) % 100) / 1000;
+    const v = 0.5 + 0.5 * fbm(tx / 7, ty / 7, 2, 0.5, saltHash, seed, channel) + (hash2(tx, ty, (seed ^ saltHash) >>> 0) % 100) / 1000;
     const k = Math.floor(v * n);
     return k < 0 ? 0 : k >= n ? n - 1 : k;
   }
@@ -278,12 +302,15 @@
 
   function elevationAt(tx, ty, seed, params) {
     const d = Math.hypot(tx, ty);
-    let e = fbm(tx / 96, ty / 96, 4, 0.6, SALT.ELEV, seed) + 0.35;
-    e = Math.max(e, 0.6 - d / 100);
+    let e = fbm(tx / 96, ty / 96, 4, 0.6, SALT.ELEV, seed, CH.ELEV) + 0.35;
+    e = Math.max(e, 0.6 - d / 100); // starting plateau: guaranteed land near spawn
     const lc = params.lakeCentre;
-    const lakeDist = Math.hypot(tx - lc.x, ty - lc.y);
-    e = Math.min(e, (lakeDist - LAKE_RADIUS) / 8 + 0.25 * fbm(tx / 6, ty / 6, 3, 0.5, SALT.LAKE, seed));
-    return e;
+    const lake = (Math.hypot(tx - lc.x, ty - lc.y) - LAKE_RADIUS) / 8;
+    // The lake term is lake + 0.25 * fbm with fbm in [-1, 1]; when even its
+    // minimum stays above e the min() below cannot change e, so skip the
+    // noise (0.26 leaves margin for rounding).
+    if (lake - 0.26 > e) return e;
+    return Math.min(e, lake + 0.25 * fbm(tx / 6, ty / 6, 3, 0.5, SALT.LAKE, seed, CH.LAKE));
   }
 
   function regionPatches(seed, rx, ry) {
@@ -354,27 +381,25 @@
   // Per-tile terrain / moisture fields
   // ---------------------------------------------------------------------
 
-  function tileFields(tx, ty, seed, params) {
-    const d = Math.hypot(tx, ty);
-    let e = fbm(tx / 96, ty / 96, 4, 0.6, SALT.ELEV, seed) + 0.35;
-    e = Math.max(e, 0.6 - d / 100); // starting plateau: guaranteed land near spawn
-    const lc = params.lakeCentre;
-    const lakeDist = Math.hypot(tx - lc.x, ty - lc.y);
-    e = Math.min(e, (lakeDist - LAKE_RADIUS) / 8 + 0.25 * fbm(tx / 6, ty / 6, 3, 0.5, SALT.LAKE, seed));
-    let moisture = 0.5 + 0.5 * fbm(tx / 256, ty / 256, 4, 0.5, SALT.MOIST, seed);
-    moisture += 0.04 * noise2D(tx, ty, (seed ^ SALT.JITTER) >>> 0);
-    const aux = 0.5 + 0.5 * fbm(tx / 512, ty / 512, 3, 0.5, SALT.AUX, seed);
-    return { e: e, moisture: moisture, aux: aux, d: d };
+  function moistureAt(tx, ty, seed) {
+    // The jitter term samples noise at integer coordinates, where the
+    // interpolation weights are 0 and noise2D reduces to the lattice value.
+    return 0.5 + 0.5 * fbm(tx / 256, ty / 256, 4, 0.5, SALT.MOIST, seed, CH.MOIST)
+      + 0.04 * latticeValue(tx, ty, (seed ^ SALT.JITTER) >>> 0);
+  }
+
+  function auxAt(tx, ty, seed) {
+    return 0.5 + 0.5 * fbm(tx / 512, ty / 512, 3, 0.5, SALT.AUX, seed, CH.AUX);
   }
 
   function terrainIdFor(tx, ty, seed, e, moisture, aux) {
     if (e < -0.5) return TERRAIN.DEEPWATER;
     if (e < 0) return TERRAIN.WATER;
-    if (moisture < 0.22 && aux < 0.5) return TERRAIN.SAND1 + variant(tx, ty, seed, SALT.SANDV, 2);
+    if (moisture < 0.22 && aux < 0.5) return TERRAIN.SAND1 + variant(tx, ty, seed, SALT.SANDV, 2, CH.SANDV);
     if (moisture < 0.35 && aux >= 0.5) return TERRAIN.RED_DESERT;
-    if (moisture < 0.45) return TERRAIN.DIRT1 + variant(tx, ty, seed, SALT.DIRTV, 2);
-    if (moisture < 0.62) return TERRAIN.GRASS_DRY1 + variant(tx, ty, seed, SALT.GRASSDV, 2);
-    return TERRAIN.GRASS1 + variant(tx, ty, seed, SALT.GRASSV, 2);
+    if (moisture < 0.45) return TERRAIN.DIRT1 + variant(tx, ty, seed, SALT.DIRTV, 2, CH.DIRTV);
+    if (moisture < 0.62) return TERRAIN.GRASS_DRY1 + variant(tx, ty, seed, SALT.GRASSDV, 2, CH.GRASSDV);
+    return TERRAIN.GRASS1 + variant(tx, ty, seed, SALT.GRASSV, 2, CH.GRASSV);
   }
 
   function biomeTerm(moisture) {
@@ -387,15 +412,17 @@
   // Places a tree or rock feature into chunk.feature[i]/featHp[i] if the roll
   // succeeds. Only called on land tiles with no ore. GDD §2.6 / §2.7.
   function featureFor(tx, ty, seed, d, moisture, chunk, i) {
-    const forestBase = fbm(tx / 48, ty / 48, 3, 0.5, SALT.FOREST, seed) - 0.5 + 0.2 * 1 /* TREE_COVERAGE */ + biomeTerm(moisture);
     const clearMult = F.util.clamp((d - 64) / 64, 0, 1); // no trees within 64, full density from 128
-    const p = F.util.clamp(forestBase, 0, 0.7) * clearMult;
-    if (p > 0) {
-      const u = F.util.hash2(tx, ty, (seed ^ SALT.TREE) >>> 0) / 4294967296;
-      if (u < p) { chunk.feature[i] = FEATURE.TREE; chunk.featHp[i] = TREE_HP; return; }
+    if (clearMult > 0) {
+      const forestBase = fbm(tx / 48, ty / 48, 3, 0.5, SALT.FOREST, seed, CH.FOREST) - 0.5 + 0.2 * 1 /* TREE_COVERAGE */ + biomeTerm(moisture);
+      const p = F.util.clamp(forestBase, 0, 0.7) * clearMult;
+      if (p > 0) {
+        const u = hash2(tx, ty, (seed ^ SALT.TREE) >>> 0) / 4294967296;
+        if (u < p) { chunk.feature[i] = FEATURE.TREE; chunk.featHp[i] = TREE_HP; return; }
+      }
     }
     if (moisture < 0.45 && d > 40) {
-      const u2 = F.util.hash2(tx, ty, (seed ^ SALT.ROCK) >>> 0) / 4294967296;
+      const u2 = hash2(tx, ty, (seed ^ SALT.ROCK) >>> 0) / 4294967296;
       if (u2 < 0.0025) { chunk.feature[i] = FEATURE.ROCK_BIG; chunk.featHp[i] = ROCK_BIG_HP; return; }
       if (u2 < 0.0025 + 0.0006) { chunk.feature[i] = FEATURE.ROCK_HUGE; chunk.featHp[i] = ROCK_HUGE_HP; return; }
     }
@@ -482,19 +509,21 @@
       for (let lx = 0; lx < 32; lx++) {
         const tx = tx0 + lx, ty = ty0 + ly;
         const i = ly * 32 + lx;
-        const f = tileFields(tx, ty, seed, params);
-        const tid = terrainIdFor(tx, ty, seed, f.e, f.moisture, f.aux);
-        chunk.terrain[i] = tid;
-        if (tid < 2) continue; // water: no resource, no feature
+        const e = elevationAt(tx, ty, seed, params);
+        if (e < 0) { chunk.terrain[i] = e < -0.5 ? TERRAIN.DEEPWATER : TERRAIN.WATER; continue; } // water: no resource, no feature
+        const moisture = moistureAt(tx, ty, seed);
+        // aux only decides sand vs red desert, i.e. only matters when moisture < 0.35.
+        const aux = moisture < 0.35 ? auxAt(tx, ty, seed) : 0;
+        chunk.terrain[i] = terrainIdFor(tx, ty, seed, e, moisture, aux);
 
         // Resource: highest-amount overlapping patch wins.
-        let bestAmt = 0, bestOre = 0;
+        let bestAmt = 0, bestOre = 0, blob = NaN;
         for (let p = 0; p < patches.length; p++) {
           const patch = patches[p];
           const dx = tx - patch.cx, dy = ty - patch.cy;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist >= patch.r) continue;
-          const blob = fbm(tx / 5, ty / 5, 2, 0.5, SALT.BLOB, seed);
+          if (blob !== blob) blob = fbm(tx / 5, ty / 5, 2, 0.5, SALT.BLOB, seed, CH.BLOB); // same for every patch: compute once
           const amt = Math.round(patch.h * (1 - dist / patch.r) * (1 + 0.25 * blob) * (patch.richnessDistMult || 1));
           if (amt > bestAmt) { bestAmt = amt; bestOre = RES[oreEnumName(patch.ore)]; }
         }
@@ -502,7 +531,7 @@
           chunk.res[i] = bestOre;
           chunk.amount[i] = bestAmt;
         } else {
-          featureFor(tx, ty, seed, f.d, f.moisture, chunk, i);
+          featureFor(tx, ty, seed, Math.hypot(tx, ty), moisture, chunk, i);
         }
       }
     }
