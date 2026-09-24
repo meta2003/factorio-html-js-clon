@@ -250,11 +250,22 @@
     }
     return groundRGB;
   }
-  function vnoise(x, y, seed) {
+  // `slot` (0-3, one per call site) memoises the last lattice cell's corner values:
+  // neighbouring ground samples mostly share a cell, so their hashes are reused. The
+  // cached corners are exactly what the hashes return, so the ground is unchanged.
+  var vnKey = new Float64Array(12).fill(NaN), vnCorner = new Float64Array(16);
+  function vnoise(x, y, seed, slot) {
     var xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
     var u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
-    var h = F.util.hash2, k = 1 / 4294967296;
-    var a = h(xi, yi, seed) * k, b = h(xi + 1, yi, seed) * k, c = h(xi, yi + 1, seed) * k, d = h(xi + 1, yi + 1, seed) * k;
+    var kk = slot * 3, o = slot * 4, a, b, c, d;
+    if (vnKey[kk] === xi && vnKey[kk + 1] === yi && vnKey[kk + 2] === seed) {
+      a = vnCorner[o]; b = vnCorner[o + 1]; c = vnCorner[o + 2]; d = vnCorner[o + 3];
+    } else {
+      var h = F.util.hash2, k = 1 / 4294967296;
+      a = vnCorner[o] = h(xi, yi, seed) * k; b = vnCorner[o + 1] = h(xi + 1, yi, seed) * k;
+      c = vnCorner[o + 2] = h(xi, yi + 1, seed) * k; d = vnCorner[o + 3] = h(xi + 1, yi + 1, seed) * k;
+      vnKey[kk] = xi; vnKey[kk + 1] = yi; vnKey[kk + 2] = seed;
+    }
     var top = a + (b - a) * u, bot = c + (d - c) * u;
     return top + (bot - top) * v;
   }
@@ -298,8 +309,8 @@
       var ly = (py + 0.5) * step;
       for (var px = 0; px < N; px++) {
         var lx = (px + 0.5) * step, wx = ox + lx, wy = oy + ly;
-        var qx = lx - 0.5 + (vnoise(wx * 0.45, wy * 0.45, seed + 11) - 0.5) * 0.8;
-        var qy = ly - 0.5 + (vnoise(wx * 0.45, wy * 0.45, seed + 23) - 0.5) * 0.8;
+        var qx = lx - 0.5 + (vnoise(wx * 0.45, wy * 0.45, seed + 11, 0) - 0.5) * 0.8;
+        var qy = ly - 0.5 + (vnoise(wx * 0.45, wy * 0.45, seed + 23, 1) - 0.5) * 0.8;
         var ix = Math.floor(qx), iy = Math.floor(qy), fx = qx - ix, fy = qy - iy;
         fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
         var bi = (iy + 1) * W2 + ix + 1;
@@ -313,7 +324,7 @@
         }
         if (lw > 0) { lr /= lw; lg /= lw; lb /= lw; } else { lr = sand[0] * 0.8; lg = sand[1] * 0.8; lb = sand[2] * 0.8; }
         if (ww > 0) { wr /= ww; wg /= ww; wb /= ww; }
-        var n1 = vnoise(wx * 0.16, wy * 0.16, seed + 5), n2 = vnoise(wx * 0.8, wy * 0.8, seed + 7);
+        var n1 = vnoise(wx * 0.16, wy * 0.16, seed + 5, 2), n2 = vnoise(wx * 0.8, wy * 0.8, seed + 7, 3);
         var edge = ww + (n2 - 0.5) * 0.14;
         var R, Gc, B, k = (py * N + px) * 4;
         // land colour
@@ -475,7 +486,20 @@
     }
   }
 
-  function getChunkEntry(cx, cy) {
+  // Painting a chunk canvas costs 10-20 ms, so drawTerrain spends at most one paint per frame
+  // on anything that can wait. getChunkEntry() paints a chunk with no canvas yet right away
+  // (it is on screen and would otherwise be missing), but a repaint of one that already has
+  // a canvas (ore mined, border fix-up) waits for a frame with no paint yet and draws the
+  // stale canvas meanwhile. With `prefetch` it only ever paints within that budget.
+  var chunkPaintsThisFrame = 0;
+  function neighboursGenerated(cx, cy) {
+    for (var ny = -1; ny <= 1; ny++) for (var nx = -1; nx <= 1; nx++) {
+      if ((nx || ny) && !F.world.chunkAt((cx + nx) * F.C.CHUNK, (cy + ny) * F.C.CHUNK)) return false;
+    }
+    return true;
+  }
+
+  function getChunkEntry(cx, cy, prefetch) {
     var chunk = (F.world && F.world.chunkAt) ? F.world.chunkAt(cx * F.C.CHUNK, cy * F.C.CHUNK) : null;
     if (!chunk) return null; // not generated yet — nothing to draw (never generate here)
     var key = chunkKey(cx, cy);
@@ -485,17 +509,32 @@
     // A chunk built before its neighbours existed guessed their border terrain; rebuild it
     // once all 8 neighbours are generated so shared borders match exactly.
     if (entry.borderMissing && !entry.dirty && ((entry.borderCheck = (entry.borderCheck || 0) + 1) % 30 === 0)) {
-      var all = true;
-      for (var ny = -1; ny <= 1 && all; ny++) for (var nx = -1; nx <= 1 && all; nx++) {
-        if ((nx || ny) && !F.world.chunkAt((cx + nx) * F.C.CHUNK, (cy + ny) * F.C.CHUNK)) all = false;
-      }
-      if (all) { entry.dirty = true; entry.groundStale = true; }
+      if (neighboursGenerated(cx, cy)) { entry.dirty = true; entry.groundStale = true; }
     }
-    if (entry.dirty || !entry.canvas) {
+    if ((entry.dirty || !entry.canvas) && ((!entry.canvas && !prefetch) || chunkPaintsThisFrame === 0)) {
+      chunkPaintsThisFrame++;
       try { buildChunkCanvas(entry, chunk); } catch (err) { F.log.error('F.render: buildChunkCanvas', cx, cy, err); }
       entry.dirty = false;
     }
     return entry;
+  }
+
+  // Paints at most one chunk of the ring just outside the view per frame, so chunks are ready
+  // before they scroll in instead of 2-3 being painted in the frame that reveals them (a
+  // 40-60 ms hitch every chunk boundary while walking). Chunks whose neighbours are not
+  // generated yet are skipped: they would need a repaint once those appear.
+  function prefetchChunkRing(cx0, cy0, cx1, cy1) {
+    var now = F.util.now();
+    for (var cy = cy0 - 1; cy <= cy1 + 1; cy++) {
+      for (var cx = cx0 - 1; cx <= cx1 + 1; cx++) {
+        if (cy >= cy0 && cy <= cy1 && cx >= cx0 && cx <= cx1) continue; // visible: already drawn
+        var entry = chunkCache.get(chunkKey(cx, cy));
+        if (entry && entry.canvas && !entry.dirty) { entry.lastUsed = now; continue; } // keep it cached
+        if (chunkPaintsThisFrame || chunkCache.size >= CHUNK_CACHE_CAP) continue;
+        if (!F.world.chunkAt(cx * F.C.CHUNK, cy * F.C.CHUNK) || !neighboursGenerated(cx, cy)) continue;
+        getChunkEntry(cx, cy, true);
+      }
+    }
   }
 
   function invalidateChunk(cx, cy) {
@@ -551,6 +590,7 @@
     var cy0 = F.util.floorDiv(rect.y0, F.C.CHUNK), cy1 = F.util.floorDiv(rect.y1, F.C.CHUNK);
     var chunkPx = F.C.CHUNK * F.C.TILE;
     var shimmer = camera.zoom >= 0.75; // GDD §11.7 "zoomed out: skip [cheap extras]"
+    chunkPaintsThisFrame = 0;
     for (var cy = cy0; cy <= cy1; cy++) {
       for (var cx = cx0; cx <= cx1; cx++) {
         var entry = getChunkEntry(cx, cy);
@@ -561,6 +601,7 @@
         if (shimmer) drawWaterShimmer(entry, p0, size, chunkPx);
       }
     }
+    prefetchChunkRing(cx0, cy0, cx1, cy1);
   }
 
   // =====================================================================
