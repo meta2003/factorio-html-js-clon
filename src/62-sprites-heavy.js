@@ -58,105 +58,230 @@
     ctx.closePath();
   }
 
-  // Irregular stone-block pile clipped to a squat rounded-dome silhouette (stone-furnace body).
-  // Deterministic per (type) via the rng passed in — mortar gaps come from randomly-skipped
-  // cells plus the padding between blocks, no separate mortar-line pass needed.
-  function stoneDomeMass(ctx, W, H, rng) {
-    var x = W * 0.05, y = H * 0.16, w = W * 0.9, h = H * 0.78, r = Math.min(w, h) * 0.4;
-    L.roundRectPath(ctx, x, y, w, h, r); ctx.fillStyle = '#463F36'; ctx.fill();
-    ctx.save(); L.roundRectPath(ctx, x, y, w, h, r); ctx.clip();
-    var palette = ['#948A78', '#8C8072', '#A69A82', '#7D7364', '#9C917C', '#877C6C'];
-    var cols = 4, rows = 4, cw = w / cols, ch = h / rows, ix, iy;
-    for (iy = 0; iy < rows; iy++) {
-      for (ix = 0; ix < cols; ix++) {
-        if (rng() < 0.12) continue; // occasional gap — mortar shows through
-        var jx = (rng() - 0.5) * cw * 0.3, jy = (rng() - 0.5) * ch * 0.3;
-        var bx = x + ix * cw + cw * 0.09 + jx, by = y + iy * ch + ch * 0.09 + jy;
-        var bw = cw * 0.82 + rng() * cw * 0.06, bh = ch * 0.82 + rng() * ch * 0.06;
-        var col = palette[(rng() * palette.length) | 0];
-        L.rectBevel(ctx, bx, by, bw, bh, col, {
-          light: L.lighten(col, 22), dark: L.darken(col, 26),
-          outlineColor: 'rgba(30,26,20,0.6)', outlineWidth: 1
-        });
-      }
+  // Small smoke loop for a stack whose mouth is at (cx, cy). The sprite canvas ends at the
+  // building's footprint, so puffs rise only through the space above the mouth and fade out
+  // before reaching the top edge (a puff cut off by the edge reads as a pale rectangle).
+  // (L.smokePuffs' `scale` is a radius multiplier; the old sprite-sized values filled the
+  // whole canvas with translucent grey, a light box around every working building.)
+  function stackSmoke(ctx, cx, cy, frame, W) {
+    for (var i = 0; i < 3; i++) {
+      var t = (((frame | 0) + i * 5) % 16) / 16;
+      var r = W * (0.025 + t * 0.045);
+      var room = Math.max(0, cy - r);
+      var y = cy - t * room * 0.9, x = cx + Math.sin(i * 2.4 + t * 2) * W * 0.03;
+      var edgeFade = Math.min(1, Math.max(0, (y - r) / (W * 0.04)));
+      var a = 0.38 * (1 - t) * (cy > W * 0.06 ? edgeFade : 1);
+      if (a <= 0.02) continue;
+      ctx.fillStyle = 'rgba(205,205,200,' + a.toFixed(2) + ')';
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
     }
-    var wash = ctx.createLinearGradient(x, y, x, y + h);
-    wash.addColorStop(0, 'rgba(255,255,255,0.16)'); wash.addColorStop(0.5, 'rgba(255,255,255,0)'); wash.addColorStop(1, 'rgba(0,0,0,0.20)');
-    ctx.fillStyle = wash; ctx.fillRect(x, y, w, h);
-    ctx.restore();
-    L.roundRectPath(ctx, x, y, w, h, r);
-    ctx.strokeStyle = 'rgba(12,12,12,0.85)'; ctx.lineWidth = Math.max(1.5, Math.min(w, h) * 0.025); ctx.stroke();
   }
 
-  // Arched fire mouth with coals + flicker/glow (working) or a faint ember (idle) + warm spill
-  // onto the surrounding stonework — shared shape/behaviour, only the working cue differs.
-  function fireMouth(ctx, cx, topY, w, h, working, frame) {
-    archPath(ctx, cx, topY, w, h); ctx.fillStyle = '#1C1712'; ctx.fill();
-    ctx.save(); archPath(ctx, cx, topY, w, h); ctx.clip();
-    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(cx - w / 2, topY, w * 0.3, h);
+  // Fire inside a dark opening, clipped to whatever path the caller set up: glowing coal bed,
+  // three flickering flame tongues and a hot core. `k` animates (working frame 0..15).
+  function flames(ctx, cx, baseY, w, h, frame) {
+    var f = frame | 0;
+    L.glow(ctx, cx, baseY - h * 0.1, w * 0.95, '#FF7A1E', flicker(f, 1.35, 0.55, 0.3));
+    for (var i = 0; i < 3; i++) {
+      var fx = cx + (i - 1) * w * 0.26, fh = h * (0.55 + 0.25 * Math.sin(f * 0.9 + i * 2.1)) * (i === 1 ? 1.15 : 0.85);
+      var fw = w * (i === 1 ? 0.2 : 0.15), sway = Math.sin(f * 0.7 + i * 1.7) * w * 0.04;
+      var g = ctx.createLinearGradient(fx, baseY, fx, baseY - fh);
+      g.addColorStop(0, '#FFF2B0'); g.addColorStop(0.35, '#FFB43C'); g.addColorStop(0.8, 'rgba(230,80,20,0.75)'); g.addColorStop(1, 'rgba(200,50,10,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(fx - fw, baseY);
+      ctx.quadraticCurveTo(fx - fw * 0.9, baseY - fh * 0.55, fx + sway, baseY - fh);
+      ctx.quadraticCurveTo(fx + fw * 0.9, baseY - fh * 0.55, fx + fw, baseY);
+      ctx.closePath(); ctx.fill();
+    }
+    // coal bed
+    for (var j = 0; j < 7; j++) {
+      var ex = cx + (j - 3) * w * 0.13, ey = baseY - h * 0.02 - (j % 2) * h * 0.05;
+      ctx.fillStyle = (j + f) % 3 === 0 ? '#FFE08A' : ((j % 2) ? '#E8561A' : '#FF9A30');
+      ctx.beginPath(); ctx.arc(ex, ey, w * 0.075, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // stone-furnace (2x2, not rotatable): a squat beehive kiln of stacked, staggered field
+  // stones, a stone-ringed flue on top and an arched fire mouth with voussoirs in front.
+  // ---------------------------------------------------------------------
+  function kilnPath(ctx, W, H) {
+    var l = W * 0.06, r = W * 0.94, b = H * 0.94, t = H * 0.07;
+    ctx.beginPath();
+    ctx.moveTo(l + W * 0.06, b);
+    ctx.quadraticCurveTo(l, b, l, b - H * 0.08);
+    ctx.bezierCurveTo(l - W * 0.01, H * 0.42, W * 0.12, t, W * 0.5, t);
+    ctx.bezierCurveTo(W * 0.88, t, r + W * 0.01, H * 0.42, r, b - H * 0.08);
+    ctx.quadraticCurveTo(r, b, r - W * 0.06, b);
+    ctx.closePath();
+  }
+  function stoneKiln(ctx, W, H, rng) {
+    kilnPath(ctx, W, H); ctx.fillStyle = '#3E372F'; ctx.fill(); // mortar
+    ctx.save(); kilnPath(ctx, W, H); ctx.clip();
+    var palette = ['#9A907E', '#8E8474', '#A89E88', '#817868', '#948B7A', '#B0A690', '#7A7263'];
+    var rows = 7, top = H * 0.07, rowH = (H * 0.87) / rows;
+    for (var ry = 0; ry < rows; ry++) {
+      var y = top + ry * rowH, x = W * 0.02 - (ry % 2) * W * 0.09 - rng() * W * 0.04;
+      var shade = -8 + ry * 3; // courses darken slightly toward the ground
+      while (x < W) {
+        var sw = W * (0.14 + rng() * 0.1), sh = rowH * (0.84 + rng() * 0.1);
+        var col = L.darken(palette[(rng() * palette.length) | 0], Math.max(0, shade));
+        var sx = x + W * 0.008, sy = y + (rowH - sh) * 0.5, rr = sh * 0.38;
+        var g = ctx.createLinearGradient(sx, sy, sx + sw * 0.3, sy + sh);
+        g.addColorStop(0, L.lighten(col, 26)); g.addColorStop(0.5, col); g.addColorStop(1, L.darken(col, 30));
+        L.roundRectPath(ctx, sx, sy, sw - W * 0.016, sh, rr); ctx.fillStyle = g; ctx.fill();
+        ctx.strokeStyle = 'rgba(28,24,18,0.55)'; ctx.lineWidth = 1; ctx.stroke();
+        x += sw;
+      }
+    }
+    // Rounded-form shading: lit from the top-left, darker toward the right and the base.
+    var side = ctx.createLinearGradient(0, 0, W, 0);
+    side.addColorStop(0, 'rgba(255,255,255,0.10)'); side.addColorStop(0.45, 'rgba(0,0,0,0)'); side.addColorStop(1, 'rgba(0,0,0,0.30)');
+    ctx.fillStyle = side; ctx.fillRect(0, 0, W, H);
+    var vert = ctx.createLinearGradient(0, 0, 0, H);
+    vert.addColorStop(0, 'rgba(255,255,240,0.14)'); vert.addColorStop(0.5, 'rgba(0,0,0,0)'); vert.addColorStop(1, 'rgba(0,0,0,0.28)');
+    ctx.fillStyle = vert; ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+    kilnPath(ctx, W, H); ctx.strokeStyle = 'rgba(14,12,10,0.9)'; ctx.lineWidth = Math.max(1.5, W * 0.022); ctx.stroke();
+  }
+  // Flue on top: a ring of lighter capstones around a dark shaft that glows while working.
+  function kilnFlue(ctx, cx, cy, rx, ry, working, frame) {
+    ctx.fillStyle = '#6E665A';
+    ctx.beginPath(); ctx.ellipse(cx, cy, rx * 1.45, ry * 1.5, 0, 0, Math.PI * 2); ctx.fill();
+    var n = 10;
+    for (var i = 0; i < n; i++) {
+      var a0 = i / n * Math.PI * 2, a1 = (i + 0.82) / n * Math.PI * 2;
+      var lit = Math.cos((a0 + a1) / 2 + 2.3); // top-left brighter
+      ctx.fillStyle = L.adjust('#A0978A', Math.round(lit * 22));
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx * 1.45, ry * 1.5, 0, a0, a1);
+      ctx.ellipse(cx, cy, rx * 1.02, ry * 1.04, 0, a1, a0, true);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = '#15110D';
+    ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
     if (working) {
-      var flick = flicker(frame, 1.35, 0.55, 0.35);
-      L.glow(ctx, cx, topY + h * 0.8, w * 0.9, '#FFB25A', flick * 0.9);
-      L.glow(ctx, cx, topY + h * 0.8, w * 0.42, '#FFE9A8', flick);
-      var i;
-      for (i = 0; i < 4; i++) {
-        var ex = cx + (i - 1.5) * w * 0.15, ey = topY + h * 0.86;
-        ctx.fillStyle = (i % 2) ? '#FF8A2A' : '#FFD27A';
-        ctx.beginPath(); ctx.arc(ex, ey, w * 0.05, 0, Math.PI * 2); ctx.fill();
+      ctx.save(); ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.clip();
+      L.glow(ctx, cx, cy + ry * 0.4, rx * 1.3, '#FF8A2A', flicker(frame, 1.1, 0.5, 0.35));
+      ctx.restore();
+    }
+    ctx.strokeStyle = 'rgba(14,12,10,0.85)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(cx, cy, rx * 1.45, ry * 1.5, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+  // Arched fire mouth framed by wedge-shaped voussoir stones.
+  function kilnMouth(ctx, cx, bottomY, w, h, working, frame) {
+    var ring = w * 0.2, topY = bottomY - h;
+    // voussoir ring
+    archPath(ctx, cx, topY - ring, w + ring * 2, h + ring); ctx.fillStyle = '#B3A994'; ctx.fill();
+    var springY = topY + h * 0.42, r0 = w * 0.5, r1 = r0 + ring, n = 7;
+    for (var i = 0; i < n; i++) {
+      var a0 = Math.PI + i / n * Math.PI, a1 = Math.PI + (i + 1) / n * Math.PI;
+      ctx.beginPath();
+      ctx.arc(cx, springY, r1, a0 + 0.02, a1 - 0.02, false);
+      ctx.arc(cx, springY, r0, a1 - 0.02, a0 + 0.02, true);
+      ctx.closePath();
+      ctx.fillStyle = L.adjust('#A99F8A', Math.round(Math.cos((a0 + a1) / 2 + 0.8) * 18));
+      ctx.fill(); ctx.strokeStyle = 'rgba(28,24,18,0.6)'; ctx.lineWidth = 1; ctx.stroke();
+    }
+    // jamb stones
+    for (var s = 0; s < 2; s++) {
+      var jx = s ? cx + r0 : cx - r1;
+      L.rectBevel(ctx, jx, springY, ring, bottomY - springY, s ? '#8E8474' : '#A69C87', { dark: '#6A6254', light: '#BDB39C', outlineColor: 'rgba(28,24,18,0.6)', outlineWidth: 1 });
+    }
+    // opening
+    archPath(ctx, cx, topY, w, h); ctx.fillStyle = '#17120E'; ctx.fill();
+    ctx.save(); archPath(ctx, cx, topY, w, h); ctx.clip();
+    if (working) flames(ctx, cx, bottomY, w, h, frame);
+    else {
+      ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(cx - w / 2, topY, w * 0.35, h); // inner shadow
+      for (var e = 0; e < 5; e++) {
+        ctx.fillStyle = e % 2 ? 'rgba(120,45,20,0.55)' : 'rgba(70,40,30,0.8)';
+        ctx.beginPath(); ctx.arc(cx + (e - 2) * w * 0.15, bottomY - h * 0.05, w * 0.07, 0, Math.PI * 2); ctx.fill();
       }
-    } else {
-      ctx.fillStyle = 'rgba(150,55,20,0.28)';
-      ctx.beginPath(); ctx.arc(cx, topY + h * 0.82, w * 0.07, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
-    archPath(ctx, cx, topY, w, h); ctx.strokeStyle = '#0C0A08'; ctx.lineWidth = Math.max(1.5, w * 0.045); ctx.stroke();
-    if (working) L.glow(ctx, cx, topY + h * 0.98, w * 1.3, '#FF8A2A', 0.14 + 0.1 * Math.sin((frame | 0) * 1.35));
+    archPath(ctx, cx, topY, w, h); ctx.strokeStyle = '#0C0A08'; ctx.lineWidth = Math.max(1.5, w * 0.04); ctx.stroke();
+    if (working) L.glow(ctx, cx, bottomY, w * 1.25, '#FF8A2A', 0.22 + 0.1 * Math.sin((frame | 0) * 1.35)); // warm spill on the stones
   }
-
-  // ---------------------------------------------------------------------
-  // stone-furnace (2x2, not rotatable): rounded pile of stone blocks, arched fire mouth.
-  // ---------------------------------------------------------------------
   function paintStoneFurnaceHeavy(ctx, W, H, frame, dir, def, type, opts) {
     var working = !!(opts && opts.working);
-    var rng = seed(type, 1, 9);
-    stoneDomeMass(ctx, W, H, rng);
-    fireMouth(ctx, W * 0.5, H * 0.5, W * 0.4, H * 0.42, working, frame);
-    if (working) L.smokePuffs(ctx, W * 0.5, H * 0.14, frame, W * 0.4);
+    stoneKiln(ctx, W, H, seed(type, 1, 9));
+    kilnFlue(ctx, W * 0.5, H * 0.24, W * 0.13, H * 0.07, working, frame);
+    kilnMouth(ctx, W * 0.5, H * 0.94, W * 0.34, H * 0.34, working, frame);
+    if (working) stackSmoke(ctx, W * 0.5, H * 0.2, frame, W);
   }
 
   // ---------------------------------------------------------------------
-  // steel-furnace (2x2): riveted steel housing, brick-lined top opening, two glowing vents,
-  // small exhaust chimney.
+  // steel-furnace (2x2): heavy chamfered steel housing with bolted corner plates around a
+  // round crucible lined with refractory brick (molten glow while working), a slotted fire
+  // door on the front and an exhaust stack in the back corner.
   // ---------------------------------------------------------------------
   function paintSteelFurnaceHeavy(ctx, W, H, frame, dir, def, type, opts) {
     var working = !!(opts && opts.working);
     var col = L.entColors(def)[0] || '#5E6873';
-    L.foundation(ctx, W, H, L.darken(col, 6));
-    L.panel(ctx, W * 0.05, H * 0.06, W * 0.9, H * 0.86, col, { r: W * 0.07 });
-    L.rivets(ctx, [[W * 0.12, H * 0.14], [W * 0.88, H * 0.14], [W * 0.12, H * 0.86], [W * 0.88, H * 0.86],
-      [W * 0.5, H * 0.1], [W * 0.5, H * 0.9]], W * 0.02);
-    // Top opening: heat-resistant brick lining visible looking down into the furnace.
-    var ox = W * 0.28, oy = H * 0.13, ow = W * 0.44, oh = H * 0.22, rr = W * 0.03;
-    L.inset(ctx, ox, oy, ow, oh, '#241C16', rr);
-    ctx.save(); L.roundRectPath(ctx, ox, oy, ow, oh, rr); ctx.clip();
-    var brick1 = '#8A4A32', brick2 = '#6E3A26', bw = ow / 5, bh = oh / 2, r, c;
-    for (r = 0; r < 2; r++) { for (c = 0; c < 5; c++) { ctx.fillStyle = ((r + c) % 2) ? brick1 : brick2; ctx.fillRect(ox + c * bw + 1, oy + r * bh + 1, bw - 2, bh - 2); } }
-    var openA = working ? flicker(frame, 1.2, 0.5, 0.4) : 0.08;
-    L.glow(ctx, ox + ow / 2, oy + oh / 2, ow * 0.65, '#FF9A3C', openA);
-    ctx.restore();
-    L.roundRectPath(ctx, ox, oy, ow, oh, rr); ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 1.5; ctx.stroke();
-    // Two glowing side vents.
-    var vy = H * 0.5, vw = W * 0.1, vh = H * 0.28;
-    L.vent(ctx, W * 0.07, vy - vh / 2, vw, vh, 4, true);
-    L.vent(ctx, W * 0.83, vy - vh / 2, vw, vh, 4, true);
-    if (working) {
-      var va = flicker(frame, 1.5, 0.32, 0.34);
-      L.glow(ctx, W * 0.07 + vw / 2, vy, vw * 1.7, '#FF7A2A', va);
-      L.glow(ctx, W * 0.83 + vw / 2, vy, vw * 1.7, '#FF7A2A', va);
+    var f = frame | 0;
+    // plinth + housing
+    chamferPanel(ctx, W * 0.03, H * 0.05, W * 0.94, H * 0.9, W * 0.14, L.darken(col, 22), { hi: 14, lo: 22 });
+    chamferPanel(ctx, W * 0.09, H * 0.08, W * 0.82, H * 0.78, W * 0.11, col, {});
+    // bolted corner plates
+    var cp = W * 0.17, corners = [[W * 0.1, H * 0.09], [W * 0.73, H * 0.09], [W * 0.1, H * 0.68], [W * 0.73, H * 0.68]];
+    for (var i = 0; i < 4; i++) {
+      var c = corners[i];
+      L.panel(ctx, c[0], c[1], cp, cp, L.darken(col, 12), { r: W * 0.02, hi: 18, lo: 20 });
+      L.rivets(ctx, [[c[0] + cp * 0.3, c[1] + cp * 0.3], [c[0] + cp * 0.7, c[1] + cp * 0.7]], W * 0.018);
     }
-    // Small exhaust chimney, back corner — smokes while working.
-    L.rectBevel(ctx, W * 0.74, 0, W * 0.12, H * 0.14, '#33363A', { dark: '#1C1E20', light: '#4A4E52' });
-    if (working) L.smokePuffs(ctx, W * 0.8, 0, frame, W * 0.5);
+    // crucible: steel collar, refractory brick ring, pit
+    var cx = W * 0.5, cy = H * 0.44, R = W * 0.29, rb = W * 0.23, rp = W * 0.16;
+    L.disc(ctx, cx, cy, R, '#7A858F', { hi: 40, lo: 45 });
+    var n = 14;
+    for (var b = 0; b < n; b++) {
+      var a0 = b / n * Math.PI * 2 + 0.03, a1 = (b + 1) / n * Math.PI * 2 - 0.03;
+      ctx.beginPath(); ctx.arc(cx, cy, rb, a0, a1); ctx.arc(cx, cy, rp, a1, a0, true); ctx.closePath();
+      var lit = Math.cos((a0 + a1) / 2 - 0.8); // inner wall: lit side faces away from the light
+      ctx.fillStyle = L.adjust(b % 2 ? '#8A4A32' : '#7A3F2A', Math.round(lit * 16));
+      ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(10,8,6,0.9)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx, cy, rb, 0, Math.PI * 2); ctx.stroke();
+    ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, rp, 0, Math.PI * 2); ctx.clip();
+    if (working) {
+      var g = ctx.createRadialGradient(cx - rp * 0.15, cy - rp * 0.1, rp * 0.05, cx, cy, rp);
+      var hot = flicker(f, 1.2, 0.75, 0.25);
+      g.addColorStop(0, 'rgba(255,248,200,' + hot.toFixed(2) + ')'); g.addColorStop(0.45, '#FFB030'); g.addColorStop(0.85, '#D2501A'); g.addColorStop(1, '#6A200C');
+      ctx.fillStyle = g; ctx.fillRect(cx - rp, cy - rp, rp * 2, rp * 2);
+      // slow-moving crust on the melt
+      for (var k = 0; k < 4; k++) {
+        var ang = k * 1.7 + f * 0.25, dd = rp * (0.35 + 0.15 * (k % 2));
+        ctx.fillStyle = 'rgba(140,40,10,0.35)';
+        ctx.beginPath(); ctx.ellipse(cx + Math.cos(ang) * dd, cy + Math.sin(ang) * dd, rp * 0.22, rp * 0.12, ang, 0, Math.PI * 2); ctx.fill();
+      }
+    } else {
+      var gi = ctx.createRadialGradient(cx - rp * 0.3, cy - rp * 0.3, 0, cx, cy, rp);
+      gi.addColorStop(0, '#2A221C'); gi.addColorStop(1, '#0E0B09');
+      ctx.fillStyle = gi; ctx.fillRect(cx - rp, cy - rp, rp * 2, rp * 2);
+      ctx.fillStyle = 'rgba(120,40,16,0.35)';
+      ctx.beginPath(); ctx.arc(cx + rp * 0.15, cy + rp * 0.2, rp * 0.3, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(10,8,6,0.95)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, rp, 0, Math.PI * 2); ctx.stroke();
+    if (working) L.glow(ctx, cx, cy, R * 1.25, '#FF8A2A', flicker(f, 1.2, 0.18, 0.12));
+    // fire door with glowing slots
+    var dx = W * 0.36, dy = H * 0.76, dw = W * 0.28, dh = H * 0.13;
+    L.panel(ctx, dx, dy, dw, dh, L.darken(col, 28), { r: W * 0.015, hi: 12, lo: 18 });
+    var slotA = working ? flicker(f, 1.5, 0.55, 0.4) : 0;
+    for (var sl = 0; sl < 4; sl++) {
+      var sx = dx + dw * (0.12 + sl * 0.21), sy = dy + dh * 0.28, sw = dw * 0.13, sh = dh * 0.44;
+      ctx.fillStyle = '#100C09'; ctx.fillRect(sx, sy, sw, sh);
+      if (working) { ctx.fillStyle = 'rgba(255,150,50,' + slotA.toFixed(2) + ')'; ctx.fillRect(sx, sy + sh * 0.2, sw, sh * 0.8); }
+    }
+    if (working) L.glow(ctx, dx + dw / 2, dy + dh, dw * 0.8, '#FF7A2A', slotA * 0.35);
+    // exhaust stack, back-right corner
+    var sxc = W * 0.8, syc = H * 0.14, sr = W * 0.075;
+    L.disc(ctx, sxc, syc, sr, '#4A5057', { hi: 30, lo: 35 });
+    ctx.fillStyle = '#0E0C0B'; ctx.beginPath(); ctx.arc(sxc, syc, sr * 0.58, 0, Math.PI * 2); ctx.fill();
+    if (working) stackSmoke(ctx, sxc, syc, frame, W);
   }
 
   // ---------------------------------------------------------------------
@@ -181,7 +306,7 @@
     L.glow(ctx, fx, fy, fr * 1.6, '#E9781E', fireA);
     // Small chimney, smokes while working.
     L.rectBevel(ctx, W * 0.72, H * 0.02, W * 0.13, H * 0.18, '#3A342C', { dark: '#1C1810', light: '#4E4638' });
-    if (working) L.smokePuffs(ctx, W * 0.785, H * 0.02, frame, W * 0.45);
+    if (working) stackSmoke(ctx, W * 0.785, H * 0.02, frame, W);
     // Drill head/bit near the output (left column, north) — bobs and spins while working.
     var bob = working ? Math.sin((frame / 16) * Math.PI * 2) * H * 0.03 : 0;
     var spin = working ? (frame / 16) * Math.PI * 2 : 0;
@@ -273,7 +398,7 @@
     if (working) L.glow(ctx, fx + fw / 2, fy + fh * 0.5, fw * 0.9, '#FF8A2A', grateA * 0.6);
     // Chimney with smoke while working.
     L.rectBevel(ctx, W * 0.74, 0, W * 0.1, H * 0.14, '#4A4038', { dark: '#241E18', light: '#5E5148' });
-    if (working) L.smokePuffs(ctx, W * 0.79, 0, frame, W * 0.35);
+    if (working) stackSmoke(ctx, W * 0.79, 0, frame, W);
     // Fluid connections: water in at the south row's west/east ends, steam out on the north edge.
     var nub = Math.min(W, H) * 0.2;
     L.pipeNub(ctx, W * 0.5, 0, 0, nub);
