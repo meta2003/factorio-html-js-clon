@@ -312,10 +312,20 @@
   function techDef(id) { var d = techs[id]; if (!d) throw new Error('unknown tech id: ' + id); return d; }
 
   // recipe id whose furnace input is `itemId` (category 'smelting'), or null.
+  // Called for every candidate item by furnace-feeding inserters each tick, so hits are
+  // memoised. Recipes may be registered later at runtime, but they are iterated after the
+  // existing ones and so can never displace an earlier match; a hit is re-validated in case
+  // its recipe was replaced. Misses are not cached (a later recipe may add a match).
+  var smeltingHit = Object.create(null);
+  function isSmeltingOf(r, itemId) {
+    return r.category === 'smelting' && r.ingredients.length && r.ingredients[0][0] === itemId;
+  }
   function smeltingFor(itemId) {
+    var hit = smeltingHit[itemId];
+    if (hit && recipes[hit.id] === hit && isSmeltingOf(hit, itemId)) return hit;
     for (var id in recipes) {
       var r = recipes[id];
-      if (r.category === 'smelting' && r.ingredients.length && r.ingredients[0][0] === itemId) return r;
+      if (isSmeltingOf(r, itemId)) { smeltingHit[itemId] = r; return r; }
     }
     return null;
   }
