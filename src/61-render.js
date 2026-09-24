@@ -381,6 +381,34 @@
     }
   }
 
+  // Terrain chunk canvases are 1024 px; drawing them far below that size is slow (at zoom
+  // 0.3 each visible chunk cost ~0.1 ms per frame, and the big sources also make Chrome
+  // flush and rasterise mid-frame, which showed up as slow belt/entity draws at zoom 0.5).
+  // When zoomed out, draw from a cached half-size copy while that copy still covers the
+  // target (in device pixels), so the source is never scaled up. At zoom >= 1 (or 0.5 on a
+  // 2x display) the full canvas is used exactly as before.
+  var mipCache = new WeakMap(); // canvas -> [half, quarter, ...]; buildChunkCanvas drops stale ones
+  function mipFor(img, dw, dh) {
+    var tw = dw * dpr, th = dh * dpr;
+    if (!(img.width >= 2 * tw && img.height >= 2 * th)) return img;
+    var levels = mipCache.get(img);
+    if (!levels) { levels = []; mipCache.set(img, levels); }
+    var src = img;
+    for (var lvl = 0; src.width >= 2 * tw && src.height >= 2 * th && src.width >= 4 && src.height >= 4; lvl++) {
+      var next = levels[lvl];
+      if (!next) {
+        next = document.createElement('canvas');
+        next.width = Math.ceil(src.width / 2); next.height = Math.ceil(src.height / 2);
+        var nctx = next.getContext('2d');
+        nctx.imageSmoothingEnabled = true;
+        nctx.drawImage(src, 0, 0, next.width, next.height);
+        levels[lvl] = next;
+      }
+      src = next;
+    }
+    return src;
+  }
+
   function buildChunkCanvas(entry, chunk) {
     var px = F.C.CHUNK * F.C.TILE; // 1024
     if (!entry.canvas) {
@@ -389,6 +417,7 @@
       entry.ctx = entry.canvas.getContext('2d');
     }
     var c = entry.ctx, T = F.C.TILE;
+    mipCache.delete(entry.canvas); // repainted in place: drop its now-stale mip levels
     c.clearRect(0, 0, px, px);
     var waterRects = [];
     var ly, lx, i;
@@ -528,7 +557,7 @@
         if (!entry || !entry.canvas) continue;
         var p0 = toScreen(cx * F.C.CHUNK, cy * F.C.CHUNK);
         var size = chunkPx * camera.zoom;
-        ctx.drawImage(entry.canvas, p0[0], p0[1], size, size);
+        ctx.drawImage(mipFor(entry.canvas, size, size), p0[0], p0[1], size, size);
         if (shimmer) drawWaterShimmer(entry, p0, size, chunkPx);
       }
     }
@@ -1468,22 +1497,24 @@
     return MINIMAP_ENTITY_COLOR_DEFAULT;
   }
 
-  function drawChunkOnMap(mctx, chunk, tx0, ty0, pxPerTile) {
-    var step = Math.max(1, Math.round(1 / Math.max(pxPerTile, 0.0001)));
-    var s = Math.max(1, pxPerTile * step);
-    for (var ly = 0; ly < F.C.CHUNK; ly += step) {
-      for (var lx = 0; lx < F.C.CHUNK; lx += step) {
-        var i = ly * F.C.CHUNK + lx;
-        var wtx = chunk.cx * F.C.CHUNK + lx, wty = chunk.cy * F.C.CHUNK + ly;
-        var mx = (wtx - tx0) * pxPerTile, my = (wty - ty0) * pxPerTile;
-        var terrain = chunk.terrain[i];
-        var color = (F.world && F.world.TERRAIN_COLOR && F.world.TERRAIN_COLOR[terrain]) || '#274233';
-        var res = chunk.res[i];
-        if (res) color = (F.world && F.world.RES_COLOR && F.world.RES_COLOR[res]) || color;
-        mctx.fillStyle = color;
-        mctx.fillRect(mx, my, s, s);
-      }
+  // '#rrggbb' -> [r, g, b] (colour tables are parsed once and cached).
+  function hexRgb(hex) {
+    var n = parseInt(String(hex).slice(1, 7), 16) || 0;
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  var mapRgb = null;
+  function mapColors() {
+    if (mapRgb) return mapRgb;
+    var tc = (F.world && F.world.TERRAIN_COLOR) || [], rc = (F.world && F.world.RES_COLOR) || [];
+    mapRgb = { terrain: [], res: [], fallback: hexRgb('#274233'), empty: hexRgb('#111111') };
+    for (var i = 0; i < 256; i++) {
+      mapRgb.terrain.push(tc[i] ? hexRgb(tc[i]) : mapRgb.fallback);
+      mapRgb.res.push(rc[i] ? hexRgb(rc[i]) : null);
     }
+    return mapRgb;
+  }
+
+  function drawPollutionOnMap(mctx, chunk, tx0, ty0, pxPerTile) {
     if (chunk.pollution > 15) {
       var mx0 = (chunk.cx * F.C.CHUNK - tx0) * pxPerTile, my0 = (chunk.cy * F.C.CHUNK - ty0) * pxPerTile;
       var s0 = F.C.CHUNK * pxPerTile;
@@ -1505,16 +1536,40 @@
 
   function buildMapImage(canvasTarget, sizePx, chunkRadius) {
     var mctx = canvasTarget.getContext('2d');
-    mctx.clearRect(0, 0, sizePx, sizePx);
-    mctx.fillStyle = '#111'; mctx.fillRect(0, 0, sizePx, sizePx);
     var w = mapWindow(sizePx, chunkRadius);
-    var cx0 = F.util.floorDiv(w.tx0, F.C.CHUNK), cx1 = F.util.floorDiv(w.tx0 + w.tilesSpan, F.C.CHUNK);
-    var cy0 = F.util.floorDiv(w.ty0, F.C.CHUNK), cy1 = F.util.floorDiv(w.ty0 + w.tilesSpan, F.C.CHUNK);
-    for (var cy = cy0; cy <= cy1; cy++) {
-      for (var cx = cx0; cx <= cx1; cx++) {
-        var chunk = (F.world && F.world.chunkAt) ? F.world.chunkAt(cx * F.C.CHUNK, cy * F.C.CHUNK) : null;
-        if (!chunk) continue;
-        drawChunkOnMap(mctx, chunk, w.tx0, w.ty0, w.pxPerTile);
+    // Terrain/ore: one pixel write per map pixel into an ImageData (sampling the tile under
+    // the pixel centre) instead of one fillRect per tile block — the latter was ~40k canvas
+    // calls per minimap refresh, a visible hitch every 30 frames.
+    var CH = F.C.CHUNK, col = mapColors();
+    var img = mctx.createImageData(sizePx, sizePx), d = img.data;
+    var inv = 1 / w.pxPerTile;
+    for (var py = 0, o = 0; py < sizePx; py++) {
+      var ty = Math.floor(w.ty0 + (py + 0.5) * inv);
+      var cy = F.util.floorDiv(ty, CH), rowBase = (ty - cy * CH) * CH;
+      var lastCx = NaN, chunk = null, cx0 = 0;
+      for (var px = 0; px < sizePx; px++, o += 4) {
+        var tx = Math.floor(w.tx0 + (px + 0.5) * inv);
+        var cxx = F.util.floorDiv(tx, CH);
+        if (cxx !== lastCx) {
+          lastCx = cxx; cx0 = cxx * CH;
+          chunk = (F.world && F.world.chunkAt) ? F.world.chunkAt(tx, ty) : null;
+        }
+        var rgb;
+        if (!chunk) rgb = col.empty;
+        else {
+          var i = rowBase + (tx - cx0);
+          rgb = (chunk.res[i] && col.res[chunk.res[i]]) || col.terrain[chunk.terrain[i]];
+        }
+        d[o] = rgb[0]; d[o + 1] = rgb[1]; d[o + 2] = rgb[2]; d[o + 3] = 255;
+      }
+    }
+    mctx.putImageData(img, 0, 0);
+    var cx0c = F.util.floorDiv(w.tx0, CH), cx1c = F.util.floorDiv(w.tx0 + w.tilesSpan, CH);
+    var cy0c = F.util.floorDiv(w.ty0, CH), cy1c = F.util.floorDiv(w.ty0 + w.tilesSpan, CH);
+    for (var ccy = cy0c; ccy <= cy1c; ccy++) {
+      for (var ccx = cx0c; ccx <= cx1c; ccx++) {
+        var pc = (F.world && F.world.chunkAt) ? F.world.chunkAt(ccx * CH, ccy * CH) : null;
+        if (pc) drawPollutionOnMap(mctx, pc, w.tx0, w.ty0, w.pxPerTile);
       }
     }
     var ents = F.state && F.state.entities;
