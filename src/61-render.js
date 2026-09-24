@@ -1121,11 +1121,15 @@
     // out after the animation/position bookkeeping above so a later un-hide resumes smoothly.
     if (playerHidden()) return;
     var scr = toScreen(p.x, p.y);
-    var size = F.C.TILE * camera.zoom * 1.4;
-    var frame = Math.floor(playerAnimT / 100) % 8;
+    var size = F.C.TILE * camera.zoom * 1.5; // sprite height (the figure is ~1.4 tiles tall)
+    // Frame 0 is the standing pose, 1..8 the walk cycle.
+    var frame = moving ? 1 + Math.floor(playerAnimT / 90) % 8 : 0;
     var spr = (F.sprites && F.sprites.player) ? F.sprites.player(p.dir || 0, frame) : null;
-    if (spr) {
-      ctx.drawImage(spr, scr[0] - size / 2, scr[1] - size, size, size);
+    if (spr && spr.height) {
+      // Keep the sprite's aspect ratio (drawing it into a square stretched the figure) and put
+      // its feet (93% down the canvas) on the player's position.
+      var w = size * spr.width / spr.height;
+      ctx.drawImage(spr, scr[0] - w / 2, scr[1] - size * 0.93, w, size);
     } else {
       ctx.fillStyle = '#DE8021';
       ctx.fillRect(scr[0] - size * 0.22, scr[1] - size, size * 0.44, size);

@@ -1491,97 +1491,180 @@
     return c;
   };
 
-  // Player: 4 facings x 4 walk frames, 0.8x1.6-ish tile figure per GDD §11.4.
+  // Player (GDD §11.4): a stocky engineer in an orange suit with grey armour plates, helmet
+  // with visor and a backpack, seen top-down 3/4. Frame 0 is the standing pose, frames 1..8 a
+  // walk cycle (swinging leg lifts, arms swing opposite, body bobs). Parts are posed from a
+  // small skeleton (hips/knees/feet, shoulders/elbows/hands) and drawn as outlined, shaded
+  // shapes. The canvas is 0.6:1 (width:height) and must be drawn at that aspect; the feet sit
+  // at 93% of its height.
   var playerCache = new Map();
+  var PLAYER_FRAMES = 9; // 0 = standing, 1..8 = walk cycle
+  var PC = {
+    suit: '#D9862C', suitDark: '#9E5716', armour: '#56585A', armourDark: '#34363A',
+    helmet: '#6A6B6C', visor: '#14212A', glove: '#2A2724', boot: '#26231F', pack: '#4A4B4D', line: '#141414',
+  };
   F.sprites.player = function (dir, frame) {
     if (!F.sprites.enabled) return stub();
-    dir = ((dir | 0) % 4 + 4) % 4; frame = ((frame | 0) % 4 + 4) % 4;
+    dir = ((dir | 0) % 4 + 4) % 4; frame = ((frame | 0) % PLAYER_FRAMES + PLAYER_FRAMES) % PLAYER_FRAMES;
     var key = dir + '|' + frame;
     var c = playerCache.get(key);
     if (c) return c;
-    var W = Math.round(PX * 0.9), H = Math.round(PX * 1.5);
+    var H = Math.round(PX * 2.1), W = Math.round(H * 0.6);
     c = newCanvas(W, H);
-    var ctx = ctxOf(c);
-    // Top-down 3/4 engineer: dir 0 = facing north (back to camera), 2 = facing camera.
-    var sw = Math.sin(frame / 4 * Math.PI * 2);
-    var legOff = sw * H * 0.05, armOff = -sw * H * 0.05;
-    function rr(x, y, w, h, r) {
-      ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-      ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h);
-      ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+    var ctx = c.getContext('2d');
+    var u = H / 100, cx = W / 2;
+    var walking = frame > 0, phi = (frame - 1) / 8 * Math.PI * 2;
+    var bob = walking ? (1 - Math.abs(Math.sin(phi))) * 1.2 * u : 0; // highest when passing, lowest at contact
+    var side = dir === 1 || dir === 3;
+    if (dir === 3) { ctx.translate(W, 0); ctx.scale(-1, 1); }
+
+    function outlined(pathFn, fill, lw) {
+      pathFn(); ctx.strokeStyle = PC.line; ctx.lineWidth = lw || 1.6 * u; ctx.lineJoin = 'round'; ctx.stroke();
+      pathFn(); ctx.fillStyle = fill; ctx.fill();
     }
-    var side = dir === 1 || dir === 3, flip = dir === 3;
-    ctx.save();
-    if (flip) { ctx.translate(W, 0); ctx.scale(-1, 1); }
-    // soft ground shadow
-    var shg = ctx.createRadialGradient(W * 0.5, H * 0.95, 0, W * 0.5, H * 0.95, W * 0.46);
-    shg.addColorStop(0, 'rgba(0,0,0,0.45)'); shg.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = shg; ctx.beginPath(); ctx.ellipse(W * 0.5, H * 0.95, W * 0.44, H * 0.06, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.lineCap = 'round';
-    // legs + boots
-    var legW = Math.max(2, W * 0.15);
-    var lx1 = side ? W * 0.44 : W * 0.39, lx2 = side ? W * 0.56 : W * 0.61;
-    ctx.strokeStyle = '#3B3A36'; ctx.lineWidth = legW;
-    ctx.beginPath(); ctx.moveTo(lx1, H * 0.7); ctx.lineTo(lx1 + (side ? legOff * 0.8 : 0), H * 0.89 + (side ? 0 : legOff)); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(lx2, H * 0.7); ctx.lineTo(lx2 - (side ? legOff * 0.8 : 0), H * 0.89 - (side ? 0 : legOff)); ctx.stroke();
-    ctx.fillStyle = '#1E1C1A';
-    ctx.beginPath(); ctx.ellipse(lx1 + (side ? legOff * 0.8 : 0), H * 0.9 + (side ? 0 : legOff), legW * 0.62, legW * 0.42, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(lx2 - (side ? legOff * 0.8 : 0), H * 0.9 - (side ? 0 : legOff), legW * 0.62, legW * 0.42, 0, 0, Math.PI * 2); ctx.fill();
-    // backpack behind the torso when facing the camera / sideways
-    if (dir === 2) { rr(W * 0.24, H * 0.3, W * 0.52, H * 0.28, W * 0.08); ctx.fillStyle = '#4E4A42'; ctx.fill(); }
-    if (side) { rr(W * 0.14, H * 0.33, W * 0.26, H * 0.3, W * 0.06); ctx.fillStyle = '#4E4A42'; ctx.fill(); ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 1; ctx.stroke(); }
-    // torso (suit) with vertical light gradient
-    var tx = side ? W * 0.3 : W * 0.24, tw = side ? W * 0.42 : W * 0.52;
-    var tg = ctx.createLinearGradient(0, H * 0.32, 0, H * 0.72);
-    tg.addColorStop(0, '#E08A2E'); tg.addColorStop(1, '#9C5518');
-    rr(tx, H * 0.33, tw, H * 0.39, W * 0.1); ctx.fillStyle = tg; ctx.fill();
-    ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 1.2; ctx.stroke();
-    // belt
-    ctx.fillStyle = '#2E2A24'; ctx.fillRect(tx + 1, H * 0.6, tw - 2, H * 0.04);
-    if (dir === 2) { ctx.fillStyle = '#B8B0A0'; ctx.fillRect(W * 0.46, H * 0.6, W * 0.08, H * 0.04); }
-    // backpack on the back when facing away
-    if (dir === 0) {
-      rr(W * 0.28, H * 0.35, W * 0.44, H * 0.27, W * 0.07); ctx.fillStyle = '#57524A'; ctx.fill();
-      ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 1; ctx.stroke();
-      ctx.fillStyle = '#6E685E'; ctx.fillRect(W * 0.33, H * 0.39, W * 0.34, H * 0.05);
-      ctx.fillStyle = '#3FA7D6'; ctx.fillRect(W * 0.46, H * 0.5, W * 0.08, H * 0.04);
+    function limb(x1, y1, x2, y2, w, color) {
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = PC.line; ctx.lineWidth = w + 1.6 * u;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.strokeStyle = color; ctx.lineWidth = w;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      // lit edge
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = w * 0.3;
+      ctx.beginPath(); ctx.moveTo(x1 - w * 0.2, y1); ctx.lineTo(x2 - w * 0.2, y2); ctx.stroke();
     }
-    // arms (swing opposite the legs) with dark gloves
-    var armW = Math.max(2, W * 0.12);
-    ctx.strokeStyle = '#B86A22'; ctx.lineWidth = armW;
-    if (side) {
-      ctx.beginPath(); ctx.moveTo(W * 0.52, H * 0.4); ctx.lineTo(W * 0.52 + armOff * 0.9, H * 0.6); ctx.stroke();
-      ctx.fillStyle = '#26221E'; ctx.beginPath(); ctx.arc(W * 0.52 + armOff * 0.9, H * 0.62, armW * 0.6, 0, Math.PI * 2); ctx.fill();
-    } else {
-      ctx.beginPath(); ctx.moveTo(W * 0.22, H * 0.39); ctx.lineTo(W * 0.18, H * 0.59 + armOff); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(W * 0.78, H * 0.39); ctx.lineTo(W * 0.82, H * 0.59 - armOff); ctx.stroke();
-      ctx.fillStyle = '#26221E';
-      ctx.beginPath(); ctx.arc(W * 0.18, H * 0.61 + armOff, armW * 0.6, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(W * 0.82, H * 0.61 - armOff, armW * 0.6, 0, Math.PI * 2); ctx.fill();
-      // grey shoulder pads
-      ctx.fillStyle = '#7A7870';
-      ctx.beginPath(); ctx.ellipse(W * 0.27, H * 0.36, W * 0.1, H * 0.035, -0.3, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(W * 0.73, H * 0.36, W * 0.1, H * 0.035, 0.3, 0, Math.PI * 2); ctx.fill();
+    function ellipse(x, y, rx, ry, fill, rot) {
+      outlined(function () { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, rot || 0, 0, Math.PI * 2); }, fill);
     }
-    // helmet
-    var hx = W * 0.5, hy = H * 0.24, hr = W * 0.2;
-    var hg = ctx.createRadialGradient(hx - hr * 0.35, hy - hr * 0.4, hr * 0.1, hx, hy, hr);
-    hg.addColorStop(0, '#8C8A84'); hg.addColorStop(1, '#45433E');
-    ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(hx, hy, hr, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#161616'; ctx.lineWidth = 1.2; ctx.stroke();
-    // visor (none when facing away)
-    if (dir === 2) {
-      rr(hx - hr * 0.72, hy - hr * 0.15, hr * 1.44, hr * 0.62, hr * 0.25); ctx.fillStyle = '#1C2A33'; ctx.fill();
-      ctx.fillStyle = 'rgba(160,210,235,0.55)'; ctx.fillRect(hx - hr * 0.5, hy - hr * 0.05, hr * 0.35, hr * 0.12);
-    } else if (side) {
-      rr(hx + hr * 0.05, hy - hr * 0.2, hr * 0.85, hr * 0.6, hr * 0.22); ctx.fillStyle = '#1C2A33'; ctx.fill();
-      ctx.fillStyle = 'rgba(160,210,235,0.55)'; ctx.fillRect(hx + hr * 0.35, hy - hr * 0.1, hr * 0.3, hr * 0.1);
-    } else {
-      ctx.fillStyle = '#5A5850'; ctx.fillRect(hx - hr * 0.12, hy - hr * 0.9, hr * 0.24, hr * 1.2);
+    function rrect(x, y, w, h, r, fill) {
+      outlined(function () { roundRectPath(ctx, x, y, w, h, r); }, fill);
     }
+    function vgrad(y0, y1, a, b) { var g = ctx.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, a); g.addColorStop(1, b); return g; }
+    function hgrad(x0, x1, a, b) { var g = ctx.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, a); g.addColorStop(1, b); return g; }
+
+    // leg state for phase psi: forward -1..1 (towards facing), lift while swinging forward
+    function leg(psi) { return walking ? { fwd: Math.sin(psi), lift: Math.max(0, Math.cos(psi)) * 3.2 * u } : { fwd: 0, lift: 0 }; }
+    var legL = leg(phi), legR = leg(phi + Math.PI);
+
+    // ground shadow
+    var shg = ctx.createRadialGradient(cx, 93 * u, 0, cx, 93 * u, 22 * u);
+    shg.addColorStop(0, 'rgba(0,0,0,0.42)'); shg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = shg; ctx.beginPath(); ctx.ellipse(cx, 93 * u, 22 * u, 5 * u, 0, 0, Math.PI * 2); ctx.fill();
+
+    ctx.save(); ctx.translate(0, -bob);
+    if (!side) drawFrontBack(dir === 2); else drawSide();
     ctx.restore();
     playerCache.set(key, c);
     return c;
+
+    function drawLegFB(hx, l, facingCam) {
+      var fy = 91 * u + bob + (facingCam ? 1 : -1) * l.fwd * 1.8 * u - l.lift;
+      var fx = hx + (hx - cx) * 0.1;
+      var ky = (63 * u + fy) / 2 - l.lift * 0.3;
+      limb(hx, 63 * u, fx, ky, 10.5 * u, darken(PC.suit, 14));
+      limb(fx, ky, fx, fy - 2.5 * u, 9.5 * u, PC.suit);
+      if (facingCam) rrect(fx - 4.2 * u, ky - 2.2 * u, 8.4 * u, 4.4 * u, 1.6 * u, vgrad(ky - 2 * u, ky + 2 * u, lighten(PC.armour, 22), PC.armourDark)); // knee pad
+      var s = 1 + (facingCam ? 1 : -1) * l.fwd * 0.08;
+      ellipse(fx, fy, 6 * u * s, 3.8 * u * s, PC.boot);
+    }
+    function drawArmFB(sx, l, facingCam) {
+      var fwd = -l.fwd; // arms swing opposite the leg on the same side
+      var hy = 56 * u + (facingCam ? 1 : -1) * fwd * 2.4 * u, hx = sx + (sx - cx) * 0.18;
+      var ey = (37 * u + hy) / 2;
+      limb(sx, 37 * u, hx, ey, 7 * u, PC.suit);
+      limb(hx, ey, hx, hy, 6.5 * u, PC.armour);
+      ellipse(hx, hy + 1 * u, 4.3 * u, 4 * u, PC.glove);
+    }
+    function drawFrontBack(front) {
+      var lx = cx - 6 * u, rx = cx + 6 * u;
+      // backpack edges peek out behind the shoulders (front) — the pack itself when seen from behind
+      if (front) { rrect(cx - 18 * u, 32 * u, 36 * u, 22 * u, 4 * u, PC.pack); }
+      drawLegFB(lx, legL, front); drawLegFB(rx, legR, front);
+      // torso
+      outlined(function () {
+        ctx.beginPath();
+        ctx.moveTo(cx - 15 * u, 32 * u); ctx.lineTo(cx + 15 * u, 32 * u);
+        ctx.quadraticCurveTo(cx + 17 * u, 45 * u, cx + 13.5 * u, 64 * u);
+        ctx.lineTo(cx - 13.5 * u, 64 * u);
+        ctx.quadraticCurveTo(cx - 17 * u, 45 * u, cx - 15 * u, 32 * u); ctx.closePath();
+      }, hgrad(cx - 16 * u, cx + 16 * u, lighten(PC.suit, 18), PC.suitDark));
+      if (front) {
+        // chest plate + belt + buckle
+        rrect(cx - 9 * u, 35 * u, 18 * u, 13 * u, 3 * u, vgrad(35 * u, 48 * u, lighten(PC.armour, 20), PC.armourDark));
+        ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(cx - 7 * u, 37 * u, 5 * u, 1.2 * u);
+        ctx.fillStyle = '#3FA7D6'; ctx.fillRect(cx + 3 * u, 40 * u, 3 * u, 2 * u);
+      } else {
+        // backpack with vents and a status light
+        rrect(cx - 13 * u, 33 * u, 26 * u, 25 * u, 4 * u, vgrad(33 * u, 58 * u, lighten(PC.pack, 18), darken(PC.pack, 18)));
+        for (var v = 0; v < 3; v++) { ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(cx - 9 * u, (38 + v * 4) * u, 18 * u, 1.5 * u); }
+        ctx.fillStyle = '#3FA7D6'; ctx.fillRect(cx - 2 * u, 51 * u, 4 * u, 2.5 * u);
+      }
+      rrect(cx - 12.5 * u, 60 * u, 25 * u, 7 * u, 3 * u, vgrad(60 * u, 67 * u, lighten(PC.armour, 12), PC.armourDark));
+      rrect(cx - 13.5 * u, 57 * u, 27 * u, 4.5 * u, 1.2 * u, '#2E2A24');
+      if (front) rrect(cx - 2.5 * u, 57.5 * u, 5 * u, 3.5 * u, 0.8 * u, '#B8B0A0');
+      rrect(cx + (front ? 6 : -11) * u, 58 * u, 5 * u, 6 * u, 1.2 * u, '#6A5238'); // tool pouch
+      drawArmFB(cx - 15.5 * u, legL, front); drawArmFB(cx + 15.5 * u, legR, front);
+      // shoulder pads
+      ellipse(cx - 13.5 * u, 33 * u, 7 * u, 4.5 * u, vgrad(28 * u, 37 * u, lighten(PC.armour, 24), PC.armourDark), -0.25);
+      ellipse(cx + 13.5 * u, 33 * u, 7 * u, 4.5 * u, vgrad(28 * u, 37 * u, lighten(PC.armour, 24), PC.armourDark), 0.25);
+      // collar + helmet
+      rrect(cx - 7.5 * u, 26 * u, 15 * u, 7 * u, 2.5 * u, PC.armourDark);
+      var hy = 19 * u, hr = 11 * u;
+      ellipse(cx, hy, hr, hr * 1.02, (function () { var g = ctx.createRadialGradient(cx - hr * 0.4, hy - hr * 0.45, hr * 0.1, cx, hy, hr); g.addColorStop(0, lighten(PC.helmet, 40)); g.addColorStop(1, darken(PC.helmet, 25)); return g; })());
+      if (front) {
+        rrect(cx - 8.8 * u, hy - 3 * u, 17.6 * u, 8.5 * u, 3.5 * u, vgrad(hy - 3 * u, hy + 5.5 * u, '#26404E', PC.visor));
+        ctx.fillStyle = 'rgba(160,220,245,0.7)'; ctx.fillRect(cx - 6.5 * u, hy - 1.5 * u, 5 * u, 1.3 * u);
+        ctx.fillStyle = 'rgba(160,220,245,0.35)'; ctx.fillRect(cx - 0.5 * u, hy - 1.5 * u, 2 * u, 1.3 * u);
+        ctx.fillStyle = PC.suit; ctx.fillRect(cx - 1.2 * u, hy - hr * 0.95, 2.4 * u, 5 * u); // stripe
+      } else {
+        ctx.fillStyle = darken(PC.helmet, 18); ctx.fillRect(cx - 1.4 * u, hy - hr * 0.95, 2.8 * u, hr * 1.7);
+        ctx.fillStyle = PC.suit; ctx.fillRect(cx - 1.2 * u, hy - hr * 0.95, 2.4 * u, 5 * u);
+      }
+    }
+    function drawSide() {
+      var hipX = cx - 0.5 * u;
+      function sideLeg(l, far) {
+        var fx = hipX + l.fwd * 7 * u, fy = 91 * u + bob - l.lift;
+        var kx = (hipX + fx) / 2 + 2 * u + l.lift * 0.4, ky = (63 * u + fy) / 2 - l.lift * 0.2;
+        var col = far ? darken(PC.suit, 38) : PC.suit;
+        limb(hipX, 63 * u, kx, ky, 10.5 * u, far ? darken(PC.suit, 50) : darken(PC.suit, 14));
+        limb(kx, ky, fx, fy - 2.5 * u, 9.5 * u, col);
+        if (!far) rrect(kx - 0.5 * u, ky - 3 * u, 4.5 * u, 6 * u, 1.6 * u, hgrad(kx, kx + 4 * u, PC.armourDark, lighten(PC.armour, 20)));
+        outlined(function () { roundRectPath(ctx, fx - 4.5 * u, fy - 3 * u, 11 * u, 5.5 * u, 2.2 * u); }, far ? '#191715' : PC.boot);
+      }
+      function sideArm(l, far) {
+        var sx = cx - 2.5 * u, fwd = -l.fwd, hx = sx + fwd * 7 * u, hy = 55 * u - Math.abs(fwd) * 1.5 * u;
+        var ex = (sx + hx) / 2 - 0.8 * u, ey = (37 * u + hy) / 2 + 1 * u;
+        limb(sx, 37 * u, ex, ey, 6.8 * u, far ? darken(PC.suit, 38) : PC.suit);
+        limb(ex, ey, hx, hy, 6.2 * u, far ? darken(PC.armour, 20) : PC.armour);
+        ellipse(hx, hy + 0.8 * u, 4.1 * u, 3.8 * u, PC.glove);
+      }
+      sideArm(legR, true); sideLeg(legR, true);
+      // backpack (behind = left when facing east)
+      rrect(cx - 17 * u, 32 * u, 11 * u, 26 * u, 3 * u, hgrad(cx - 17 * u, cx - 6 * u, darken(PC.pack, 10), lighten(PC.pack, 14)));
+      for (var sv = 0; sv < 3; sv++) { ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(cx - 15 * u, (37 + sv * 4) * u, 7 * u, 1.4 * u); }
+      ctx.fillStyle = '#3FA7D6'; ctx.fillRect(cx - 15.5 * u, 51 * u, 2 * u, 3 * u);
+      sideLeg(legL, false);
+      // torso (profile)
+      outlined(function () {
+        ctx.beginPath();
+        ctx.moveTo(cx - 9 * u, 31 * u); ctx.lineTo(cx + 8 * u, 31 * u);
+        ctx.quadraticCurveTo(cx + 14 * u, 42 * u, cx + 9 * u, 64 * u);
+        ctx.lineTo(cx - 9.5 * u, 64 * u); ctx.quadraticCurveTo(cx - 11 * u, 46 * u, cx - 9 * u, 31 * u); ctx.closePath();
+      }, hgrad(cx - 11 * u, cx + 12 * u, PC.suitDark, lighten(PC.suit, 14)));
+      rrect(cx + 3.5 * u, 34 * u, 8.5 * u, 14 * u, 3 * u, vgrad(34 * u, 48 * u, lighten(PC.armour, 20), PC.armourDark)); // chest plate edge
+      rrect(cx - 9.5 * u, 60 * u, 18 * u, 7 * u, 3 * u, vgrad(60 * u, 67 * u, lighten(PC.armour, 12), PC.armourDark));
+      rrect(cx - 10 * u, 57 * u, 19.5 * u, 4.5 * u, 1.2 * u, '#2E2A24');
+      rrect(cx - 3 * u, 58 * u, 5 * u, 6 * u, 1.2 * u, '#6A5238'); // tool pouch
+      sideArm(legL, false);
+      ellipse(cx - 2.5 * u, 33 * u, 7.5 * u, 5 * u, vgrad(28 * u, 37 * u, lighten(PC.armour, 24), PC.armourDark));
+      // helmet with visor facing +x
+      rrect(cx - 5.5 * u, 26 * u, 11 * u, 7 * u, 2.5 * u, PC.armourDark);
+      var hx = cx + 1 * u, hy = 19 * u, hr = 11 * u;
+      ellipse(hx, hy, hr, hr * 1.02, (function () { var g = ctx.createRadialGradient(hx - hr * 0.4, hy - hr * 0.45, hr * 0.1, hx, hy, hr); g.addColorStop(0, lighten(PC.helmet, 40)); g.addColorStop(1, darken(PC.helmet, 25)); return g; })());
+      rrect(hx + 1.5 * u, hy - 3 * u, 10.5 * u, 8.5 * u, 3.5 * u, vgrad(hy - 3 * u, hy + 5.5 * u, '#26404E', PC.visor));
+      ctx.fillStyle = 'rgba(160,220,245,0.7)'; ctx.fillRect(hx + 5 * u, hy - 1.5 * u, 4 * u, 1.3 * u);
+      ctx.fillStyle = PC.suit; ctx.fillRect(hx - 6 * u, hy - hr * 0.95, 8 * u, 2.4 * u);
+    }
   };
 
   // ---------------------------------------------------------------------
