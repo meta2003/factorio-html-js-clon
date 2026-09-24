@@ -47,17 +47,6 @@
     ctx.strokeStyle = 'rgba(12,12,12,0.9)'; ctx.lineWidth = Math.max(1.5, Math.min(w, h) * 0.03); ctx.stroke();
   }
 
-  // Rounded-arch path (furnace fire mouth): straight jambs rising to a semicircular head.
-  function archPath(ctx, cx, topY, w, h) {
-    var springY = topY + h * 0.42, r = w * 0.5;
-    ctx.beginPath();
-    ctx.moveTo(cx - r, topY + h);
-    ctx.lineTo(cx - r, springY);
-    ctx.arc(cx, springY, r, Math.PI, 0, false);
-    ctx.lineTo(cx + r, topY + h);
-    ctx.closePath();
-  }
-
   // Small smoke loop for a stack whose mouth is at (cx, cy). The sprite canvas ends at the
   // building's footprint, so puffs rise only through the space above the mouth and fade out
   // before reaching the top edge (a puff cut off by the edge reads as a pale rectangle).
@@ -103,274 +92,348 @@
   }
 
   // ---------------------------------------------------------------------
-  // stone-furnace (2x2, not rotatable): a squat beehive kiln of stacked, staggered field
-  // stones, a stone-ringed flue on top and an arched fire mouth with voussoirs in front.
+  // Industrial detailing shared by the furnaces and drills: weathering, raised housings
+  // (lit top face + darker front face, the game's slight top-down-from-the-south view),
+  // cast-iron grates and the auger drill bit both drills use.
   // ---------------------------------------------------------------------
-  function kilnPath(ctx, W, H) {
-    var l = W * 0.06, r = W * 0.94, b = H * 0.94, t = H * 0.07;
-    ctx.beginPath();
-    ctx.moveTo(l + W * 0.06, b);
-    ctx.quadraticCurveTo(l, b, l, b - H * 0.08);
-    ctx.bezierCurveTo(l - W * 0.01, H * 0.42, W * 0.12, t, W * 0.5, t);
-    ctx.bezierCurveTo(W * 0.88, t, r + W * 0.01, H * 0.42, r, b - H * 0.08);
-    ctx.quadraticCurveTo(r, b, r - W * 0.06, b);
-    ctx.closePath();
-  }
-  function stoneKiln(ctx, W, H, rng) {
-    kilnPath(ctx, W, H); ctx.fillStyle = '#3E372F'; ctx.fill(); // mortar
-    ctx.save(); kilnPath(ctx, W, H); ctx.clip();
-    var palette = ['#9A907E', '#8E8474', '#A89E88', '#817868', '#948B7A', '#B0A690', '#7A7263'];
-    var rows = 7, top = H * 0.07, rowH = (H * 0.87) / rows;
-    for (var ry = 0; ry < rows; ry++) {
-      var y = top + ry * rowH, x = W * 0.02 - (ry % 2) * W * 0.09 - rng() * W * 0.04;
-      var shade = -8 + ry * 3; // courses darken slightly toward the ground
-      while (x < W) {
-        var sw = W * (0.14 + rng() * 0.1), sh = rowH * (0.84 + rng() * 0.1);
-        var col = L.darken(palette[(rng() * palette.length) | 0], Math.max(0, shade));
-        var sx = x + W * 0.008, sy = y + (rowH - sh) * 0.5, rr = sh * 0.38;
-        var g = ctx.createLinearGradient(sx, sy, sx + sw * 0.3, sy + sh);
-        g.addColorStop(0, L.lighten(col, 26)); g.addColorStop(0.5, col); g.addColorStop(1, L.darken(col, 30));
-        L.roundRectPath(ctx, sx, sy, sw - W * 0.016, sh, rr); ctx.fillStyle = g; ctx.fill();
-        ctx.strokeStyle = 'rgba(28,24,18,0.55)'; ctx.lineWidth = 1; ctx.stroke();
-        x += sw;
-      }
-    }
-    // Rounded-form shading: lit from the top-left, darker toward the right and the base.
-    var side = ctx.createLinearGradient(0, 0, W, 0);
-    side.addColorStop(0, 'rgba(255,255,255,0.10)'); side.addColorStop(0.45, 'rgba(0,0,0,0)'); side.addColorStop(1, 'rgba(0,0,0,0.30)');
-    ctx.fillStyle = side; ctx.fillRect(0, 0, W, H);
-    var vert = ctx.createLinearGradient(0, 0, 0, H);
-    vert.addColorStop(0, 'rgba(255,255,240,0.14)'); vert.addColorStop(0.5, 'rgba(0,0,0,0)'); vert.addColorStop(1, 'rgba(0,0,0,0.28)');
-    ctx.fillStyle = vert; ctx.fillRect(0, 0, W, H);
-    ctx.restore();
-    kilnPath(ctx, W, H); ctx.strokeStyle = 'rgba(14,12,10,0.9)'; ctx.lineWidth = Math.max(1.5, W * 0.022); ctx.stroke();
-  }
-  // Flue on top: a ring of lighter capstones around a dark shaft that glows while working.
-  function kilnFlue(ctx, cx, cy, rx, ry, working, frame) {
-    ctx.fillStyle = '#6E665A';
-    ctx.beginPath(); ctx.ellipse(cx, cy, rx * 1.45, ry * 1.5, 0, 0, Math.PI * 2); ctx.fill();
-    var n = 10;
+  // Grime speckles (deterministic via rng).
+  function grime(ctx, x, y, w, h, rng, n, color) {
+    ctx.fillStyle = color || 'rgba(18,14,10,0.16)';
     for (var i = 0; i < n; i++) {
-      var a0 = i / n * Math.PI * 2, a1 = (i + 0.82) / n * Math.PI * 2;
-      var lit = Math.cos((a0 + a1) / 2 + 2.3); // top-left brighter
-      ctx.fillStyle = L.adjust('#A0978A', Math.round(lit * 22));
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, rx * 1.45, ry * 1.5, 0, a0, a1);
-      ctx.ellipse(cx, cy, rx * 1.02, ry * 1.04, 0, a1, a0, true);
-      ctx.closePath(); ctx.fill();
+      var r = Math.min(w, h) * (0.01 + rng() * 0.035);
+      ctx.beginPath(); ctx.arc(x + rng() * w, y + rng() * h, r, 0, Math.PI * 2); ctx.fill();
     }
-    ctx.fillStyle = '#15110D';
-    ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
-    if (working) {
-      ctx.save(); ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.clip();
-      L.glow(ctx, cx, cy + ry * 0.4, rx * 1.3, '#FF8A2A', flicker(frame, 1.1, 0.5, 0.35));
-      ctx.restore();
-    }
-    ctx.strokeStyle = 'rgba(14,12,10,0.85)'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.ellipse(cx, cy, rx * 1.45, ry * 1.5, 0, 0, Math.PI * 2); ctx.stroke();
   }
-  // Arched fire mouth framed by wedge-shaped voussoir stones.
-  function kilnMouth(ctx, cx, bottomY, w, h, working, frame) {
-    var ring = w * 0.2, topY = bottomY - h;
-    // voussoir ring
-    archPath(ctx, cx, topY - ring, w + ring * 2, h + ring); ctx.fillStyle = '#B3A994'; ctx.fill();
-    var springY = topY + h * 0.42, r0 = w * 0.5, r1 = r0 + ring, n = 7;
+  // Run-down stains (rust, soot) starting at y and fading downwards.
+  function streaks(ctx, x, y, w, h, rng, n, color) {
     for (var i = 0; i < n; i++) {
-      var a0 = Math.PI + i / n * Math.PI, a1 = Math.PI + (i + 1) / n * Math.PI;
-      ctx.beginPath();
-      ctx.arc(cx, springY, r1, a0 + 0.02, a1 - 0.02, false);
-      ctx.arc(cx, springY, r0, a1 - 0.02, a0 + 0.02, true);
-      ctx.closePath();
-      ctx.fillStyle = L.adjust('#A99F8A', Math.round(Math.cos((a0 + a1) / 2 + 0.8) * 18));
-      ctx.fill(); ctx.strokeStyle = 'rgba(28,24,18,0.6)'; ctx.lineWidth = 1; ctx.stroke();
+      var sx = x + rng() * w, sw = w * (0.015 + rng() * 0.035), sl = h * (0.35 + rng() * 0.65);
+      var g = ctx.createLinearGradient(0, y, 0, y + sl);
+      g.addColorStop(0, color); g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g; ctx.fillRect(sx, y, sw, sl);
     }
-    // jamb stones
-    for (var s = 0; s < 2; s++) {
-      var jx = s ? cx + r0 : cx - r1;
-      L.rectBevel(ctx, jx, springY, ring, bottomY - springY, s ? '#8E8474' : '#A69C87', { dark: '#6A6254', light: '#BDB39C', outlineColor: 'rgba(28,24,18,0.6)', outlineWidth: 1 });
-    }
-    // opening
-    archPath(ctx, cx, topY, w, h); ctx.fillStyle = '#17120E'; ctx.fill();
-    ctx.save(); archPath(ctx, cx, topY, w, h); ctx.clip();
-    if (working) flames(ctx, cx, bottomY, w, h, frame);
+  }
+  // Raised housing: top face (x, y, w, d) and a front face of height h below it.
+  function housing(ctx, x, y, w, d, h, color, r) {
+    var fg = ctx.createLinearGradient(0, y + d, 0, y + d + h);
+    fg.addColorStop(0, L.darken(color, 22)); fg.addColorStop(1, L.darken(color, 50));
+    L.roundRectPath(ctx, x, y + d - r, w, h + r, r); ctx.fillStyle = fg; ctx.fill();
+    ctx.strokeStyle = 'rgba(10,10,10,0.9)'; ctx.lineWidth = 1.5; ctx.stroke();
+    L.panel(ctx, x, y, w, d, color, { r: r, hi: 22, lo: 26 });
+  }
+  // Horizontal seam with a row of rivets.
+  function rivetSeam(ctx, x0, x1, y, n, r) {
+    ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.beginPath(); ctx.moveTo(x0, y + 1.2); ctx.lineTo(x1, y + 1.2); ctx.stroke();
+    var pts = [];
+    for (var i = 0; i < n; i++) pts.push([x0 + (x1 - x0) * (i + 0.5) / n, y]);
+    L.rivets(ctx, pts, r);
+  }
+  // Heavy cast-iron door frame with vertical grate bars over a (possibly burning) fire box.
+  function fireGrate(ctx, x, y, w, h, working, frame, bars) {
+    L.rectBevel(ctx, x - w * 0.1, y - h * 0.12, w * 1.2, h * 1.24, '#2E2A27', { light: '#4A4440', dark: '#171412', outlineColor: '#0B0A09', outlineWidth: 1.5 });
+    ctx.fillStyle = '#120E0B'; ctx.fillRect(x, y, w, h);
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    if (working) flames(ctx, x + w / 2, y + h, w, h * 1.1, frame);
     else {
-      ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(cx - w / 2, topY, w * 0.35, h); // inner shadow
-      for (var e = 0; e < 5; e++) {
-        ctx.fillStyle = e % 2 ? 'rgba(120,45,20,0.55)' : 'rgba(70,40,30,0.8)';
-        ctx.beginPath(); ctx.arc(cx + (e - 2) * w * 0.15, bottomY - h * 0.05, w * 0.07, 0, Math.PI * 2); ctx.fill();
-      }
+      ctx.fillStyle = 'rgba(110,40,16,0.5)';
+      for (var e = 0; e < 4; e++) { ctx.beginPath(); ctx.arc(x + w * (0.2 + e * 0.2), y + h * 0.92, w * 0.07, 0, Math.PI * 2); ctx.fill(); }
     }
     ctx.restore();
-    archPath(ctx, cx, topY, w, h); ctx.strokeStyle = '#0C0A08'; ctx.lineWidth = Math.max(1.5, w * 0.04); ctx.stroke();
-    if (working) L.glow(ctx, cx, bottomY, w * 1.25, '#FF8A2A', 0.22 + 0.1 * Math.sin((frame | 0) * 1.35)); // warm spill on the stones
+    for (var b = 1; b < bars; b++) {
+      var bx = x + w * b / bars;
+      ctx.fillStyle = '#1E1B19'; ctx.fillRect(bx - w * 0.035, y, w * 0.07, h);
+      ctx.fillStyle = 'rgba(255,255,255,0.14)'; ctx.fillRect(bx - w * 0.035, y, w * 0.02, h);
+    }
+    if (working) L.glow(ctx, x + w / 2, y + h, w * 1.1, '#FF8A2A', flicker(frame, 1.35, 0.22, 0.14));
+  }
+  // Round exhaust stack seen from above: shaded collar, sooty lip, dark bore (+ inner glow).
+  function stack(ctx, cx, cy, r, color, working, frame) {
+    L.disc(ctx, cx, cy, r, color, { hi: 36, lo: 40 });
+    ctx.fillStyle = '#1A1714'; ctx.beginPath(); ctx.arc(cx, cy, r * 0.66, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#060504'; ctx.beginPath(); ctx.arc(cx + r * 0.06, cy + r * 0.08, r * 0.5, 0, Math.PI * 2); ctx.fill();
+    if (working) L.glow(ctx, cx, cy, r * 0.8, '#FF7A2A', flicker(frame, 1.1, 0.25, 0.2));
+  }
+  // Vertical auger (screw drill bit) hanging from topY; `phase` 0..1 scrolls the flights so
+  // it appears to turn; the tip ends at topY + len.
+  function auger(ctx, cx, topY, len, r, phase) {
+    var tip = r * 1.8;
+    function path() {
+      ctx.beginPath();
+      ctx.moveTo(cx - r, topY); ctx.lineTo(cx + r, topY);
+      ctx.lineTo(cx + r, topY + len - tip); ctx.lineTo(cx, topY + len); ctx.lineTo(cx - r, topY + len - tip);
+      ctx.closePath();
+    }
+    var g = ctx.createLinearGradient(cx - r, 0, cx + r, 0);
+    g.addColorStop(0, '#4A4F55'); g.addColorStop(0.3, '#C9CED3'); g.addColorStop(0.55, '#8D949B'); g.addColorStop(1, '#33373B');
+    path(); ctx.fillStyle = g; ctx.fill();
+    ctx.save(); path(); ctx.clip();
+    var pitch = r * 1.25;
+    for (var k = -2; k < len / pitch + 2; k++) {
+      var yy = topY + (k + phase) * pitch;
+      ctx.strokeStyle = 'rgba(15,15,15,0.6)'; ctx.lineWidth = r * 0.38;
+      ctx.beginPath(); ctx.moveTo(cx - r, yy + r * 0.55); ctx.lineTo(cx + r, yy - r * 0.55); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = r * 0.14;
+      ctx.beginPath(); ctx.moveTo(cx - r, yy + r * 0.2); ctx.lineTo(cx + r, yy - r * 0.9); ctx.stroke();
+    }
+    ctx.restore();
+    path(); ctx.strokeStyle = 'rgba(10,10,10,0.9)'; ctx.lineWidth = 1.3; ctx.stroke();
+  }
+  // I-beam post of a drill gantry, from (x, y0) down to y1 (a vertical member).
+  function post(ctx, x, y0, y1, w, color) {
+    L.rectBevel(ctx, x - w / 2, y0, w, y1 - y0, color, { light: L.lighten(color, 30), dark: L.darken(color, 35), outlineColor: '#101010', outlineWidth: 1.2 });
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x - w * 0.12, y0, w * 0.24, y1 - y0);
+  }
+  // Loose ore in an output chute (neutral grey-brown: the chute doesn't know the ore type).
+  function oreInChute(ctx, x, y, w, h, frame, working, rng) {
+    var cols = ['#5E5750', '#4A443E', '#6E665C', '#3C3732'];
+    for (var i = 0; i < 9; i++) {
+      var ox = x + w * (0.15 + rng() * 0.7), oy = y + h * (0.2 + rng() * 0.7);
+      if (working) oy = y + ((oy - y + (frame | 0) * h * 0.07) % h);
+      ctx.fillStyle = cols[i % cols.length];
+      ctx.beginPath(); ctx.arc(ox, oy, w * (0.07 + rng() * 0.05), 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // stone-furnace (2x2, not rotatable): cut-stone block furnace held together by riveted
+  // iron straps and corner angle-irons, a cast-iron fire door with grate on the front and a
+  // square iron flue collar on top; soot above the door.
+  // ---------------------------------------------------------------------
+  function stoneCourses(ctx, x, y, w, h, rows, rng, shadeTop, shadeBottom) {
+    var palette = ['#8F8676', '#857C6D', '#9B9280', '#7A7264', '#A39A86', '#8A8272'];
+    var rowH = h / rows;
+    for (var ry = 0; ry < rows; ry++) {
+      var yy = y + ry * rowH, xx = x - (ry % 2) * w * 0.12 - rng() * w * 0.05;
+      var shade = shadeTop + (shadeBottom - shadeTop) * (ry / Math.max(1, rows - 1));
+      while (xx < x + w) {
+        var sw = w * (0.2 + rng() * 0.12);
+        var col = L.adjust(palette[(rng() * palette.length) | 0], Math.round(shade));
+        L.rectBevel(ctx, xx + 1, yy + 1, sw - 2, rowH - 2, col, { light: L.lighten(col, 20), dark: L.darken(col, 28), outlineColor: 'rgba(30,26,20,0.75)', outlineWidth: 1 });
+        // chisel marks
+        ctx.fillStyle = 'rgba(0,0,0,0.12)';
+        ctx.fillRect(xx + sw * (0.2 + rng() * 0.5), yy + rowH * (0.3 + rng() * 0.3), sw * 0.12, 1);
+        xx += sw;
+      }
+    }
   }
   function paintStoneFurnaceHeavy(ctx, W, H, frame, dir, def, type, opts) {
     var working = !!(opts && opts.working);
-    stoneKiln(ctx, W, H, seed(type, 1, 9));
-    kilnFlue(ctx, W * 0.5, H * 0.24, W * 0.13, H * 0.07, working, frame);
-    kilnMouth(ctx, W * 0.5, H * 0.94, W * 0.34, H * 0.34, working, frame);
-    if (working) stackSmoke(ctx, W * 0.5, H * 0.2, frame, W);
+    var rng = seed(type, 1, 9);
+    var x = W * 0.06, w = W * 0.88, top = H * 0.08, faceY = H * 0.56, bot = H * 0.95;
+    // mortar bed / silhouette
+    L.roundRectPath(ctx, x, top, w, bot - top, W * 0.07); ctx.fillStyle = '#3A342D'; ctx.fill();
+    ctx.save(); L.roundRectPath(ctx, x, top, w, bot - top, W * 0.07); ctx.clip();
+    stoneCourses(ctx, x, top, w, faceY - top, 4, rng, 8, 0);        // top face (lit)
+    stoneCourses(ctx, x, faceY, w, bot - faceY, 3, rng, -22, -38);  // front face (shade)
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(x, faceY, w, H * 0.02); // eave shadow
+    streaks(ctx, W * 0.3, faceY, W * 0.4, H * 0.12, rng, 5, 'rgba(15,12,10,0.35)'); // soot
+    ctx.restore();
+    L.roundRectPath(ctx, x, top, w, bot - top, W * 0.07); ctx.strokeStyle = '#0E0C0A'; ctx.lineWidth = 2; ctx.stroke();
+    // iron straps: around the top edge and across the front face, with rivets
+    var iron = '#3B3A38';
+    L.rectBevel(ctx, x, faceY - H * 0.035, w, H * 0.05, iron, { light: '#5A5754', dark: '#232120', outlineColor: '#0E0D0C', outlineWidth: 1 });
+    L.rivets(ctx, [[x + w * 0.08, faceY - H * 0.01], [x + w * 0.36, faceY - H * 0.01], [x + w * 0.64, faceY - H * 0.01], [x + w * 0.92, faceY - H * 0.01]], W * 0.016);
+    L.rectBevel(ctx, x, bot - H * 0.1, w, H * 0.045, iron, { light: '#5A5754', dark: '#232120', outlineColor: '#0E0D0C', outlineWidth: 1 });
+    L.rivets(ctx, [[x + w * 0.08, bot - H * 0.078], [x + w * 0.92, bot - H * 0.078]], W * 0.016);
+    // corner angle irons
+    for (var s = 0; s < 2; s++) {
+      var cx0 = s ? x + w - W * 0.07 : x;
+      L.rectBevel(ctx, cx0, top + H * 0.05, W * 0.07, bot - top - H * 0.08, s ? '#2E2D2B' : '#46443F', { light: '#5E5B56', dark: '#1D1C1A', outlineColor: '#0E0D0C', outlineWidth: 1 });
+      L.rivets(ctx, [[cx0 + W * 0.035, top + H * 0.14], [cx0 + W * 0.035, top + H * 0.33]], W * 0.014);
+    }
+    // square cast-iron flue collar on the top face
+    var fx = W * 0.36, fy = H * 0.14, fw = W * 0.28, fh = H * 0.24;
+    L.rectBevel(ctx, fx, fy, fw, fh, '#403D3A', { light: '#66625C', dark: '#221F1D', outlineColor: '#0B0A09', outlineWidth: 1.5 });
+    L.inset(ctx, fx + fw * 0.2, fy + fh * 0.2, fw * 0.6, fh * 0.6, '#0C0A08', fw * 0.05);
+    if (working) {
+      L.glow(ctx, fx + fw / 2, fy + fh * 0.55, fw * 0.55, '#FF8A2A', flicker(frame, 1.1, 0.55, 0.3));
+      stackSmoke(ctx, fx + fw / 2, fy + fh * 0.4, frame, W);
+    }
+    L.rivets(ctx, [[fx + fw * 0.1, fy + fh * 0.1], [fx + fw * 0.9, fy + fh * 0.1], [fx + fw * 0.1, fy + fh * 0.9], [fx + fw * 0.9, fy + fh * 0.9]], W * 0.013);
+    // cast-iron fire door on the front face
+    fireGrate(ctx, W * 0.34, H * 0.66, W * 0.32, H * 0.2, working, frame, 4);
   }
 
   // ---------------------------------------------------------------------
-  // steel-furnace (2x2): heavy chamfered steel housing with bolted corner plates around a
-  // round crucible lined with refractory brick (molten glow while working), a slotted fire
-  // door on the front and an exhaust stack in the back corner.
+  // steel-furnace (2x2): dark riveted steel housing with cooling ribs, a bolted crucible
+  // flange (refractory brick, molten glow while working) on top, a wide grated fire window
+  // with a hazard-striped kick plate on the front, twin exhaust stacks and rust/soot runs.
   // ---------------------------------------------------------------------
   function paintSteelFurnaceHeavy(ctx, W, H, frame, dir, def, type, opts) {
     var working = !!(opts && opts.working);
-    var col = L.entColors(def)[0] || '#5E6873';
-    var f = frame | 0;
-    // plinth + housing
-    chamferPanel(ctx, W * 0.03, H * 0.05, W * 0.94, H * 0.9, W * 0.14, L.darken(col, 22), { hi: 14, lo: 22 });
-    chamferPanel(ctx, W * 0.09, H * 0.08, W * 0.82, H * 0.78, W * 0.11, col, {});
-    // bolted corner plates
-    var cp = W * 0.17, corners = [[W * 0.1, H * 0.09], [W * 0.73, H * 0.09], [W * 0.1, H * 0.68], [W * 0.73, H * 0.68]];
-    for (var i = 0; i < 4; i++) {
-      var c = corners[i];
-      L.panel(ctx, c[0], c[1], cp, cp, L.darken(col, 12), { r: W * 0.02, hi: 18, lo: 20 });
-      L.rivets(ctx, [[c[0] + cp * 0.3, c[1] + cp * 0.3], [c[0] + cp * 0.7, c[1] + cp * 0.7]], W * 0.018);
+    var f = frame | 0, rng = seed(type, 4, 2);
+    var steel = '#4C535B';
+    // housing: top face + front face
+    housing(ctx, W * 0.05, H * 0.07, W * 0.9, H * 0.55, H * 0.32, steel, W * 0.05);
+    ctx.save(); L.roundRectPath(ctx, W * 0.05, H * 0.07, W * 0.9, H * 0.87, W * 0.05); ctx.clip();
+    grime(ctx, W * 0.05, H * 0.07, W * 0.9, H * 0.55, rng, 26);
+    streaks(ctx, W * 0.08, H * 0.62, W * 0.84, H * 0.3, rng, 7, 'rgba(110,55,25,0.35)'); // rust runs on the front
+    ctx.restore();
+    // cooling ribs down both sides of the top face
+    for (var side = 0; side < 2; side++) {
+      var rx = side ? W * 0.8 : W * 0.09;
+      for (var k = 0; k < 5; k++) {
+        var ry = H * (0.14 + k * 0.09);
+        L.rectBevel(ctx, rx, ry, W * 0.11, H * 0.05, '#5A626B', { light: '#7C858F', dark: '#2E3338', outlineColor: '#111', outlineWidth: 1 });
+      }
     }
-    // crucible: steel collar, refractory brick ring, pit
-    var cx = W * 0.5, cy = H * 0.44, R = W * 0.29, rb = W * 0.23, rp = W * 0.16;
-    L.disc(ctx, cx, cy, R, '#7A858F', { hi: 40, lo: 45 });
-    var n = 14;
+    // crucible flange: bolted steel ring, brick lining, melt
+    var cx = W * 0.5, cy = H * 0.35, R = W * 0.25, rb = W * 0.19, rp = W * 0.13;
+    L.disc(ctx, cx, cy, R, '#6A737C', { hi: 34, lo: 44 });
+    var bolts = [];
+    for (var bI = 0; bI < 12; bI++) { var a = bI / 12 * Math.PI * 2; bolts.push([cx + Math.cos(a) * R * 0.87, cy + Math.sin(a) * R * 0.87]); }
+    L.rivets(ctx, bolts, W * 0.014);
+    var n = 12;
     for (var b = 0; b < n; b++) {
-      var a0 = b / n * Math.PI * 2 + 0.03, a1 = (b + 1) / n * Math.PI * 2 - 0.03;
+      var a0 = b / n * Math.PI * 2 + 0.035, a1 = (b + 1) / n * Math.PI * 2 - 0.035;
       ctx.beginPath(); ctx.arc(cx, cy, rb, a0, a1); ctx.arc(cx, cy, rp, a1, a0, true); ctx.closePath();
-      var lit = Math.cos((a0 + a1) / 2 - 0.8); // inner wall: lit side faces away from the light
-      ctx.fillStyle = L.adjust(b % 2 ? '#8A4A32' : '#7A3F2A', Math.round(lit * 16));
+      ctx.fillStyle = L.adjust(b % 2 ? '#7E4430' : '#6C3A28', Math.round(Math.cos((a0 + a1) / 2 - 0.8) * 14));
       ctx.fill();
     }
-    ctx.strokeStyle = 'rgba(10,8,6,0.9)'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(cx, cy, rb, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#0A0806'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, rb, 0, Math.PI * 2); ctx.stroke();
     ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, rp, 0, Math.PI * 2); ctx.clip();
     if (working) {
       var g = ctx.createRadialGradient(cx - rp * 0.15, cy - rp * 0.1, rp * 0.05, cx, cy, rp);
-      var hot = flicker(f, 1.2, 0.75, 0.25);
-      g.addColorStop(0, 'rgba(255,248,200,' + hot.toFixed(2) + ')'); g.addColorStop(0.45, '#FFB030'); g.addColorStop(0.85, '#D2501A'); g.addColorStop(1, '#6A200C');
+      g.addColorStop(0, 'rgba(255,246,200,' + flicker(f, 1.2, 0.75, 0.25).toFixed(2) + ')');
+      g.addColorStop(0.45, '#FFAA2E'); g.addColorStop(0.85, '#C8481A'); g.addColorStop(1, '#5A1A0A');
       ctx.fillStyle = g; ctx.fillRect(cx - rp, cy - rp, rp * 2, rp * 2);
-      // slow-moving crust on the melt
-      for (var k = 0; k < 4; k++) {
-        var ang = k * 1.7 + f * 0.25, dd = rp * (0.35 + 0.15 * (k % 2));
-        ctx.fillStyle = 'rgba(140,40,10,0.35)';
+      for (var c = 0; c < 4; c++) {
+        var ang = c * 1.7 + f * 0.25, dd = rp * (0.35 + 0.15 * (c % 2));
+        ctx.fillStyle = 'rgba(130,36,10,0.35)';
         ctx.beginPath(); ctx.ellipse(cx + Math.cos(ang) * dd, cy + Math.sin(ang) * dd, rp * 0.22, rp * 0.12, ang, 0, Math.PI * 2); ctx.fill();
       }
     } else {
-      var gi = ctx.createRadialGradient(cx - rp * 0.3, cy - rp * 0.3, 0, cx, cy, rp);
-      gi.addColorStop(0, '#2A221C'); gi.addColorStop(1, '#0E0B09');
-      ctx.fillStyle = gi; ctx.fillRect(cx - rp, cy - rp, rp * 2, rp * 2);
-      ctx.fillStyle = 'rgba(120,40,16,0.35)';
-      ctx.beginPath(); ctx.arc(cx + rp * 0.15, cy + rp * 0.2, rp * 0.3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#0E0B09'; ctx.fillRect(cx - rp, cy - rp, rp * 2, rp * 2);
+      ctx.fillStyle = 'rgba(120,40,16,0.35)'; ctx.beginPath(); ctx.arc(cx + rp * 0.15, cy + rp * 0.2, rp * 0.3, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
-    ctx.strokeStyle = 'rgba(10,8,6,0.95)'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(cx, cy, rp, 0, Math.PI * 2); ctx.stroke();
-    if (working) L.glow(ctx, cx, cy, R * 1.25, '#FF8A2A', flicker(f, 1.2, 0.18, 0.12));
-    // fire door with glowing slots
-    var dx = W * 0.36, dy = H * 0.76, dw = W * 0.28, dh = H * 0.13;
-    L.panel(ctx, dx, dy, dw, dh, L.darken(col, 28), { r: W * 0.015, hi: 12, lo: 18 });
-    var slotA = working ? flicker(f, 1.5, 0.55, 0.4) : 0;
-    for (var sl = 0; sl < 4; sl++) {
-      var sx = dx + dw * (0.12 + sl * 0.21), sy = dy + dh * 0.28, sw = dw * 0.13, sh = dh * 0.44;
-      ctx.fillStyle = '#100C09'; ctx.fillRect(sx, sy, sw, sh);
-      if (working) { ctx.fillStyle = 'rgba(255,150,50,' + slotA.toFixed(2) + ')'; ctx.fillRect(sx, sy + sh * 0.2, sw, sh * 0.8); }
-    }
-    if (working) L.glow(ctx, dx + dw / 2, dy + dh, dw * 0.8, '#FF7A2A', slotA * 0.35);
-    // exhaust stack, back-right corner
-    var sxc = W * 0.8, syc = H * 0.14, sr = W * 0.075;
-    L.disc(ctx, sxc, syc, sr, '#4A5057', { hi: 30, lo: 35 });
-    ctx.fillStyle = '#0E0C0B'; ctx.beginPath(); ctx.arc(sxc, syc, sr * 0.58, 0, Math.PI * 2); ctx.fill();
-    if (working) stackSmoke(ctx, sxc, syc, frame, W);
+    ctx.strokeStyle = '#0A0806'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, rp, 0, Math.PI * 2); ctx.stroke();
+    if (working) L.glow(ctx, cx, cy, R * 1.2, '#FF8A2A', flicker(f, 1.2, 0.16, 0.1));
+    // twin exhaust stacks in the back corners
+    stack(ctx, W * 0.16, H * 0.1, W * 0.075, '#3E444A', working, frame);
+    stack(ctx, W * 0.84, H * 0.1, W * 0.075, '#3E444A', working, frame);
+    if (working) { stackSmoke(ctx, W * 0.16, H * 0.1, frame, W); stackSmoke(ctx, W * 0.84, H * 0.1, frame + 7, W); }
+    // front face: seam, wide grated fire window, hazard kick plate
+    rivetSeam(ctx, W * 0.08, W * 0.92, H * 0.66, 6, W * 0.013);
+    fireGrate(ctx, W * 0.26, H * 0.7, W * 0.48, H * 0.12, working, frame, 6);
+    L.hazardStripe(ctx, W * 0.1, H * 0.86, W * 0.8, H * 0.05, W * 0.04);
   }
 
   // ---------------------------------------------------------------------
-  // burner-mining-drill (2x2, rotatable): iron box on skids, bobbing/spinning bit near the
-  // output (left column, north), firebox glow, smoking chimney.
+  // burner-mining-drill (2x2, rotatable, output north of the left column): rusty riveted iron
+  // chassis, a gantry carrying the drive gearbox over a screw auger that turns and bobs
+  // while working, drive gear, ore chute on the output side, stoked firebox on the front and
+  // a smoking stack at the back.
   // ---------------------------------------------------------------------
   function paintBurnerDrillHeavy(ctx, W, H, frame, dir, def, type, opts) {
     var working = !!(opts && opts.working);
-    var col = L.entColors(def)[0] || '#6E6A60';
-    // Skids poking out from under the box.
-    ctx.fillStyle = '#241F1A';
-    ctx.fillRect(0, H * 0.86, W * 0.34, H * 0.08); ctx.fillRect(W * 0.62, H * 0.86, W * 0.34, H * 0.08);
-    ctx.strokeStyle = '#141210'; ctx.lineWidth = 1;
-    ctx.strokeRect(0, H * 0.86, W * 0.34, H * 0.08); ctx.strokeRect(W * 0.62, H * 0.86, W * 0.34, H * 0.08);
-    // Main iron box.
-    L.panel(ctx, W * 0.06, H * 0.18, W * 0.88, H * 0.68, col, { r: W * 0.05 });
-    L.rivets(ctx, [[W * 0.14, H * 0.26], [W * 0.86, H * 0.26], [W * 0.14, H * 0.78], [W * 0.86, H * 0.78]], W * 0.02);
-    // Firebox window.
-    var fx = W * 0.68, fy = H * 0.58, fr = W * 0.09;
-    L.inset(ctx, fx - fr, fy - fr * 0.7, fr * 2, fr * 1.4, '#1A1410', fr * 0.3);
-    var fireA = working ? flicker(frame, 1.4, 0.5, 0.4) : 0.14;
-    L.glow(ctx, fx, fy, fr * 1.6, '#E9781E', fireA);
-    // Small chimney, smokes while working.
-    L.rectBevel(ctx, W * 0.72, H * 0.02, W * 0.13, H * 0.18, '#3A342C', { dark: '#1C1810', light: '#4E4638' });
-    if (working) stackSmoke(ctx, W * 0.785, H * 0.02, frame, W);
-    // Drill head/bit near the output (left column, north) — bobs and spins while working.
-    var bob = working ? Math.sin((frame / 16) * Math.PI * 2) * H * 0.03 : 0;
-    var spin = working ? (frame / 16) * Math.PI * 2 : 0;
-    var hx = W * 0.28, hy = H * 0.22 + bob, bitLen = H * 0.24;
-    ctx.save(); ctx.translate(hx, hy); ctx.rotate(spin);
-    var g = ctx.createLinearGradient(0, -bitLen * 0.5, 0, bitLen * 0.5);
-    g.addColorStop(0, L.lighten('#B8BEC4', 10)); g.addColorStop(0.5, '#8C939A'); g.addColorStop(1, L.darken('#8C939A', 30));
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.moveTo(0, -bitLen * 0.5); ctx.lineTo(W * 0.055, bitLen * 0.15); ctx.lineTo(0, bitLen * 0.5); ctx.lineTo(-W * 0.055, bitLen * 0.15); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = '#141210'; ctx.lineWidth = 1.2; ctx.stroke();
-    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(-W * 0.02, -bitLen * 0.3); ctx.lineTo(W * 0.02, bitLen * 0.3); ctx.stroke();
+    var f = frame | 0, rng = seed(type, 3, 3);
+    var rust = '#6B5847';
+    // skids
+    L.rectBevel(ctx, W * 0.04, H * 0.2, W * 0.07, H * 0.76, '#2B2621', { outlineColor: '#0E0C0A', outlineWidth: 1 });
+    L.rectBevel(ctx, W * 0.89, H * 0.2, W * 0.07, H * 0.76, '#2B2621', { outlineColor: '#0E0C0A', outlineWidth: 1 });
+    // ore chute to the output tile (north of the left column)
+    var chx = W * 0.12, chw = W * 0.28;
+    ctx.fillStyle = '#2C2622';
+    ctx.beginPath(); ctx.moveTo(chx, 0); ctx.lineTo(chx + chw, 0); ctx.lineTo(chx + chw * 0.9, H * 0.3); ctx.lineTo(chx + chw * 0.1, H * 0.3); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#0E0C0A'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.save(); ctx.clip(); oreInChute(ctx, chx, 0, chw, H * 0.3, f, working, seed(type, 7, 7)); ctx.restore();
+    // chassis
+    housing(ctx, W * 0.08, H * 0.24, W * 0.84, H * 0.46, H * 0.24, rust, W * 0.04);
+    ctx.save(); L.roundRectPath(ctx, W * 0.08, H * 0.24, W * 0.84, H * 0.7, W * 0.04); ctx.clip();
+    grime(ctx, W * 0.08, H * 0.24, W * 0.84, H * 0.46, rng, 30, 'rgba(60,30,12,0.22)');
+    streaks(ctx, W * 0.1, H * 0.7, W * 0.8, H * 0.22, rng, 8, 'rgba(120,58,22,0.45)');
     ctx.restore();
-    // Output lip, top-left (def.drill.output = left column, north).
-    L.arrowShape(ctx, W * 0.22, H * 0.08, W * 0.08, working ? '#E8B31E' : L.darken('#E8B31E', 25));
+    rivetSeam(ctx, W * 0.1, W * 0.9, H * 0.3, 6, W * 0.014);
+    rivetSeam(ctx, W * 0.1, W * 0.9, H * 0.74, 6, W * 0.014);
+    // shaft hole under the auger
+    var ax = W * 0.4;
+    ctx.fillStyle = '#0D0B09'; ctx.beginPath(); ctx.ellipse(ax, H * 0.6, W * 0.1, H * 0.045, 0, 0, Math.PI * 2); ctx.fill();
+    // drive gear beside the gantry
+    var gearA = working ? (f / 16) * (Math.PI * 2 / 10) * 2 : 0;
+    L.gearShape(ctx, W * 0.72, H * 0.46, W * 0.12, W * 0.035, 10, gearA, '#7A7F84', '#222');
+    // auger (bobs and turns)
+    var bob = working ? Math.sin(f / 16 * Math.PI * 2) * H * 0.025 : -H * 0.03;
+    auger(ctx, ax, H * 0.22 + bob, H * 0.4, W * 0.055, working ? (f % 4) / 4 : 0);
+    // gantry: two posts + cross beam + gearbox
+    post(ctx, W * 0.2, H * 0.1, H * 0.46, W * 0.06, '#4E4A45');
+    post(ctx, W * 0.6, H * 0.1, H * 0.46, W * 0.06, '#4E4A45');
+    L.rectBevel(ctx, W * 0.15, H * 0.1, W * 0.5, H * 0.07, '#57524C', { light: '#7A746C', dark: '#2C2926', outlineColor: '#0E0C0A', outlineWidth: 1.2 });
+    L.panel(ctx, ax - W * 0.1, H * 0.06, W * 0.2, H * 0.15, '#5E574F', { r: W * 0.02 });
+    L.rivets(ctx, [[ax - W * 0.06, H * 0.1], [ax + W * 0.06, H * 0.1], [ax - W * 0.06, H * 0.18], [ax + W * 0.06, H * 0.18]], W * 0.012);
+    // stoked firebox on the front face
+    fireGrate(ctx, W * 0.56, H * 0.77, W * 0.26, H * 0.12, working, frame, 4);
+    // exhaust stack, back-right
+    stack(ctx, W * 0.82, H * 0.2, W * 0.07, '#3A342E', working, frame);
+    if (working) stackSmoke(ctx, W * 0.82, H * 0.2, frame, W);
   }
 
   // ---------------------------------------------------------------------
-  // electric-mining-drill (3x3, rotatable): chamfered steel body on 4 corner legs, hazard
-  // stripe, centre drill head with 3-4 spinning arms, north-centre output chute, status light.
+  // electric-mining-drill (3x3, rotatable, output north of the centre column): heavy steel
+  // base on four hydraulic outriggers, geared turntable, tall gantry with a finned electric
+  // motor over the screw auger (same family look as the burner drill), ore chute, status
+  // LED and hazard-striped edges.
   // ---------------------------------------------------------------------
   function paintElectricDrillHeavy(ctx, W, H, frame, dir, def, type, opts) {
     var working = !!(opts && opts.working);
-    var col = L.entColors(def)[0] || '#5E6C7A';
-    L.foundation(ctx, W, H, '#4E5154');
-    var legs = [[0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9]], li;
-    for (li = 0; li < legs.length; li++) {
-      var p = legs[li];
-      L.rectBevel(ctx, W * p[0] - W * 0.045, H * p[1] - H * 0.045, W * 0.09, H * 0.09, '#33383D', { dark: '#1C1E20', light: '#454C52' });
+    var f = frame | 0, rng = seed(type, 5, 1);
+    var steel = L.entColors(def)[0] || '#5E6C7A';
+    // hydraulic outriggers to foot pads in the corners
+    var feet = [[0.1, 0.12], [0.9, 0.12], [0.1, 0.9], [0.9, 0.9]];
+    for (var i = 0; i < 4; i++) {
+      var fx = W * feet[i][0], fy = H * feet[i][1], bx = W * (feet[i][0] < 0.5 ? 0.24 : 0.76), by = H * (feet[i][1] < 0.5 ? 0.26 : 0.74);
+      ctx.strokeStyle = '#1A1C1E'; ctx.lineWidth = W * 0.05; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(fx, fy); ctx.stroke();
+      ctx.strokeStyle = '#8A949C'; ctx.lineWidth = W * 0.022;
+      ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo((bx + fx) / 2, (by + fy) / 2); ctx.stroke();
+      ctx.lineCap = 'butt';
+      L.rectBevel(ctx, fx - W * 0.055, fy - H * 0.05, W * 0.11, H * 0.1, '#35393D', { outlineColor: '#0E0E0E', outlineWidth: 1.2 });
     }
-    var bx = W * 0.1, by = H * 0.1, bw = W * 0.8, bh = H * 0.8, chamfer = Math.min(bw, bh) * 0.22;
-    chamferPanel(ctx, bx, by, bw, bh, chamfer, col, {});
-    L.hazardStripe(ctx, bx + bw * 0.06, by + bh * 0.8, bw * 0.88, bh * 0.1, bw * 0.045);
-    // Status light: green + glow while working, dark grey idle.
-    var lx = bx + bw * 0.86, ly = by + bh * 0.14;
-    ctx.fillStyle = working ? '#3FCB63' : '#2A2A2A';
-    ctx.beginPath(); ctx.arc(lx, ly, W * 0.025, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#141414'; ctx.lineWidth = 1; ctx.stroke();
-    if (working) L.glow(ctx, lx, ly, W * 0.09, '#5EE68A', 0.7);
-    // Output chute, north edge, centre column.
-    var chx = W * 0.5, chw = W * 0.22, chh = H * 0.1;
-    ctx.fillStyle = '#2A2018'; ctx.fillRect(chx - chw / 2, 0, chw, chh);
-    ctx.strokeStyle = '#141210'; ctx.lineWidth = 1.5; ctx.strokeRect(chx - chw / 2, 0, chw, chh);
-    ctx.fillStyle = working ? 'rgba(217,165,32,0.5)' : 'rgba(217,165,32,0.15)';
-    ctx.fillRect(chx - chw * 0.4, chh * 0.15, chw * 0.8, chh * 0.4);
-    // Centre drill head: hub + 4 arms, rotates only while working, seamless over 16 frames.
-    var cx = W / 2, cy = H / 2, hubR = Math.min(W, H) * 0.1, armR = Math.min(W, H) * 0.32;
-    var angle = working ? (frame / 16) * Math.PI * 2 : 0;
-    ctx.save(); ctx.translate(cx, cy); ctx.rotate(angle);
-    var arms = 4, ai;
-    for (ai = 0; ai < arms; ai++) {
-      var a = ai / arms * Math.PI * 2;
-      ctx.save(); ctx.rotate(a);
-      var ag = ctx.createLinearGradient(0, -hubR * 0.3, 0, -armR);
-      ag.addColorStop(0, '#B8BEC4'); ag.addColorStop(1, '#5A6168');
-      ctx.fillStyle = ag;
-      ctx.beginPath();
-      ctx.moveTo(-Math.min(W, H) * 0.035, -hubR * 0.3); ctx.lineTo(Math.min(W, H) * 0.035, -hubR * 0.3);
-      ctx.lineTo(Math.min(W, H) * 0.018, -armR); ctx.lineTo(-Math.min(W, H) * 0.018, -armR); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = '#141210'; ctx.lineWidth = 1; ctx.stroke();
-      ctx.restore();
-    }
-    L.disc(ctx, 0, 0, hubR, '#D9A520', { hi: 55, lo: 40 });
+    // ore chute to the output tile
+    var chx = W * 0.39, chw = W * 0.22;
+    ctx.fillStyle = '#26282A';
+    ctx.beginPath(); ctx.moveTo(chx, 0); ctx.lineTo(chx + chw, 0); ctx.lineTo(chx + chw * 0.92, H * 0.2); ctx.lineTo(chx + chw * 0.08, H * 0.2); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#0E0E0E'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.save(); ctx.clip(); oreInChute(ctx, chx, 0, chw, H * 0.2, f, working, seed(type, 8, 8)); ctx.restore();
+    // base housing
+    var bx0 = W * 0.14, by0 = H * 0.16, bw = W * 0.72, bd = H * 0.56, bh = H * 0.14;
+    housing(ctx, bx0, by0, bw, bd, bh, steel, W * 0.05);
+    ctx.save(); L.roundRectPath(ctx, bx0, by0, bw, bd + bh, W * 0.05); ctx.clip();
+    grime(ctx, bx0, by0, bw, bd, rng, 30);
+    streaks(ctx, bx0, by0 + bd, bw, bh, rng, 6, 'rgba(20,18,16,0.35)');
     ctx.restore();
+    L.hazardStripe(ctx, bx0 + bw * 0.05, by0 + bd + bh * 0.3, bw * 0.9, bh * 0.45, W * 0.028);
+    // geared turntable
+    var cx = W * 0.5, cy = H * 0.46, tr = W * 0.25;
+    var ringA = working ? (f / 16) * (Math.PI * 2 / 24) * 2 : 0;
+    L.gearShape(ctx, cx, cy, tr, tr * 0.8, 24, ringA, '#6E777F', '#2B2F33');
+    L.disc(ctx, cx, cy, tr * 0.78, '#4A5158', { hi: 30, lo: 40 });
+    ctx.fillStyle = '#0D0D0D'; ctx.beginPath(); ctx.ellipse(cx, cy + H * 0.04, W * 0.08, H * 0.04, 0, 0, Math.PI * 2); ctx.fill();
+    // auger under the gantry (lifts a little while working)
+    var lift = working ? (Math.sin(f / 16 * Math.PI * 2) * 0.5 + 0.5) * H * 0.03 : 0;
+    auger(ctx, cx, H * 0.2 - lift, H * 0.3, W * 0.04, working ? (f % 4) / 4 : 0);
+    // gantry posts + beam
+    post(ctx, W * 0.29, H * 0.14, H * 0.5, W * 0.045, '#3E444A');
+    post(ctx, W * 0.71, H * 0.14, H * 0.5, W * 0.045, '#3E444A');
+    L.rectBevel(ctx, W * 0.26, H * 0.12, W * 0.48, H * 0.05, '#4C545C', { light: '#6E7880', dark: '#262A2E', outlineColor: '#0E0E0E', outlineWidth: 1.2 });
+    // finned electric motor on the beam
+    var mx = cx - W * 0.1, my = H * 0.05, mw = W * 0.2, mh = H * 0.12;
+    L.cylinder(ctx, mx, my, mw, mh, '#59636C', true, { r: mh * 0.3 });
+    for (var fin = 1; fin < 7; fin++) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(mx + mw * fin / 7 - 1, my + mh * 0.15, 2, mh * 0.7); }
+    L.hazardStripe(ctx, mx + mw * 0.3, my + mh * 0.82, mw * 0.4, mh * 0.18, W * 0.015);
+    // power cable from the motor down to the base
+    ctx.strokeStyle = '#141414'; ctx.lineWidth = W * 0.018;
+    ctx.beginPath(); ctx.moveTo(mx + mw, my + mh * 0.5); ctx.quadraticCurveTo(W * 0.84, H * 0.1, W * 0.8, H * 0.3); ctx.stroke();
+    // status LED
+    var lx = W * 0.8, ly = H * 0.34;
+    L.inset(ctx, lx - W * 0.03, ly - W * 0.03, W * 0.06, W * 0.06, '#151515', W * 0.01);
+    ctx.fillStyle = working ? '#4BE07A' : '#1F3A28';
+    ctx.beginPath(); ctx.arc(lx, ly, W * 0.018, 0, Math.PI * 2); ctx.fill();
+    if (working) L.glow(ctx, lx, ly, W * 0.07, '#5EE68A', 0.8);
+    L.rivets(ctx, [[bx0 + bw * 0.06, by0 + bd * 0.08], [bx0 + bw * 0.94, by0 + bd * 0.08], [bx0 + bw * 0.06, by0 + bd * 0.92], [bx0 + bw * 0.94, by0 + bd * 0.92]], W * 0.012);
   }
 
   // ---------------------------------------------------------------------
