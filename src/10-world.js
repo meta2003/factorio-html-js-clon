@@ -43,9 +43,12 @@
     '#A87246', // 10 red desert
   ];
 
-  const RES = { NONE: 0, IRON_ORE: 1, COPPER_ORE: 2, COAL: 3, STONE: 4 };
-  const RES_ITEM = [null, 'iron-ore', 'copper-ore', 'coal', 'stone'];
-  const RES_COLOR = ['#000000', '#8B96A3', '#B87333', '#2B2B2B', '#ABA9A0'];
+  // RES.CRUDE_OIL / RES_ITEM[5] / RES_COLOR[5] — design/EXPANSION.md §6.4: there is
+  // no crude-oil ITEM, the resource id just names the fluid a well produces; see
+  // oilYieldFor()/maybePlaceOilWells() below for well generation.
+  const RES = { NONE: 0, IRON_ORE: 1, COPPER_ORE: 2, COAL: 3, STONE: 4, CRUDE_OIL: 5 };
+  const RES_ITEM = [null, 'iron-ore', 'copper-ore', 'coal', 'stone', 'crude-oil'];
+  const RES_COLOR = ['#000000', '#8B96A3', '#B87333', '#2B2B2B', '#ABA9A0', '#1A1614'];
 
   const FEATURE = { NONE: 0, TREE: 1, ROCK_BIG: 2, ROCK_HUGE: 3 };
   const TREE_HP = 50;          // GDD §2.6
@@ -76,6 +79,9 @@
     ROCK: F.util.hashStr('rock'),
     BASE: F.util.hashStr('base'),
     LAKEANGLE: F.util.hashStr('lakeAngle'),
+    OIL: F.util.hashStr('oil'),
+    OILCLUSTER: F.util.hashStr('oilCluster'),
+    OILANGLE: F.util.hashStr('oilAngle'),
   };
 
   // ---------------------------------------------------------------------
@@ -244,7 +250,19 @@
       const h = Math.cbrt(def.Q) / ((Math.PI / 3) * def.rq * def.rq);
       return { ore: def.ore, cx: cx, cy: cy, r: r, h: h, richnessDistMult: 1 };
     });
-    paramsCache = { seed: seed, lakeAngle: lakeAngle, lakeCentre: lakeCentre, startingPatches: startingPatches };
+    // Guaranteed oil well cluster (design/EXPANSION.md §6.4): one cluster somewhere
+    // 70-110 tiles from spawn, angle independent of the lake/ore angle. Deterministic
+    // per seed via its own F.rng.local stream; the chunk containing this point forces
+    // a cluster placement in maybePlaceOilWells() regardless of the per-chunk roll.
+    const oilRng = F.rng.local(seed, SALT.OILANGLE, 0);
+    const oilAngle = oilRng() * Math.PI * 2;
+    const oilDist = 70 + oilRng() * 40;
+    const oilX = Math.cos(oilAngle) * oilDist, oilY = Math.sin(oilAngle) * oilDist;
+    const oilGuaranteed = {
+      cx: F.util.floorDiv(Math.round(oilX), 32),
+      cy: F.util.floorDiv(Math.round(oilY), 32),
+    };
+    paramsCache = { seed: seed, lakeAngle: lakeAngle, lakeCentre: lakeCentre, startingPatches: startingPatches, oilGuaranteed: oilGuaranteed };
     return paramsCache;
   }
 
@@ -384,6 +402,58 @@
   }
 
   // ---------------------------------------------------------------------
+  // Crude-oil wells (design/EXPANSION.md §6.4): sparse single-tile resource
+  // tiles (RES.CRUDE_OIL), generated deterministically per chunk (order
+  // independent — every random decision below comes from F.rng.local or
+  // F.util.hash2, never F.rng.next()). Clusters of 3-8 wells, >=3 tiles apart
+  // (within the same chunk — spacing across a chunk boundary is not enforced,
+  // a deliberate simplification mirroring maybePlaceSpawners()'s chunk-local
+  // placement above). Runs AFTER the main terrain/resource/feature loop so it
+  // can read chunk.terrain directly (must NOT call F.world.isLand/resource
+  // here: the chunk is not yet stored in F.state.world.chunks while genChunk
+  // is still running, so that would recurse into a duplicate generation).
+  // ---------------------------------------------------------------------
+
+  // yield% in [60,400], richer with distance from spawn (EXPANSION §6.4).
+  function oilYieldFor(dist, rng) {
+    const base = 60 + Math.min(300, Math.max(0, dist - 60) * 0.5);
+    const jitter = 0.7 + rng() * 0.6; // 0.7..1.3
+    return F.util.clamp(Math.round(base * jitter), 60, 400);
+  }
+
+  function maybePlaceOilWells(cx, cy, chunk, seed, params) {
+    const ccx = cx * 32 + 16, ccy = cy * 32 + 16;
+    const dist = Math.hypot(ccx, ccy);
+    const guaranteed = !!(params.oilGuaranteed && params.oilGuaranteed.cx === cx && params.oilGuaranteed.cy === cy);
+    if (!guaranteed) {
+      if (dist <= 60) return; // no wells near spawn
+      const hv = F.util.hash2(cx, cy, (seed ^ SALT.OIL) >>> 0) / 4294967296;
+      if (hv >= 0.18) return; // ~18% chance per eligible chunk
+    }
+    const rng = F.rng.local((seed ^ SALT.OILCLUSTER) >>> 0, cx, cy);
+    const count = 3 + Math.floor(rng() * 6); // 3..8 wells
+    const placed = [];
+    let guard = 0;
+    while (placed.length < count && guard++ < 300) {
+      const lx = Math.floor(rng() * 32), ly = Math.floor(rng() * 32);
+      const i = ly * 32 + lx;
+      if (chunk.terrain[i] < 2) continue; // water: wells only on land
+      let tooClose = false;
+      for (let k = 0; k < placed.length; k++) {
+        const dx = lx - placed[k].lx, dy = ly - placed[k].ly;
+        if (dx * dx + dy * dy < 9) { tooClose = true; break; } // >= 3 tiles apart
+      }
+      if (tooClose) continue;
+      const tx = cx * 32 + lx, ty = cy * 32 + ly;
+      const amount = oilYieldFor(Math.hypot(tx, ty), rng);
+      chunk.res[i] = RES.CRUDE_OIL;
+      chunk.amount[i] = amount;
+      chunk.feature[i] = 0; chunk.featHp[i] = 0; // clear any tree/rock so the well tile is clean
+      placed.push({ lx: lx, ly: ly });
+    }
+  }
+
+  // ---------------------------------------------------------------------
   // Chunk generation
   // ---------------------------------------------------------------------
 
@@ -436,6 +506,7 @@
         }
       }
     }
+    maybePlaceOilWells(cx, cy, chunk, seed, params);
     return chunk;
   }
 
@@ -627,6 +698,11 @@
       const i = r[2];
       const idx = chunk.res[i];
       if (!idx) return null;
+      // Crude-oil wells are pumpjack-only (EXPANSION §6.4): not hand-minable and not
+      // targetable by burner/electric drills. Guarded here (rather than hidden from
+      // F.world.resource(), which pumpjack placement/pickers still need to see) so
+      // every caller of mineResource gets a consistent "nothing happened" result.
+      if (idx === RES.CRUDE_OIL) return null;
       const item = RES_ITEM[idx];
       const remain = Math.max(0, chunk.amount[i] - n);
       chunk.amount[i] = remain;
@@ -743,6 +819,12 @@
         }
       }
       return best;
+    },
+
+    // EXPANSION §6.4: same search as findResourceNear but fixed to crude-oil,
+    // used by the pumpjack placement rule / oil-feature scenarios.
+    findOilNear: function (x, y, radius) {
+      return F.world.findResourceNear('crude-oil', x, y, radius);
     },
 
     tileInfo: function (tx, ty) {

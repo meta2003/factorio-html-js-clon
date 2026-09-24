@@ -868,6 +868,9 @@
     if (opts.lit) s += 'l';
     if (opts.shape) s += 's' + opts.shape;
     if (opts.cap) s += 'c' + opts.cap;
+    // Fluid tint (pipe/pipe-to-ground/storage-tank, design/EXPANSION.md §6.5): fluid is one of
+    // ~8 ids, so this keeps the cache bounded while still giving each fluid its own canvas.
+    if (opts.fluid) s += 'f' + opts.fluid;
     return s;
   }
   // F.sprites.entity(type, dir=0, frame=0, opts?) -> canvas (ARCHITECTURE §16).
@@ -884,9 +887,12 @@
     var c = entityCache.get(key);
     if (c) return c;
     var fn = PAINTERS[type] || paintDefault;
+    // No soft cast shadow for belts OR 'floor'-layer entities (rails, design/EXPANSION.md §6.5):
+    // rails are flat full-tile ballast, not a raised building, and a cast shadow would visibly
+    // darken the neighbouring tile it's drawn toward.
     c = drawDirectional(def.size[0], def.size[1], dir, function (ctx, w0, h0) {
       fn(ctx, w0, h0, frame, dir, def, type, opts);
-    }, def.layer !== 'belt');
+    }, def.layer !== 'belt' && def.layer !== 'floor');
     entityCache.set(key, c);
     return c;
   };
@@ -993,7 +999,22 @@
     ctx.strokeStyle = darken(c1, 30); ctx.lineWidth = Math.max(1, S * 0.05);
     ctx.strokeRect(S * 0.18, S * 0.62, S * 0.22, S * 0.22);
   }
+  // F.sprites.defineIcon(shape, fn(ctx, S, def)) — registry for new item.icon.shape ids added by
+  // expansion art packs (design/EXPANSION.md §6.5). Consulted before the built-in switch below so
+  // an art pack can add e.g. 'plastic'/'powder'/'robot' shapes without editing this file. Clears
+  // the item caches so already-drawn icons (e.g. drawn before the pack registered) get refreshed.
+  var ICON_PAINTERS = {};
+  F.sprites.defineIcon = function (shape, fn) {
+    ICON_PAINTERS[shape] = fn;
+    itemCache.clear();
+    itemURLCache.clear();
+  };
   function paintItemIcon(ctx, S, def) {
+    var custom = ICON_PAINTERS[def.icon.shape];
+    if (custom) {
+      try { custom(ctx, S, def); return; }
+      catch (err) { F.log.error('[sprites] defineIcon painter failed for shape ' + def.icon.shape, err); }
+    }
     var c1 = def.icon.color, c2 = def.icon.color2 || darken(c1, 35);
     switch (def.icon.shape) {
       case 'ore': drawOreChunks(ctx, S, c1, c2); break;
@@ -1060,6 +1081,77 @@
       url = c.toDataURL('image/png');
     } catch (e) { F.log.warn('[sprites] itemURL failed for ' + id, e); url = ''; }
     itemURLCache.set(id, url);
+    return url;
+  };
+
+  // ---------------------------------------------------------------------
+  // Fluid icons (design/EXPANSION.md §6.5): a generic glossy droplet in a fluid's colours, used
+  // by UI tooltips / recipe pickers for any fluid id (existing water/steam or new expansion
+  // fluids). Reads F.data.fluids[id].color/color2 when present; falls back to grey so this still
+  // draws something sane if the data module hasn't defined that fluid (or loads later).
+  // ---------------------------------------------------------------------
+  function drawFluidDroplet(ctx, S, c1, c2) {
+    var cx = S * 0.5, topY = S * 0.1, r = S * 0.33, cy = S * 0.6;
+    ctx.save();
+    var grad = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.08, cx, cy, r * 1.15);
+    grad.addColorStop(0, lighten(c1, 35));
+    grad.addColorStop(0.55, c1);
+    grad.addColorStop(1, darken(c1, 25));
+    ctx.beginPath();
+    ctx.moveTo(cx, topY);
+    ctx.bezierCurveTo(cx + r * 1.15, cy - r * 0.75, cx + r, cy + r * 0.35, cx, cy + r);
+    ctx.bezierCurveTo(cx - r, cy + r * 0.35, cx - r * 1.15, cy - r * 0.75, cx, topY);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.strokeStyle = darken(c2 || c1, 30);
+    ctx.lineWidth = Math.max(1, S * 0.035);
+    ctx.stroke();
+    // glossy highlight
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = c2 || lighten(c1, 40);
+    ctx.beginPath();
+    ctx.ellipse(cx - r * 0.32, cy - r * 0.08, r * 0.22, r * 0.34, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.restore();
+  }
+  function fluidColors(fluidId) {
+    var fdef = (F.data.fluids && F.data.fluids[fluidId]) || null;
+    var c1 = (fdef && fdef.color) || '#7A8288';
+    var c2 = (fdef && fdef.color2) || lighten(c1, 30);
+    return [c1, c2];
+  }
+  var fluidIconCache = new Map();
+  // F.sprites.fluidIcon(fluidId, size=32) -> canvas (design/EXPANSION.md §6.5), cached per (id,size).
+  F.sprites.fluidIcon = function (fluidId, size) {
+    if (!F.sprites.enabled) return stub();
+    size = size || 32;
+    var key = fluidId + '|' + size;
+    var c = fluidIconCache.get(key);
+    if (c) return c;
+    var col = fluidColors(fluidId);
+    c = newCanvas(size, size);
+    drawFluidDroplet(ctxOf(c), size, col[0], col[1]);
+    fluidIconCache.set(key, c);
+    return c;
+  };
+  var fluidIconURLCache = new Map();
+  // F.sprites.fluidIconURL(fluidId) -> cached data URL (design/EXPANSION.md §6.5), for CSS
+  // backgrounds in the DOM UI — same real-<canvas>-only pattern as F.sprites.itemURL.
+  F.sprites.fluidIconURL = function (fluidId) {
+    if (!F.sprites.enabled) return '';
+    if (fluidIconURLCache.has(fluidId)) return fluidIconURLCache.get(fluidId);
+    var url = '';
+    try {
+      var c = document.createElement('canvas'); c.width = 32; c.height = 32;
+      var ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false;
+      var col = fluidColors(fluidId);
+      drawFluidDroplet(ctx, 32, col[0], col[1]);
+      url = c.toDataURL('image/png');
+    } catch (e) { F.log.warn('[sprites] fluidIconURL failed for ' + fluidId, e); url = ''; }
+    fluidIconURLCache.set(fluidId, url);
     return url;
   };
 
@@ -1203,6 +1295,16 @@
   // caller passes (see report "assumptions").
   var RES_COLOR = { 1: ['#6C8399', '#9FB3C4'], 2: ['#C9662F', '#E8925A'], 3: ['#1E1E1E', '#4A4F5A'], 4: ['#A8956B', '#D2C39A'] };
   var oreCache = new Map();
+  // F.sprites.defineOre(resIndex, fn(ctx, S, stage, variant)) — registry for resource tile art
+  // beyond the 4 built-in ids (design/EXPANSION.md §6.5, e.g. crude-oil well = res 5). `S` is the
+  // full 1.5-tile canvas size (same one F.sprites.ore always allocates, for cache-shape
+  // consistency); painters for single-tile resources (wells) should draw centred and NOT
+  // overhang past the middle 1-tile square, unlike the built-in overlapping ore chunk art.
+  var ORE_PAINTERS = {};
+  F.sprites.defineOre = function (resIndex, fn) {
+    ORE_PAINTERS[resIndex] = fn;
+    oreCache.clear();
+  };
   // Dense clustered rock chunks (task brief problem #2: "sparse little dots" -> "dense ore
   // clusters ... several shaded rock chunks with highlights, amount-dependent density").
   // Chunks are jittered polygons (reusing fillPoly) with a dark undershadow + lit facet each,
@@ -1220,6 +1322,13 @@
     var S = Math.round(PX * 1.5), M = (S - PX) / 2;
     c = newCanvas(S, S);
     var ctx = ctxOf(c);
+    var custom = ORE_PAINTERS[res];
+    if (custom) {
+      try { custom(ctx, S, stage | 0, variant); }
+      catch (err) { F.log.error('[sprites] defineOre painter failed for res ' + res, err); }
+      oreCache.set(key, c);
+      return c;
+    }
     var pal = RES_COLOR[res];
     if (pal) {
       var st = stage | 0;
@@ -1250,6 +1359,17 @@
           ctx.restore();
         }
       }
+    } else {
+      // Unknown resource id with neither a built-in palette nor a registered defineOre painter
+      // (design/EXPANSION.md §6.5 "default fallback for unknown res = dark blob"): a single soft
+      // dark blob, centred and not overhanging (consistent with the single-tile convention above).
+      ctx.save(); ctx.globalAlpha = 0.4; ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.ellipse(S / 2 + PX * 0.05, S / 2 + PX * 0.06, PX * 0.3, PX * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = '#241F1A';
+      fillPoly(ctx, S / 2, S / 2, PX * 0.26, 7, 0.4, F.rng.local(res | 0, 0, 55));
+      ctx.fillStyle = '#3A332C';
+      fillPoly(ctx, S / 2 - PX * 0.06, S / 2 - PX * 0.06, PX * 0.12, 5, 1.1, F.rng.local(res | 0, 1, 55));
     }
     oreCache.set(key, c);
     return c;

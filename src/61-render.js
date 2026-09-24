@@ -69,6 +69,26 @@
   }
 
   // =====================================================================
+  // Defensive registry queue (design/EXPANSION.md §6.5). Feature files 37-oil.js/38-trains.js/
+  // 39-robots.js/45-rocket.js load BEFORE this module (load order 05..45 < 60-sprites < 61-render),
+  // so `F.render` does not exist yet when they run — they cannot call F.render.addLayer() etc.
+  // directly. Instead everything (both those early callers AND F.render's own wrapper functions
+  // below) reads/writes this single plain object hung off `F`, created by whichever module runs
+  // first. See EXPANSION.md §6.5 for the exact snippet early-loading files should use.
+  // =====================================================================
+  var RH = F._renderHooks = F._renderHooks || {
+    layers: { floor: [], objects: [], air: [], overlay: [] },
+    entityOpts: {},     // behaviour -> fn(e, def, tick) -> {frame, opts}
+    minimapColors: {},  // behaviour|layer -> color
+    hidePlayerFns: [],  // fn() -> bool
+    altOverlayFns: [],  // fn(ctx, e, def, sx, sy, tilePx)
+  };
+  // A feature file that already pushed layer functions before this module's own layer buckets
+  // existed (shouldn't happen given the fixed shape above, but stay defensive) would otherwise
+  // be silently dropped.
+  ['floor', 'objects', 'air', 'overlay'].forEach(function (z) { RH.layers[z] = RH.layers[z] || []; });
+
+  // =====================================================================
   // F.camera — pure math, safe to call at any time (no DOM access).
   // =====================================================================
   var camera = {
@@ -107,6 +127,35 @@
     var t = 1 - Math.exp(-dtMs / 110); // smooth, framerate-independent follow
     camera.x += (p.x - camera.x) * t;
     camera.y += (p.y - camera.y) * t;
+  }
+
+  // =====================================================================
+  // F.render registry hooks (design/EXPANSION.md §6.5): addLayer / entityOpts / minimapColor /
+  // hidePlayerWhen / altOverlay. All of these are thin wrappers over the RH object above so a
+  // call from a feature file that loaded before this module (via the direct-RH snippet) and a
+  // call made through F.render after this module has loaded land in the exact same place.
+  // =====================================================================
+  function addLayer(z, fn) {
+    if (typeof fn !== 'function') return;
+    if (!RH.layers[z]) { F.log.warn('[render] addLayer: unknown layer "' + z + '"'); RH.layers[z] = []; }
+    RH.layers[z].push(fn);
+  }
+  function runLayer(z, rect) {
+    var arr = RH.layers[z];
+    if (!arr || !arr.length) return;
+    for (var i = 0; i < arr.length; i++) {
+      try { arr[i](ctx, rect, camera); } catch (err) { F.log.error('[render] addLayer("' + z + '") hook', err); }
+    }
+  }
+  function registerEntityOpts(behaviour, fn) { if (typeof fn === 'function') RH.entityOpts[behaviour] = fn; }
+  function registerMinimapColor(behaviourOrLayer, color) { RH.minimapColors[behaviourOrLayer] = color; }
+  function registerHidePlayerWhen(fn) { if (typeof fn === 'function') RH.hidePlayerFns.push(fn); }
+  function registerAltOverlay(fn) { if (typeof fn === 'function') RH.altOverlayFns.push(fn); }
+  function playerHidden() {
+    for (var i = 0; i < RH.hidePlayerFns.length; i++) {
+      try { if (RH.hidePlayerFns[i]()) return true; } catch (err) { F.log.error('[render] hidePlayerWhen hook', err); }
+    }
+    return false;
   }
 
   // =====================================================================
@@ -664,23 +713,39 @@
   // =====================================================================
   // Non-belt entities (GDD §11.2 layer order). Culled + y-sorted.
   // =====================================================================
+  // Returns { floor, rest }: entities with def.layer === 'floor' (rails, design/EXPANSION.md §6.5)
+  // are drawn in their own earlier pass (after belts, before other entities) via drawEntities too,
+  // just called on `floor` first — see frameInner. Both arrays are y-sorted independently.
   function collectVisibleEntities(rect) {
-    var list = F.state && F.state.entities; if (!list) return [];
-    var out = [];
+    var list = F.state && F.state.entities; if (!list) return { floor: [], rest: [] };
+    var floor = [], rest = [];
     for (var i = 0; i < list.length; i++) {
       var e = list[i]; if (e._removed) continue;
       var def = F.data.entities[e.type]; if (!def) continue;
       if (def.layer === 'belt') continue; // drawn by drawBelts
       if (!inRectEntity(e, rect)) continue;
-      out.push(e);
+      (def.layer === 'floor' ? floor : rest).push(e);
     }
-    out.sort(function (a, b) { return (a.y + a.h) - (b.y + b.h); });
-    return out;
+    var bySort = function (a, b) { return (a.y + a.h) - (b.y + b.h); };
+    floor.sort(bySort); rest.sort(bySort);
+    return { floor: floor, rest: rest };
   }
 
   function isFluidCapable(type) {
     var def = F.data.entities[type];
-    return !!(def && (def.pipe || def.groundPipe || def.boiler || def.engine || def.offshore_pump));
+    // storage-tank (design/EXPANSION.md §6.5/§7.1) has a port at the centre of all 4 edges, same
+    // "connects on every side" shape as pipe, so it counts for a neighbouring pipe's connector
+    // mask too. oil-refinery/chemical-plant/pumpjack are deliberately NOT included here: their
+    // fluid ports sit at specific points along a multi-tile edge (not every point), so a
+    // neighbour-mask (which assumes any point on the edge connects) would misrepresent them.
+    return !!(def && (def.pipe || def.groundPipe || def.boiler || def.engine || def.offshore_pump || def.behaviour === 'storage-tank'));
+  }
+  // opts.fluid for the pipe/pipe-to-ground/storage-tank painters (design/EXPANSION.md §6.5):
+  // F.fluids.fluidOf is added by another agent, so guard both its existence and any error inside
+  // it (a not-yet-loaded/partial F.fluids must never break rendering).
+  function addFluidOpt(e, opts) {
+    if (!F.fluids || !F.fluids.fluidOf) return;
+    try { var fl = F.fluids.fluidOf(e); if (fl) opts.fluid = fl; } catch (err) { /* best-effort */ }
   }
 
   // Neighbour bitmask (bit0=N,1=E,2=S,3=W) for tile-adjacent auto-shaping — shared by
@@ -694,7 +759,25 @@
     }
     return mask;
   }
-  function pipeConnMask(e) { return neighbourMask(e, function (ent) { return isFluidCapable(ent.type); }); }
+  // Pipes also show a connector toward point-ported machines (refinery, chemical plant, pumpjack)
+  // when one of that machine's fluid ports sits on the adjacent tile facing this pipe.
+  function portFacing(ent, tx, ty, dir) {
+    if (!F.fluids || !F.fluids.connections) return false;
+    var ports; try { ports = F.fluids.connections(ent); } catch (err) { return false; }
+    for (var i = 0; ports && i < ports.length; i++) {
+      if (ports[i].x === tx && ports[i].y === ty && ports[i].dir === dir) return true;
+    }
+    return false;
+  }
+  function pipeConnMask(e) {
+    var mask = 0;
+    for (var d = 0; d < 4; d++) {
+      var v = F.C.DIRS[d], nx = e.x + v[0], ny = e.y + v[1];
+      var ent = (F.world && F.world.entityAt) ? F.world.entityAt(nx, ny) : null;
+      if (ent && (isFluidCapable(ent.type) || portFacing(ent, nx, ny, (d + 2) % 4))) mask |= (1 << d);
+    }
+    return mask;
+  }
   function wallConnMask(e) { return neighbourMask(e, function (ent) { return ent.type === 'stone-wall'; }); }
 
   // Working-animation frame: a 16-step bucket (matches the belt chevron strip's cache
@@ -713,6 +796,10 @@
       var frame = 0, opts = null;
       if (def.behaviour === 'pipe' || def.behaviour === 'pipe-to-ground') {
         opts = { mask: pipeConnMask(e) };
+        addFluidOpt(e, opts);
+      } else if (def.behaviour === 'storage-tank') {
+        opts = {};
+        addFluidOpt(e, opts);
       } else if (def.behaviour === 'wall') {
         opts = { mask: wallConnMask(e) };
       } else if (def.drill || def.assembler || def.furnace || def.boiler || def.engine) {
@@ -732,6 +819,15 @@
         frame = F.util.clamp(Math.round(((e.charge || 0) / cap) * 4), 0, 4);
       } else if (def.spawner) {
         frame = animFrame(5);
+      } else if (RH.entityOpts[def.behaviour]) {
+        // F.render.entityOpts registry (design/EXPANSION.md §6.5): per-behaviour frame/opts for
+        // new machines not covered by the built-in chain above. Default (no registration): frame 0,
+        // opts {} (i.e. the `var frame = 0, opts = null;` above, equivalent for F.sprites.entity).
+        try {
+          var custom = RH.entityOpts[def.behaviour](e, def, F.state.tick || 0);
+          frame = (custom && custom.frame) || 0;
+          opts = (custom && custom.opts) || {};
+        } catch (err) { F.log.error('[render] entityOpts("' + def.behaviour + '")', err); }
       }
       var spr = (F.sprites && F.sprites.entity) ? F.sprites.entity(e.type, e.dir, frame, opts) : null;
       drawEntitySpriteRect(e, spr);
@@ -951,6 +1047,9 @@
     if (playerPrev) { var dx = p.x - playerPrev.x, dy = p.y - playerPrev.y; moving = (dx * dx + dy * dy) > 1e-8; }
     playerAnimT = moving ? playerAnimT + dtMs : 0;
     playerPrev = { x: p.x, y: p.y };
+    // F.render.hidePlayerWhen (design/EXPANSION.md §6.5, e.g. hidden while riding a train). Bail
+    // out after the animation/position bookkeeping above so a later un-hide resumes smoothly.
+    if (playerHidden()) return;
     var scr = toScreen(p.x, p.y);
     var size = F.C.TILE * camera.zoom * 1.4;
     var frame = Math.floor(playerAnimT / 100) % 8;
@@ -982,6 +1081,23 @@
 
   function drawPlacementPreview() {
     var pv = F.input && F.input.preview; if (!pv || !pv.type) return;
+    // Virtual placers (vehicles, EXPANSION §6.4/§6.6): the placer may draw its own ghost via
+    // previewDraw(ctx, tx, ty, dir, ok, camera); otherwise a 1x1 green/red tile outline.
+    if (pv.virtual) {
+      var vp = F.api && F.api.getVirtual ? F.api.getVirtual(pv.type) : null;
+      ctx.save();
+      if (vp && typeof vp.previewDraw === 'function') {
+        try { vp.previewDraw(ctx, pv.tx, pv.ty, pv.dir || 0, !!pv.ok, camera); } catch (err) { F.log.warn('[render] previewDraw', err); }
+      } else {
+        var vs = F.C.TILE * camera.zoom, vq = toScreen(pv.tx, pv.ty);
+        ctx.fillStyle = pv.ok ? 'rgba(60,220,90,0.35)' : 'rgba(230,60,60,0.4)';
+        ctx.fillRect(vq[0], vq[1], vs, vs);
+        ctx.strokeStyle = pv.ok ? 'rgba(90,240,120,0.9)' : 'rgba(255,90,90,0.9)';
+        ctx.lineWidth = 2; ctx.strokeRect(vq[0] + 1, vq[1] + 1, vs - 2, vs - 2);
+      }
+      ctx.restore();
+      return;
+    }
     var def = F.data.entities[pv.type]; if (!def) return;
     var fp = (F.entities && F.entities.footprint) ? F.entities.footprint(def, pv.dir || 0) : (def.size || [1, 1]);
     var w = fp[0], h = fp[1];
@@ -1103,6 +1219,16 @@
         if (n != null) drawBar(p[0] - size * 0.4, p[1] - size * 0.8, size * 0.8, size * 0.12, n / (def.turret.ammoLimit || 10));
       }
       if (def.behaviour === 'inserter' || def.drill) drawArrowToFront(e);
+      // F.render.altOverlay (design/EXPANSION.md §6.5): per-entity alt-mode extras for behaviours
+      // not handled by the built-in cases above (e.g. recipe icon on a chemical plant). sx/sy are
+      // the entity's top-left screen position (matching drawEntitySpriteRect's convention).
+      if (RH.altOverlayFns.length) {
+        var p0 = toScreen(e.x, e.y);
+        for (var af = 0; af < RH.altOverlayFns.length; af++) {
+          try { RH.altOverlayFns[af](ctx, e, def, p0[0], p0[1], size); }
+          catch (err) { F.log.error('[render] altOverlay hook', err); }
+        }
+      }
     }
   }
 
@@ -1278,21 +1404,36 @@
     drawGroundItems(rect);
     drawBelts(rect);
 
-    var vis = collectVisibleEntities(rect);
+    // F.render.addLayer('floor', ...) (design/EXPANSION.md §6.5): after belts, before entities.
+    runLayer('floor', rect);
+    var collected = collectVisibleEntities(rect);
+    // Entities with def.layer === 'floor' (rails): drawn after belts, before other entities.
+    drawEntities(collected.floor);
+    var vis = collected.rest;
     drawEntities(vis);
-    drawInserterArms(vis);
-    drawTurretHeads(vis);
-    drawPoleWires(vis);
+    // Floor-layer entities (rails/train-stops) also participate in the generic passes below
+    // (inserter arms/turret heads/pole wires are all no-ops for them; status/alt/damage flash
+    // support "just works" for any new floor-layer entity without extra wiring).
+    var allVis = collected.floor.concat(vis);
+    drawInserterArms(allVis);
+    drawTurretHeads(allVis);
+    drawPoleWires(allVis);
     drawUnits(rect);
     drawCorpses(rect);
     drawTracers();
+    // F.render.addLayer('objects', ...): after entities & inserter arms, before player.
+    runLayer('objects', rect);
     drawPlayer(dtMs);
+    // F.render.addLayer('air', ...): after player, before previews.
+    runLayer('air', rect);
     drawPlacementPreview();
     drawMiningRing();
     drawSelectionBox();
-    if (F.render.altMode) drawAltOverlay(vis);
-    drawStatusIcons(vis);
-    drawDamageFlashes(vis);
+    if (F.render.altMode) drawAltOverlay(allVis);
+    drawStatusIcons(allVis);
+    drawDamageFlashes(allVis);
+    // F.render.addLayer('overlay', ...): after status icons, before night.
+    runLayer('overlay', rect);
     drawNightOverlay();
 
     ctx.restore();
@@ -1314,6 +1455,12 @@
       MINIMAP_ENTITY_COLOR_DEFAULT = '#006191';
 
   function minimapEntityColor(def) {
+    // F.render.minimapColor (design/EXPANSION.md §6.5): checked first so new behaviours/layers
+    // (rails, trains, robots, rocket-silo, ...) get their own dot colour instead of the generic
+    // default; existing built-ins below are unaffected unless a feature explicitly overrides them.
+    var custom = RH.minimapColors[def.behaviour];
+    if (custom == null) custom = RH.minimapColors[def.layer];
+    if (custom != null) return custom;
     if (def.layer === 'belt') return MINIMAP_ENTITY_COLOR_BELT;
     if (def.layer === 'wall') return MINIMAP_ENTITY_COLOR_WALL;
     if (def.behaviour === 'turret') return MINIMAP_ENTITY_COLOR_TURRET;
@@ -1444,14 +1591,21 @@
   }
 
   // =====================================================================
-  // Public API (design/ARCHITECTURE.md §16).
+  // Public API (design/ARCHITECTURE.md §16, design/EXPANSION.md §6.5). Merges onto whatever
+  // F.render already is (defensively — nothing else currently creates F.render before this module
+  // runs, but a future early-loading file might start doing so the same way F._renderHooks does)
+  // instead of clobbering it, and only defaults altMode if nothing set it already.
   // =====================================================================
-  F.render = {
-    init: init,
-    frame: frame,
-    invalidateChunk: invalidateChunk,
-    minimap: minimap,
-    mapImage: mapImage,
-    altMode: false, // toggled directly by 75-input.js on the Alt key (GDD §9.12)
-  };
+  F.render = F.render || {};
+  F.render.init = init;
+  F.render.frame = frame;
+  F.render.invalidateChunk = invalidateChunk;
+  F.render.minimap = minimap;
+  F.render.mapImage = mapImage;
+  if (F.render.altMode === undefined) F.render.altMode = false; // toggled by 75-input.js on Alt (GDD §9.12)
+  F.render.addLayer = addLayer;
+  F.render.entityOpts = registerEntityOpts;
+  F.render.minimapColor = registerMinimapColor;
+  F.render.hidePlayerWhen = registerHidePlayerWhen;
+  F.render.altOverlay = registerAltOverlay;
 })();

@@ -5,14 +5,24 @@
 // Defines F.input:
 //   F.input.init(canvas)                          — binds keyboard/mouse (guarded, HEADLESS no-op)
 //   F.input.state = { mx, my, mine, shoot, aimAt } — consumed by F.player.tick(input) every sim tick
-//   F.input.preview = { type, tx, ty, dir, ok, reason } — placement preview, recomputed every frame
+//   F.input.preview = { type, tx, ty, dir, ok, reason, virtual, previewDraw } — placement preview,
+//                                                      recomputed every frame. `virtual`/`previewDraw`
+//                                                      are set for virtual placer items (design/
+//                                                      EXPANSION.md §6.4/§6.6) — see this module's
+//                                                      final report for what 61-render.js should do
+//                                                      with them.
 //   F.input.hover                                  — entity under the cursor (or null)
-//   F.input.mining                                  — mirror of F.state.player.mining, for the renderer
+//   F.input.mining                                  — mirror of F.state.player.mining (grid mining),
+//                                                      or a picker-mining progress record in the same
+//                                                      {tx,ty,progress} shape (design/EXPANSION.md §6.6)
 //   F.input.worldCursor() -> [tx,ty]                — hovered tile (integers)
 //   F.input.screenCursor() -> [px,py]               — mouse position in canvas pixels
 //   F.input.frame()                                 — recompute preview/hover/mining (idempotent;
 //                                                      called by our own rAF loop and safe to call
 //                                                      again from 61-render.js/80-game.js if they want to)
+//   F.input.addKey(key, fn(ev)->bool)               — extra hotkey, consulted before the built-in
+//                                                      switch (design/EXPANSION.md §6.6)
+//   F.input.addDragKind(behaviour, 'line')          — extra drag-placement kind (rails)
 //
 // Headless contract: this module must NEVER touch document/canvas/addEventListener/rAF at load
 // time. F.input.init() is only ever called by 80-game.js's F.boot() when !window.HEADLESS, so all
@@ -40,7 +50,14 @@
   // so tests may drive F.player.tick(F.input.state) directly per ARCHITECTURE §14).
   // =========================================================================
   input.state = { mx: 0, my: 0, mine: null, shoot: false, aimAt: null };
-  input.preview = { type: null, tx: 0, ty: 0, dir: 0, ok: false, reason: null };
+  // `virtual`/`previewDraw` are a Factio-local extension for virtual placers
+  // (design/EXPANSION.md §6.4/§6.6, e.g. locomotives/wagons): when true, `type`
+  // is an item id (not an F.data.entities type) placed via F.api.placeVirtual,
+  // footprint is always 1x1, and `previewDraw` — when the placer exposed one —
+  // is the ghost-drawing function 61-render.js should call instead of its
+  // normal sprite-tint preview. See this module's final report for exactly
+  // what 61-render.js needs to do with these two fields.
+  input.preview = { type: null, tx: 0, ty: 0, dir: 0, ok: false, reason: null, virtual: false, previewDraw: null };
   input.hover = null;
   input.mining = null;
 
@@ -59,6 +76,33 @@
 
   var hoverTx = 0, hoverTy = 0;         // last computed hovered tile (integers)
   var hoverWx = 0, hoverWy = 0;         // last computed hovered tile (continuous / float)
+  var pickerMineState = null;           // { key, startMs, mineTime } — right-click-hold mining of an F.api.addPicker() result
+
+  // =========================================================================
+  // Expansion registries (design/EXPANSION.md §6.6). Feature modules
+  // (src/37-oil.js, 38-trains.js, 39-robots.js, 45-rocket.js) load BEFORE
+  // this file (filename order 37/38/39/45 < 75), so F.input does not exist
+  // yet at their load time. They therefore register directly onto plain F.*
+  // objects (created with `X = X || {}` so whoever runs first wins the
+  // creation), and F.input.addKey()/addDragKind() below are sugar over the
+  // same objects for anything that registers after this file has run. See
+  // the exact snippet appended to design/EXPANSION.md §6.6.
+  //   F._inputKeys: lowercase key -> [fn(ev)->bool, ...], consulted before
+  //     the built-in switch in onKeyDown (first handler to return true wins).
+  //   F._dragKinds: entity behaviour -> 'line' (place along the drag path,
+  //     no rotation logic — like walls/pipes; rails use this).
+  // =========================================================================
+  F._inputKeys = F._inputKeys || {};
+  F._dragKinds = F._dragKinds || {};
+  function addKey(key, fn) {
+    if (!key || typeof fn !== 'function') { F.log.warn('F.input.addKey: invalid args', key); return; }
+    var k = String(key).toLowerCase();
+    (F._inputKeys[k] = F._inputKeys[k] || []).push(fn);
+  }
+  function addDragKind(behaviour, kind) {
+    if (!behaviour) return;
+    F._dragKinds[behaviour] = kind;
+  }
 
   // =========================================================================
   // Small helpers
@@ -112,11 +156,42 @@
   // Per-frame recomputation: hover entity, mining mirror, placement preview,
   // and (while a drag is active) stepping the drag path.
   // =========================================================================
+  // Right-click-hold mining of an F.api.addPicker() result (design/EXPANSION.md
+  // §6.4/§6.6): pickers are consulted BEFORE grid entities, so a picker that
+  // claims this world position (even one with no `.mine`) fully replaces the
+  // grid-entity/resource mine check below for this tile. Progress is tracked
+  // in real time here (this module's own rAF-driven state) rather than via
+  // F.state.player.mining, since F.player.tick only knows about tile-grid
+  // targets — but the result is written into F.input.mining in the exact same
+  // {tx,ty,progress} shape so 61-render.js's existing mining-ring drawer just
+  // works for pickers too, unchanged.
+  function computePickerMine() {
+    if (!F.api || typeof F.api.pickAt !== 'function') return false;
+    var p;
+    try { p = F.api.pickAt(hoverWx, hoverWy); } catch (err) { p = null; F.log.warn('[input] F.api.pickAt threw', err); }
+    if (!p) return false;
+    if (typeof p.mine !== 'function') { pickerMineState = null; return true; } // picker owns this tile, but isn't minable
+    var key = hoverTx + ',' + hoverTy;
+    var need = (p.mineTime != null) ? p.mineTime : 0.5;
+    var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    if (!pickerMineState || pickerMineState.key !== key) pickerMineState = { key: key, startMs: now, mineTime: need };
+    var elapsedS = (now - pickerMineState.startMs) / 1000;
+    input.mining = { tx: hoverTx, ty: hoverTy, progress: F.util.clamp(elapsedS / pickerMineState.mineTime, 0, 1) };
+    if (elapsedS >= pickerMineState.mineTime) {
+      try { p.mine(); } catch (err) { F.log.warn('[input] picker.mine failed', err); }
+      pickerMineState = null;
+      input.mining = null;
+    }
+    return true;
+  }
+
   function computeMineTarget() {
     input.state.mine = null;
-    if (!rightDown) return;
-    if (textFocused()) return;
-    if (!F.player || !F.player.inReach || !F.player.inReach(hoverTx, hoverTy)) return;
+    if (!rightDown) { pickerMineState = null; return; }
+    if (textFocused()) { pickerMineState = null; return; }
+    if (!F.player || !F.player.inReach || !F.player.inReach(hoverTx, hoverTy)) { pickerMineState = null; return; }
+    if (computePickerMine()) return;
+    pickerMineState = null;
     var hasTarget = false;
     try {
       if (F.world.resource(hoverTx, hoverTy)) hasTarget = true;
@@ -126,25 +201,58 @@
     if (hasTarget) input.state.mine = [hoverTx, hoverTy];
   }
 
-  function computePreview() {
-    var cursor = getCursor();
-    if (!cursor) { input.preview.type = null; input.preview.ok = false; input.preview.reason = null; return; }
-    var itemDef = F.data.items[cursor.id];
-    if (!itemDef || !itemDef.place) { input.preview.type = null; input.preview.ok = false; input.preview.reason = null; return; }
-    var type = itemDef.place;
-    var def = F.data.entities[type];
-    if (!def) { input.preview.type = null; return; }
-    var dir = def.rotatable ? (cursorDirByType[type] || 0) : 0;
-    var fp = F.entities.footprint(def, dir);
-    var anchor = computeAnchor(hoverWx, hoverWy, fp[0], fp[1]);
-    var tx = anchor[0], ty = anchor[1];
+  function clearPreview() {
+    input.preview.type = null; input.preview.ok = false; input.preview.reason = null;
+    input.preview.virtual = false; input.preview.previewDraw = null;
+  }
+
+  // Virtual placer preview (design/EXPANSION.md §6.4/§6.6): the cursor item
+  // has no F.data.entities def of its own (vehicles carry `vehicle: ...`, no
+  // `place` — see EXPANSION.md §3) but IS registered via F.api.registerVirtual.
+  // Footprint is always 1x1 (no computeAnchor odd/even logic needed); ok/red
+  // comes from the placer's OWN canPlace(tx,ty,dir), not F.api.canPlace.
+  function computeVirtualPreview(cursor) {
+    if (!F.api || typeof F.api.getVirtual !== 'function') return false;
+    var vdef;
+    try { vdef = F.api.getVirtual(cursor.id); } catch (err) { vdef = null; }
+    if (!vdef) return false;
+    var dir = cursorDirByType[cursor.id] || 0;
+    var tx = hoverTx, ty = hoverTy;
     var chk = { ok: false, reason: null };
-    try {
-      chk = F.api.canPlace(type, tx, ty, dir, { checkReach: true }) || chk;
-    } catch (e) { F.log.warn('[input] canPlace threw', e); }
-    input.preview.type = type;
+    try { chk = (vdef.canPlace && vdef.canPlace(tx, ty, dir)) || chk; } catch (err) { F.log.warn('[input] virtual canPlace threw', err); }
+    input.preview.type = cursor.id;
+    input.preview.virtual = true;
     input.preview.tx = tx; input.preview.ty = ty; input.preview.dir = dir;
     input.preview.ok = !!chk.ok; input.preview.reason = chk.reason || null;
+    input.preview.previewDraw = (typeof vdef.previewDraw === 'function') ? vdef.previewDraw : null;
+    return true;
+  }
+
+  function computePreview() {
+    var cursor = getCursor();
+    if (!cursor) { clearPreview(); return; }
+    var itemDef = F.data.items[cursor.id];
+    if (itemDef && itemDef.place) {
+      var type = itemDef.place;
+      var def = F.data.entities[type];
+      if (!def) { clearPreview(); return; }
+      input.preview.virtual = false;
+      input.preview.previewDraw = null;
+      var dir = def.rotatable ? (cursorDirByType[type] || 0) : 0;
+      var fp = F.entities.footprint(def, dir);
+      var anchor = computeAnchor(hoverWx, hoverWy, fp[0], fp[1]);
+      var tx = anchor[0], ty = anchor[1];
+      var chk = { ok: false, reason: null };
+      try {
+        chk = F.api.canPlace(type, tx, ty, dir, { checkReach: true }) || chk;
+      } catch (e) { F.log.warn('[input] canPlace threw', e); }
+      input.preview.type = type;
+      input.preview.tx = tx; input.preview.ty = ty; input.preview.dir = dir;
+      input.preview.ok = !!chk.ok; input.preview.reason = chk.reason || null;
+      return;
+    }
+    if (computeVirtualPreview(cursor)) return;
+    clearPreview();
   }
 
   input.frame = function () {
@@ -178,7 +286,11 @@
       def: def,
       beltLike: def.behaviour === 'belt' || def.behaviour === 'underground' || def.behaviour === 'splitter',
       poleLike: def.behaviour === 'pole',
-      chainLike: def.behaviour === 'wall' || def.behaviour === 'pipe',
+      // 'line' drag kinds (F.input.addDragKind, design/EXPANSION.md §6.6 —
+      // rails) behave exactly like walls/pipes: place along the drag path
+      // (auto L-shape from tileLine's Bresenham stepping) with no rotation
+      // logic at all.
+      chainLike: def.behaviour === 'wall' || def.behaviour === 'pipe' || (F._dragKinds && F._dragKinds[def.behaviour] === 'line'),
       visited: Object.create(null),
       lastRaw: null,
       lastPole: null,
@@ -287,14 +399,48 @@
   // =========================================================================
   // Left click: place / open entity GUI / pick up ground item.
   // =========================================================================
+  // F.api.addPicker() results (design/EXPANSION.md §6.4/§6.6): consulted
+  // BEFORE grid entities, only when the cursor is empty (a held item always
+  // wins — placement/virtual-placement above takes priority).
+  function tryPicker(wx, wy) {
+    if (!F.api || typeof F.api.pickAt !== 'function') return false;
+    var p;
+    try { p = F.api.pickAt(wx, wy); } catch (err) { p = null; F.log.warn('[input] F.api.pickAt threw', err); }
+    if (!p) return false;
+    if (typeof p.open === 'function') { try { p.open(); } catch (err) { F.log.warn('[input] picker.open failed', err); } }
+    return true; // picker owns this position either way — no fallthrough to grid entities/ground
+  }
+
   function handleLeftDown() {
     if (textFocused()) return;
     input.frame();
     var cursor = getCursor();
     if (cursor && input.preview.type) {
+      // Virtual placer items (design/EXPANSION.md §6.4/§6.6, e.g. vehicles):
+      // placed with one click via F.api.placeVirtual, not the belt-style drag
+      // used for normal F.data.entities placement. Mirrors safePlace()'s
+      // cursorHolds() handling below: the cursor "hand" already holds this
+      // item (that's what drove the preview), so it's consumed from THERE
+      // (fromInventory:false + shrinkCursor) rather than from the bag —
+      // F.api.placeVirtual's fromInventory:true only decrements
+      // F.state.player.inv (F.player.take), which is empty of this item
+      // whenever it is entirely sitting on the cursor (the normal case after
+      // a quickbar/slot pick), so passing true here would silently fail.
+      if (input.preview.virtual) {
+        if (input.preview.ok && F.api && typeof F.api.placeVirtual === 'function') {
+          var itemId = input.preview.type;
+          var fromHand = cursorHolds(itemId);
+          var placedV = null;
+          try { placedV = F.api.placeVirtual(itemId, input.preview.tx, input.preview.ty, input.preview.dir, { fromInventory: !fromHand }); }
+          catch (err) { F.log.warn('[input] placeVirtual failed', err); }
+          if (placedV && fromHand) shrinkCursor(1);
+        }
+        return;
+      }
       beginDrag(input.preview.type);
       return;
     }
+    if (!cursor && tryPicker(hoverWx, hoverWy)) return;
     if (input.hover) {
       if (F.ui && F.ui.open) { F.ui.open('entity', input.hover); windowStack.push('entity'); }
       return;
@@ -347,6 +493,18 @@
       if (def && def.rotatable) {
         var cur = cursorDirByType[type] || 0;
         cursorDirByType[type] = def.allowedDirs ? nextAllowedDir(def.allowedDirs, cur, ccw) : F.util.rotDir(cur, ccw ? -1 : 1);
+        return;
+      }
+      // Virtual placer items (design/EXPANSION.md §6.4, e.g. locomotives/
+      // wagons): no F.data.entities def to key the remembered dir off, so use
+      // the item id itself.
+      if (!def && F.api && typeof F.api.getVirtual === 'function') {
+        var vdef;
+        try { vdef = F.api.getVirtual(cursor.id); } catch (err) { vdef = null; }
+        if (vdef) {
+          var curV = cursorDirByType[cursor.id] || 0;
+          cursorDirByType[cursor.id] = F.util.rotDir(curV, ccw ? -1 : 1);
+        }
       }
       return;
     }
@@ -424,6 +582,8 @@
     }
   }
 
+  // Fallback list only used if F.ui.topWindow() is somehow unavailable (it
+  // always is — 70-ui.js defines it unconditionally — this is defensive).
   var KNOWN_WINDOWS = ['entity', 'inventory', 'tech', 'help', 'map', 'menu', 'death'];
   function onEscape() {
     if (!F.ui) return;
@@ -432,6 +592,14 @@
       if (F.ui.isOpen(name)) { F.ui.close(name); windowStack.splice(i, 1); return; }
       windowStack.splice(i, 1);
     }
+    // windowStack only tracks windows THIS module opened (toggleWindow/the
+    // entity-open in handleLeftDown). A window a feature GUI opened directly
+    // (e.g. F.ui.open('trainCar', ...) from a custom entity GUI's own button
+    // — design/EXPANSION.md §6.6) is still closed here: F.ui.topWindow()
+    // covers every registered window that is currently open, not just the
+    // hardcoded KNOWN_WINDOWS list.
+    var top = (typeof F.ui.topWindow === 'function') ? F.ui.topWindow() : null;
+    if (top) { F.ui.close(top); return; }
     for (var j = 0; j < KNOWN_WINDOWS.length; j++) {
       if (F.ui.isOpen(KNOWN_WINDOWS[j])) { F.ui.close(KNOWN_WINDOWS[j]); return; }
     }
@@ -528,6 +696,19 @@
       return;
     }
     if (e.repeat) return; // one-shot actions below don't auto-repeat
+
+    // F.input.addKey() handlers (design/EXPANSION.md §6.6) run before the
+    // built-in switch below, after the text-input focus guard above. The
+    // first handler to return true stops here (and prevents the default
+    // browser action); anything else falls through to the built-in switch.
+    var customHandlers = F._inputKeys && F._inputKeys[lower];
+    if (customHandlers && customHandlers.length) {
+      for (var ci = 0; ci < customHandlers.length; ci++) {
+        var handled = false;
+        try { handled = !!customHandlers[ci](e); } catch (err) { F.log.warn('[input] custom key handler failed', lower, err); }
+        if (handled) { e.preventDefault(); return; }
+      }
+    }
 
     switch (lower) {
       case 'r': rotate(e.shiftKey); e.preventDefault(); break;
@@ -627,4 +808,6 @@
   input.worldCursor = function () { return [hoverTx, hoverTy]; };
   input.screenCursor = function () { return [mouse.x, mouse.y]; };
   input.isDragging = function () { return !!dragging; };
+  input.addKey = addKey;
+  input.addDragKind = addDragKind;
 })();

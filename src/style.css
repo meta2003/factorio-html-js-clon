@@ -510,16 +510,44 @@ html, body {
 }
 .f-filter-cell:hover { opacity: 1; background: var(--f-slot-hover); }
 
+/* Selected-recipe ring for recipePicker() cells (design/EXPANSION.md §6.6:
+   the h.recipePicker() entity-GUI helper and the assembler's own picker both
+   pass `currentId` through to highlight the machine's active recipe). */
+.f-recipe-cell-active {
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.75), inset 0 0 0 2px var(--f-orange);
+}
+
+/* Generic flex row for custom entity GUIs (design/EXPANSION.md §6.6:
+   F.ui.registerEntityGUI()'s helper object h.row(...els)). Deliberately
+   plain/unopinionated (no margin baked in like .f-row-slots) since custom
+   GUIs use it to lay out arbitrary content. */
+.f-h-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 6px 0;
+}
+
 /* --------------------------------------------------------------------------
    8. Technology window — cards in tiers/columns (GDD §9.7)
    -------------------------------------------------------------------------- */
-.f-win-tech { width: 880px; max-width: 94vw; }
+/* 960px (not 880px): the expansion's tech tree can show up to 4 tier
+   columns (tiers 3/4 added on top of the base game's 1/2 — design/
+   EXPANSION.md §5); max-width/the @media rules below still cap it on
+   narrower screens, where .f-tech-tree stacks columns vertically instead. */
+.f-win-tech { width: 960px; max-width: 94vw; }
 
 .f-tech-head { margin-bottom: 12px; }
 .f-tech-head > div:first-child { margin-bottom: 6px; color: var(--f-caption); font-weight: 600; font-size: 13px; }
 
 .f-tech-tree { display: flex; gap: 14px; align-items: flex-start; }
-.f-tech-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+/* Each tier column scrolls on its own past a sane height so a long tier
+   (the expansion adds tiers 3/4 on top of the base game's 1/2 — up to ~45
+   techs total, design/EXPANSION.md §5) doesn't force the whole window
+   taller than the screen; .f-body's own max-height (70-ui.js) still caps
+   the window as a second line of defence. */
+.f-tech-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; max-height: 64vh; overflow-y: auto; padding-right: 4px; }
 .f-tech-col-title {
   color: var(--f-caption);
   font-weight: 700;

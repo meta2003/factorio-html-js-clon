@@ -70,6 +70,25 @@
     safe('F.fluids.rebuild', function () { if (F.fluids && typeof F.fluids.rebuild === 'function') F.fluids.rebuild(); });
     safe('F.research.wake', function () { if (F.research && typeof F.research.wake === 'function') F.research.wake(); });
     safe('F.player.wake', function () { if (F.player && typeof F.player.wake === 'function') F.player.wake(); });
+    runOnRebuildHooks(); // EXPANSION.md §6.1: feature modules' F.game.onRebuild(fn) hooks — runs on both newGame and load
+  }
+
+  // ---------------------------------------------------------------------
+  // EXPANSION.md §6.1 hook runners. F.game._tickPhases/_onRebuild/_onNewGame
+  // are plain arrays that may already exist by the time this file runs (see
+  // the "queue pattern" note where F.game is built, below): feature files
+  // that load BEFORE this one (37-, 38-, 39-, 45-) push directly onto those
+  // arrays because F.game.addTickPhase/onRebuild/onNewGame do not exist yet
+  // at their load time. This file adopts whatever is already queued instead
+  // of discarding it (see the F.game merge below).
+  // ---------------------------------------------------------------------
+  function runOnRebuildHooks() {
+    const hooks = (F.game && F.game._onRebuild) || [];
+    for (let i = 0; i < hooks.length; i++) safe('game.onRebuild hook #' + i, hooks[i]);
+  }
+  function runOnNewGameHooks() {
+    const hooks = (F.game && F.game._onNewGame) || [];
+    for (let i = 0; i < hooks.length; i++) safe('game.onNewGame hook #' + i, hooks[i]);
   }
 
   // =====================================================================
@@ -114,6 +133,10 @@
       else F.state.player = fallbackPlayer();
     });
 
+    // EXPANSION.md §6.1: F.game.onNewGame(fn) hooks — state object exists (top-level
+    // feature keys like F.state.trains get created here), rebuild caches happen next.
+    runOnNewGameHooks();
+
     rebuildAll();
 
     F.state.tick = 0;
@@ -137,6 +160,21 @@
         tickPhaseErrorsLogged[name] = true;
         F.log.error('[tick] phase "' + name + '" threw (further errors from this phase are suppressed this game):', err);
       }
+    }
+  }
+
+  // EXPANSION.md §6.1: F.game.addTickPhase(name, after, fn) — run every phase
+  // registered against `afterName` right after the built-in phase of that
+  // name runs, in registration order, each wrapped in the same runTickPhase
+  // error-isolation/profiling as the built-ins (a broken feature phase logs
+  // once and never blocks the rest of the tick).
+  function runRegisteredPhasesAfter(afterName) {
+    const list = F.game && F.game._tickPhases;
+    if (!list || !list.length) return;
+    for (let i = 0; i < list.length; i++) {
+      const reg = list[i];
+      if (!reg || reg.after !== afterName) continue;
+      runTickPhase(reg.name || (afterName + ':hook' + i), reg.fn);
     }
   }
 
@@ -175,15 +213,25 @@
     if (!F.state) { (F.game._warnedNoState || (F.game._warnedNoState = true, F.log.warn('[80-game] F.tick called before F.newGame/F.load'))); return; }
 
     runTickPhase('world', function () { if (F.world && typeof F.world.tick === 'function') F.world.tick(); });
+    runRegisteredPhasesAfter('world');
     runTickPhase('player', function () { if (F.player && typeof F.player.tick === 'function') F.player.tick(F.input && F.input.state); });
+    runRegisteredPhasesAfter('player');
     runTickPhase('power', function () { if (F.power && typeof F.power.tick === 'function') F.power.tick(); });
+    runRegisteredPhasesAfter('power');
     runTickPhase('fluids', function () { if (F.fluids && typeof F.fluids.tick === 'function') F.fluids.tick(); });
+    runRegisteredPhasesAfter('fluids');
     runTickPhase('machines', function () { if (F.machines && typeof F.machines.tick === 'function') F.machines.tick(); });
+    runRegisteredPhasesAfter('machines');
     runTickPhase('inserters', function () { if (F.inserters && typeof F.inserters.tick === 'function') F.inserters.tick(); });
+    runRegisteredPhasesAfter('inserters');
     runTickPhase('belts', function () { if (F.belts && typeof F.belts.tick === 'function') F.belts.tick(); });
+    runRegisteredPhasesAfter('belts');
     runTickPhase('combat', function () { if (F.combat && typeof F.combat.tick === 'function') F.combat.tick(); });
+    runRegisteredPhasesAfter('combat');
     runTickPhase('pollution', function () { if (F.pollution && typeof F.pollution.tick === 'function') F.pollution.tick(); });
+    runRegisteredPhasesAfter('pollution');
     runTickPhase('research', function () { if (F.research && typeof F.research.tick === 'function') F.research.tick(); });
+    runRegisteredPhasesAfter('research');
     runTickPhase('bookkeeping', function () {
       if (F.entities && typeof F.entities.flushRemovals === 'function') F.entities.flushRemovals();
       expireAlerts();
@@ -552,12 +600,39 @@
     }
   }
 
-  F.game = {
+  // EXPANSION.md §6.1: F.game must exist early enough for feature files that
+  // load BEFORE this one (37-, 38-, 39-, 45- ...) to register hooks. Those
+  // files cannot call F.game.addTickPhase/onRebuild/onNewGame (this file
+  // hasn't run yet, so those functions don't exist) — instead they use the
+  // "queue pattern": push straight onto F.game._tickPhases/_onRebuild/
+  // _onNewGame, creating F.game and the arrays if needed, e.g.:
+  //   F.game = F.game || {};
+  //   (F.game._tickPhases = F.game._tickPhases || []).push({ name: 'my-feature', after: 'fluids', fn: tickMyFeature });
+  //   (F.game._onNewGame = F.game._onNewGame || []).push(function () { F.state.myFeature = []; });
+  //   (F.game._onRebuild = F.game._onRebuild || []).push(function () { /* rebuild runtime caches */ });
+  // So: MERGE onto any F.game object that already exists (Object.assign),
+  // never replace it wholesale, and adopt (not discard) whatever got queued.
+  F.game = F.game || {};
+  if (!Array.isArray(F.game._tickPhases)) F.game._tickPhases = [];
+  if (!Array.isArray(F.game._onRebuild)) F.game._onRebuild = [];
+  if (!Array.isArray(F.game._onNewGame)) F.game._onNewGame = [];
+
+  Object.assign(F.game, {
     running: false,
     paused: false,
     speed: 1,
     lastAutosave: 0,
     hasSavedGame: hasSavedGame,
+
+    // addTickPhase(name, after, fn): fn() runs every tick right after the named
+    // built-in phase (see the list in runRegisteredPhasesAfter's call sites
+    // above), wrapped in the same error-isolating runTickPhase as the built-ins.
+    // Multiple registrations against the same `after` run in registration order.
+    addTickPhase: function (name, after, fn) { F.game._tickPhases.push({ name: name, after: after, fn: fn }); },
+    // onRebuild(fn): fn() runs at the end of rebuildAll() — after F.newGame AND after F.load.
+    onRebuild: function (fn) { F.game._onRebuild.push(fn); },
+    // onNewGame(fn): fn() runs once F.state exists but before rebuildAll() (new game only).
+    onNewGame: function (fn) { F.game._onNewGame.push(fn); },
 
     loop: function () {
       if (typeof window === 'undefined' || window.HEADLESS) return; // never drive rAF under headless
@@ -608,7 +683,7 @@
     importString: function (s) { return F.load(s); },
 
     newGameWithSeed: function (seed) { return F.newGame({ seed: seed }); },
-  };
+  });
 
   // =====================================================================
   // F.boot — real-page entry point (never called under HEADLESS; see

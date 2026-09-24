@@ -16,7 +16,9 @@ js = js.replace(/<\/script/gi, '<\/script'); // never terminate the inline scrip
 if (!tpl.includes('/*__CSS__*/') || !tpl.includes('/*__JS__*/')) { console.error('template.html must contain /*__CSS__*/ and /*__JS__*/ placeholders'); process.exit(1); }
 const html = tpl.replace('/*__CSS__*/', () => css).replace('/*__JS__*/', () => js);
 fs.mkdirSync(path.join(root, 'build'), { recursive: true });
-const out = path.join(root, 'build', 'Factio.html');
+const oi = process.argv.indexOf('--out');
+const out = oi !== -1 ? path.resolve(process.argv[oi + 1]) : path.join(root, 'build', 'Factio.html');
+fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, html, 'utf8');
 console.log(`built ${out}  (${(html.length / 1024).toFixed(1)} KB, ${files.length} modules: ${files.join(', ')})`);
 const di = process.argv.indexOf('--deploy');

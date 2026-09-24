@@ -163,7 +163,10 @@
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
         const r = F.world.resource(x, y);
-        if (r && r.amount > 0) return true;
+        // crude-oil wells (design/EXPANSION.md §6.4) are pumpjack-only, not
+        // minable by burner/electric drills — ignored here so a drill can
+        // still be placed over one (it just won't find any real ore there).
+        if (r && r.amount > 0 && r.item !== 'crude-oil') return true;
       }
     }
     return false;
@@ -176,6 +179,34 @@
     if (!F.world || typeof F.world.isWater !== 'function') return true; // world not loaded yet — permissive
     const v = F.C.DIRS[dir & 3];
     return F.world.isWater(tx + v[0], ty + v[1]) && F.world.isWater(tx + v[0] * 2, ty + v[1] * 2);
+  }
+
+  // ---------------------------------------------------------------------
+  // F.api.addPlaceRule (design/EXPANSION.md §6.4) — extra per-behaviour
+  // placement validation consulted by canPlace, e.g. "pumpjack must be
+  // centred on an oil well" (-> 'no_resource') or "train stop must touch a
+  // rail" (-> 'no_rail'). Multiple rules may register for the same
+  // behaviour; the first non-null reason wins. Additive: canPlace behaves
+  // exactly as before when no rule is registered.
+  // ---------------------------------------------------------------------
+  const placeRules = Object.create(null); // behaviour -> [fn(def,tx,ty,dir)->null|reason, ...]
+
+  function addPlaceRule(behaviour, fn) {
+    if (!behaviour || typeof fn !== 'function') return;
+    if (!placeRules[behaviour]) placeRules[behaviour] = [];
+    placeRules[behaviour].push(fn);
+  }
+
+  function runPlaceRules(def, tx, ty, dir) {
+    const list = def && placeRules[def.behaviour];
+    if (!list) return null;
+    for (let i = 0; i < list.length; i++) {
+      try {
+        const reason = list[i](def, tx, ty, dir);
+        if (reason) return reason;
+      } catch (err) { F.log.error('F.api place rule for', def.behaviour, err); }
+    }
+    return null;
   }
 
   function withinReach(tx, ty, w, h) {
@@ -236,6 +267,9 @@
     if (F.fluids && typeof F.fluids.canConnect === 'function' && !F.fluids.canConnect(type, tx, ty, dir)) {
       return { ok: false, reason: 'fluid_mix' };
     }
+
+    const ruleReason = runPlaceRules(def, tx, ty, dir);
+    if (ruleReason) return { ok: false, reason: ruleReason };
 
     if (opts.checkReach && !withinReach(tx, ty, w, h)) {
       return { ok: false, reason: 'out_of_reach' };
@@ -360,6 +394,67 @@
     afterTopologyChange(e, def);
     F.events.emit('entity:placed', e); // closest documented event for "shape/orientation changed"; UI refresh hook
     return true;
+  }
+
+  // ---------------------------------------------------------------------
+  // F.api.registerVirtual / getVirtual / placeVirtual (design/EXPANSION.md
+  // §6.4) — placement for items that are NOT grid entities (vehicles: they
+  // have no `place` on their item def, see EXPANSION §3). `spec` is
+  // `{ canPlace(tx,ty,dir) -> {ok,reason}, place(tx,ty,dir) -> obj|null,
+  // previewDraw?(ctx,tx,ty,dir,ok) }`. placeVirtual removes one item from the
+  // player's inventory when opts.fromInventory and placement actually
+  // succeeds (rolled back if place() itself returns falsy).
+  // ---------------------------------------------------------------------
+  const virtualPlacers = Object.create(null); // itemId -> spec
+
+  function registerVirtual(itemId, spec) {
+    if (!itemId || !spec || typeof spec.place !== 'function') { F.log.warn('F.api.registerVirtual: invalid spec for', itemId); return; }
+    virtualPlacers[itemId] = spec;
+  }
+
+  function getVirtual(itemId) { return virtualPlacers[itemId] || null; }
+
+  function placeVirtual(itemId, tx, ty, dir, opts) {
+    opts = opts || {};
+    dir = (dir | 0) & 3;
+    const v = virtualPlacers[itemId];
+    if (!v) { F.log.warn('F.api.placeVirtual: no virtual placer registered for', itemId); return null; }
+    if (typeof v.canPlace === 'function') {
+      let chk = null;
+      try { chk = v.canPlace(tx, ty, dir); } catch (err) { F.log.error('F.api.placeVirtual: canPlace threw for', itemId, err); chk = { ok: false }; }
+      if (!chk || !chk.ok) return null;
+    }
+    if (opts.fromInventory && takeFromPlayer(itemId, 1) < 1) {
+      F.log.warn('F.api.placeVirtual: no', itemId, 'in inventory'); return null;
+    }
+    let obj = null;
+    try { obj = v.place(tx, ty, dir); } catch (err) { F.log.error('F.api.placeVirtual: place() threw for', itemId, err); obj = null; }
+    if (!obj) {
+      if (opts.fromInventory) giveToPlayer(itemId, 1); // roll back the consumed item
+      return null;
+    }
+    return obj;
+  }
+
+  // ---------------------------------------------------------------------
+  // F.api.addPicker / pickAt (design/EXPANSION.md §6.4) — lets input resolve
+  // non-grid objects under the mouse (world FLOAT coords, not tile coords).
+  // Consulted BEFORE grid entities by 75-input.js. `fn(wx,wy) -> null |
+  // { kind, label, open?(), mine?() -> bool, mineTime? }`. pickAt returns the
+  // first non-null result across all registered pickers.
+  // ---------------------------------------------------------------------
+  const pickers = [];
+
+  function addPicker(fn) { if (typeof fn === 'function') pickers.push(fn); }
+
+  function pickAt(wx, wy) {
+    for (let i = 0; i < pickers.length; i++) {
+      try {
+        const r = pickers[i](wx, wy);
+        if (r) return r;
+      } catch (err) { F.log.error('F.api picker threw', err); }
+    }
+    return null;
   }
 
   // ---------------------------------------------------------------------
@@ -679,6 +774,12 @@
     stats: stats,
     placeLine: placeLine,
     transferStack: transferStack,
+    addPlaceRule: addPlaceRule,
+    registerVirtual: registerVirtual,
+    getVirtual: getVirtual,
+    placeVirtual: placeVirtual,
+    addPicker: addPicker,
+    pickAt: pickAt,
     cheat: {
       unlockAll: unlockAll,
       giveStarterBase: giveStarterBase,

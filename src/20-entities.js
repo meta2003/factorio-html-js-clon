@@ -227,31 +227,48 @@
     try { return fn(entity); } catch (err) { F.log.error('behaviour.' + method, entity.type, err); return fallback; }
   }
 
+  // Non-grid duck-typed objects (design/EXPANSION.md §6.3, e.g. a train wagon
+  // exposed via F.inserters.addResolver) carry an `_ops` object instead of a
+  // real F.data.entities behaviour: `{ accepts(item)->count, insert(item,count)->n,
+  // take(filterFn)->item|null }`. canAcceptItem/insertItem/takeItem fall back
+  // to it whenever the normal def/behaviour lookup finds nothing to call.
   entities.canAcceptItem = function (entity, item) {
     if (!entity || entity._removed) return 0;
     const def = F.data && F.data.entities && F.data.entities[entity.type];
-    if (!def) return 0;
-    const beh = behaviourFor(def);
-    if (!beh.accepts) return 0;
-    try { return beh.accepts(entity, item) || 0; } catch (err) { F.log.error('behaviour.accepts', entity.type, err); return 0; }
+    const beh = def && behaviourFor(def);
+    if (beh && beh.accepts) {
+      try { return beh.accepts(entity, item) || 0; } catch (err) { F.log.error('behaviour.accepts', entity.type, err); return 0; }
+    }
+    if (entity._ops && typeof entity._ops.accepts === 'function') {
+      try { return entity._ops.accepts(item) || 0; } catch (err) { F.log.error('entity._ops.accepts', err); return 0; }
+    }
+    return 0;
   };
 
   entities.insertItem = function (entity, item, count) {
     if (!entity || entity._removed) return 0;
     const def = F.data && F.data.entities && F.data.entities[entity.type];
-    if (!def) return 0;
-    const beh = behaviourFor(def);
-    if (!beh.insert) return 0;
-    try { return beh.insert(entity, item, count) || 0; } catch (err) { F.log.error('behaviour.insert', entity.type, err); return 0; }
+    const beh = def && behaviourFor(def);
+    if (beh && beh.insert) {
+      try { return beh.insert(entity, item, count) || 0; } catch (err) { F.log.error('behaviour.insert', entity.type, err); return 0; }
+    }
+    if (entity._ops && typeof entity._ops.insert === 'function') {
+      try { return entity._ops.insert(item, count) || 0; } catch (err) { F.log.error('entity._ops.insert', err); return 0; }
+    }
+    return 0;
   };
 
   entities.takeItem = function (entity, filterFn) {
     if (!entity || entity._removed) return null;
     const def = F.data && F.data.entities && F.data.entities[entity.type];
-    if (!def) return null;
-    const beh = behaviourFor(def);
-    if (!beh.take) return null;
-    try { return beh.take(entity, filterFn) || null; } catch (err) { F.log.error('behaviour.take', entity.type, err); return null; }
+    const beh = def && behaviourFor(def);
+    if (beh && beh.take) {
+      try { return beh.take(entity, filterFn) || null; } catch (err) { F.log.error('behaviour.take', entity.type, err); return null; }
+    }
+    if (entity._ops && typeof entity._ops.take === 'function') {
+      try { return entity._ops.take(filterFn) || null; } catch (err) { F.log.error('entity._ops.take', err); return null; }
+    }
+    return null;
   };
 
   entities.inventories = function (entity) {

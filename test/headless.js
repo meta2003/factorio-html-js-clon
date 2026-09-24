@@ -119,9 +119,15 @@ try {
   }
 } catch (e) { report.errors.push('RUN ERROR: ' + ((e && e.stack) || e)); }
 
-const scenPath = path.resolve(process.cwd(), opt('--scenarios', path.resolve(__dirname, 'scenarios.js')));
-if (fs.existsSync(scenPath)) {
-  const scenarios = require(scenPath); // module.exports = { name: (F, window, assert) => void | string, ... }
+// --scenarios <file> runs one file; default = test/scenarios.js + every test/scenarios-*.js (feature packs).
+// --only <substring> keeps just the scenarios whose name contains it.
+const scenFiles = opt('--scenarios', null) ? [path.resolve(process.cwd(), opt('--scenarios'))]
+  : [path.resolve(__dirname, 'scenarios.js')].concat(fs.readdirSync(__dirname).filter(f => /^scenarios-.*.js$/.test(f)).sort().map(f => path.join(__dirname, f)));
+const onlyPat = opt('--only', null);
+const scenarios = {};
+for (const sp of scenFiles) if (fs.existsSync(sp)) Object.assign(scenarios, require(sp)); // module.exports = { name: (F, assert, window) => void | string, ... }
+if (onlyPat) for (const k of Object.keys(scenarios)) if (!k.includes(onlyPat)) delete scenarios[k];
+{
   const assert = (cond, msg) => { if (!cond) throw new Error('ASSERT: ' + msg); };
   for (const [name, fn] of Object.entries(scenarios)) {
     const r = { name, ok: true };

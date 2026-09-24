@@ -35,13 +35,32 @@
 
   function reachOf(ins) { return (ins && ins.reach) || 1; }
 
-  // Resolve what occupies a tile as an inserter source/target: a belt-like entity, another entity, or bare ground.
+  // Resolvers (design/EXPANSION.md §6.3): fn(tx,ty) -> obj|null, consulted when the
+  // pickup/drop tile has no grid entity. `obj` is duck-typed like an entity but with
+  // an `_ops` object instead of an F.data.entities behaviour (see 20-entities.js's
+  // canAcceptItem/insertItem/takeItem fallback) — used by train wagons while stopped.
+  const resolvers = [];
+
+  function resolveAt(tx, ty) {
+    for (let i = 0; i < resolvers.length; i++) {
+      try {
+        const r = resolvers[i](tx, ty);
+        if (r) return r;
+      } catch (err) { F.log.error('inserters resolver threw', err); }
+    }
+    return null;
+  }
+
+  // Resolve what occupies a tile as an inserter source/target: a belt-like entity,
+  // another entity, a resolver-provided virtual object, or bare ground.
   function tileTarget(tx, ty) {
     const ent = F.world.entityAt(tx, ty);
     if (ent) {
       if (F.belts.isBeltLike(ent)) return { kind: 'belt', entity: ent, tx, ty };
       return { kind: 'entity', entity: ent, tx, ty };
     }
+    const resolved = resolveAt(tx, ty);
+    if (resolved) return { kind: 'entity', entity: resolved, tx, ty };
     return { kind: 'ground', tx, ty };
   }
 
@@ -62,10 +81,18 @@
   // primary (and normally sufficient) guard; when F.machines exposes an explicit insertLimit
   // helper (GDD §7.4.1 table) we apply it as a second guard, since some limits (e.g. "furnace
   // input slot capped at crafts×amount") depend on data only F.machines fully resolves.
+  //
+  // The second guard only applies to REAL grid entities: F.machines.insertLimit resolves the
+  // limit via F.data.entities[dst.type]'s behaviour and falls back to 0 (its safe default) for
+  // anything it doesn't recognise — which is exactly what a resolver-provided virtual object
+  // (design/EXPANSION.md §6.3, `dst._ops`, e.g. a train wagon) looks like from its point of view.
+  // Applying it there would make every _ops-based insert look "at its limit" (0 >= 0) and never
+  // succeed, so those objects rely solely on their own `_ops.accepts` cap instead.
   function entityAcceptsNow(dst, item) {
     const cap = F.entities.canAcceptItem ? F.entities.canAcceptItem(dst, item) : 0;
     if (!cap || cap <= 0) return false;
-    if (F.machines && typeof F.machines.insertLimit === 'function') {
+    const isRealEntity = !!(F.data && F.data.entities && F.data.entities[dst.type]);
+    if (isRealEntity && F.machines && typeof F.machines.insertLimit === 'function') {
       try {
         const lim = F.machines.insertLimit(dst, item);
         if (typeof lim === 'number' && isFinite(lim)) {
@@ -410,5 +437,7 @@
     },
 
     status(e) { return status(e); },
+
+    addResolver(fn) { if (typeof fn === 'function') resolvers.push(fn); },
   };
 })();

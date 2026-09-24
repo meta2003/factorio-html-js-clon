@@ -90,6 +90,9 @@
     'ui.controlsSummary': 'Key summary', 'ui.exportHint': 'Select and copy the text below, or use the Copy button.',
     'ui.importHint': 'Paste a saved game (JSON) below and click Load.', 'ui.newGameConfirmed': 'New game created',
     'ui.daylight': 'Daylight', 'ui.uses': 'Uses', 'ui.perTile': '/tile', 'ui.notConnected': 'Not connected to a network',
+    // Expansion (design/EXPANSION.md §5/§6.6): tier-3/4 tech column labels and
+    // the empty-fluid-box label used by the fluidBar() entity-GUI helper.
+    'ui.research.tier3': 'Blue tier', 'ui.research.tier4': 'Endgame tier', 'ui.fluidEmpty': 'Empty',
   });
 
   // =========================================================================
@@ -146,6 +149,54 @@
       var color = (it && it.icon && it.icon.color) || '#5a5a5a';
       box.style.background = color;
       box.appendChild(el('span', 'f-icon-abbrev', iconAbbrev(id)));
+    }
+    return box;
+  }
+
+  // =========================================================================
+  // Fluid helpers (design/EXPANSION.md §2/§6.6). F.data.fluids and
+  // F.sprites.fluidIconURL are owned by other agents (D-data / A-view) that
+  // may not have loaded yet in a partial build, so both are guarded and fall
+  // back to a plain coloured dot when unavailable.
+  // =========================================================================
+  function fluidDefSafe(fluidId) {
+    return (fluidId && F.data && F.data.fluids && F.data.fluids[fluidId]) || null;
+  }
+  function fluidColorSafe(fluidId) {
+    var fdef = fluidDefSafe(fluidId);
+    return (fdef && fdef.color) || '#5a7fa0';
+  }
+  function fluidIconURLSafe(fluidId) {
+    if (F.sprites && typeof F.sprites.fluidIconURL === 'function') {
+      try { return F.sprites.fluidIconURL(fluidId); } catch (err) { return null; }
+    }
+    return null;
+  }
+  // Small inline icon for a fluid line in a tooltip: F.sprites.fluidIconURL
+  // when available, else a coloured dot in the fluid's own colour.
+  function fluidDotHtml(fluidId) {
+    var url = fluidIconURLSafe(fluidId);
+    if (url) return '<img src="' + url + '" style="width:10px;height:10px;vertical-align:middle;margin-right:4px;">';
+    return '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' +
+      fluidColorSafe(fluidId) + ';margin-right:4px;vertical-align:middle;"></span>';
+  }
+  function fluidLineHtml(fluidId, amount) {
+    return fluidDotHtml(fluidId) + U.escapeHtml(F.t('fluid.' + fluidId)) + ' x' + amount;
+  }
+  // Icon element for a fluid (used by recipePicker() for fluid-only results):
+  // F.sprites.fluidIconURL when available, else a coloured circle.
+  function buildFluidIcon(fluidId, size) {
+    size = size || 32;
+    var box = el('div', 'f-icon');
+    box.style.width = size + 'px';
+    box.style.height = size + 'px';
+    var url = fluidIconURLSafe(fluidId);
+    if (url) {
+      box.style.backgroundImage = 'url(' + url + ')';
+      box.style.backgroundSize = 'cover';
+    } else {
+      box.style.background = fluidColorSafe(fluidId);
+      box.style.borderRadius = '50%';
     }
     return box;
   }
@@ -290,11 +341,23 @@
       }
     }
   }
+  // recipeIconId(recipeId) -> the item id to use as the recipe's icon: its
+  // first item result, or (design/EXPANSION.md §4: recipes with an empty
+  // items-out list are allowed, e.g. basic-oil-processing) null when the
+  // recipe only produces fluids — callers fall back to a fluid icon.
+  function recipeIconId(rdef) {
+    return (rdef.results && rdef.results.length) ? rdef.results[0][0] : null;
+  }
   function recipeTooltipHtml(recipeId) {
     var rdef = F.data.recipes[recipeId];
     if (!rdef) return U.escapeHtml(recipeId);
-    var resultId = rdef.results[0][0];
-    var html = '<b style="color:#ffa500">' + U.escapeHtml(F.t('item.' + resultId)) + '</b>';
+    var itemResults = rdef.results || [];
+    var fluidIngredients = rdef.fluidIngredients || [];
+    var fluidResults = rdef.fluidResults || [];
+    var resultId = recipeIconId(rdef);
+    var fluidResultId = fluidResults.length ? fluidResults[0][0] : null;
+    var titleText = resultId ? F.t('item.' + resultId) : (fluidResultId ? F.t('fluid.' + fluidResultId) : recipeId);
+    var html = '<b style="color:#ffa500">' + U.escapeHtml(titleText) + '</b>';
     html += '<br><u>' + U.escapeHtml(F.t('ui.ingredients')) + ':</u>';
     for (var i = 0; i < rdef.ingredients.length; i++) {
       var id = rdef.ingredients[i][0], need = rdef.ingredients[i][1];
@@ -302,10 +365,16 @@
       var color = have < need ? '#ff8e8e' : '#e0dcd3';
       html += '<br><span style="color:' + color + '">' + U.escapeHtml(F.t('item.' + id)) + ' x' + need + '</span>';
     }
+    for (var fi = 0; fi < fluidIngredients.length; fi++) {
+      html += '<br>' + fluidLineHtml(fluidIngredients[fi][0], fluidIngredients[fi][1]);
+    }
     html += '<br>' + U.escapeHtml(F.t('ui.craftTime')) + ': ' + U.fmt(rdef.time, 2) + ' s';
     html += '<br><u>' + U.escapeHtml(F.t('ui.products')) + ':</u>';
-    for (var j = 0; j < rdef.results.length; j++) {
-      html += '<br>' + U.escapeHtml(F.t('item.' + rdef.results[j][0])) + ' x' + rdef.results[j][1];
+    for (var j = 0; j < itemResults.length; j++) {
+      html += '<br>' + U.escapeHtml(F.t('item.' + itemResults[j][0])) + ' x' + itemResults[j][1];
+    }
+    for (var fj = 0; fj < fluidResults.length; fj++) {
+      html += '<br>' + fluidLineHtml(fluidResults[fj][0], fluidResults[fj][1]);
     }
     var raw = {}, seen = {};
     rawMaterials(recipeId, 1, 0, seen, raw);
@@ -417,12 +486,32 @@
   // =========================================================================
   // WINDOW: inventory  (80-slot grid + crafting tabs)
   // =========================================================================
-  // 'combat' tab omitted: F.FEATURES.combat is off, so recipesByTab.combat
-  // is always empty (see src/disabled/README.md to re-enable it).
-  var CRAFT_TABS = (F.FEATURES && F.FEATURES.combat)
-    ? ['logistics', 'production', 'intermediate', 'combat']
-    : ['logistics', 'production', 'intermediate'];
-  var craftTabState = { current: 'logistics' };
+  // Crafting tabs (design/EXPANSION.md §6.6): derived from
+  // F.data.order.recipesByTab's own keys (so new tabs D-data introduces show
+  // up automatically) in a fixed preferred order — logistics, production,
+  // intermediate, combat, then any further keys in whatever order
+  // Object.keys() gives them — and only kept when at least one HAND recipe
+  // (crafting-grid craftable, design/EXPANSION.md §4) in that tab exists;
+  // this hides genuinely empty tabs and, as before, the whole combat tab
+  // when F.FEATURES.combat is off (its recipesByTab.combat list is empty in
+  // that build — see src/disabled/README.md to re-enable it).
+  function tabHasHandRecipe(tab) {
+    var ids = (F.data.order.recipesByTab && F.data.order.recipesByTab[tab]) || [];
+    for (var i = 0; i < ids.length; i++) { var r = F.data.recipes[ids[i]]; if (r && r.hand) return true; }
+    return false;
+  }
+  function computeCraftTabs() {
+    var preferred = ['logistics', 'production', 'intermediate', 'combat'];
+    var keys = Object.keys((F.data.order && F.data.order.recipesByTab) || {});
+    var ordered = preferred.filter(function (k) { return keys.indexOf(k) >= 0; });
+    keys.forEach(function (k) { if (ordered.indexOf(k) < 0) ordered.push(k); });
+    return ordered.filter(function (tab) {
+      if (tab === 'combat' && !(F.FEATURES && F.FEATURES.combat)) return false;
+      return tabHasHandRecipe(tab);
+    });
+  }
+  var CRAFT_TABS = computeCraftTabs();
+  var craftTabState = { current: CRAFT_TABS[0] || 'logistics' };
 
   function maxCraftable(recipeId) {
     if (!F.player || typeof F.player.canCraft !== 'function') return 1;
@@ -457,11 +546,15 @@
     panel.appendChild(tabs);
 
     var list = el('div', 'f-recipe-list');
-    var ids = (F.data.order.recipesByTab && F.data.order.recipesByTab[craftTabState.current]) || [];
+    // Only HAND recipes ever appear in the hand-crafting grid (design/EXPANSION.md
+    // §4: a fluid-only recipe like basic-oil-processing sits in the
+    // 'intermediate' tab's list too, but is machine-only).
+    var ids = ((F.data.order.recipesByTab && F.data.order.recipesByTab[craftTabState.current]) || [])
+      .filter(function (id) { var r = F.data.recipes[id]; return r && r.hand; });
     ids.forEach(function (id) {
       var state = recipeState(id);
       var rdef = F.data.recipes[id];
-      var resultId = rdef.results[0][0];
+      var resultId = recipeIconId(rdef);
       var b = el('div', 'f-recipe f-recipe-' + state);
       b.appendChild(buildIcon(resultId, 34));
       b.appendChild(el('span', 'f-recipe-name', F.t('item.' + resultId)));
@@ -547,40 +640,64 @@
     root.appendChild(row);
   }
 
+  // Recipe ids offered by an assembler's picker (design/EXPANSION.md §6.6):
+  // F.machines.recipesFor(e) when that API exists (it already returns only
+  // unlocked recipes valid for this specific machine — e.g. respecting
+  // def.assembler.categories / def.crafter.categories for the new oil/chemistry
+  // machines); otherwise fall back to this module's pre-existing behaviour
+  // (crafting + advanced categories, unlocked, in CRAFT_TABS order).
+  function machineRecipeIds(e, def) {
+    if (F.machines && typeof F.machines.recipesFor === 'function') {
+      try { var r = F.machines.recipesFor(e); if (r) return r; } catch (err) { F.log.warn('ui-windows: F.machines.recipesFor failed', err); }
+    }
+    var cats = (def.assembler && def.assembler.categories) || ['crafting', 'advanced'];
+    var ids = [], seen = {};
+    CRAFT_TABS.concat(['intermediate']).forEach(function (tab) {
+      (F.data.order.recipesByTab[tab] || []).forEach(function (id) {
+        if (seen[id]) return;
+        var rdef = F.data.recipes[id];
+        if (!rdef || cats.indexOf(rdef.category) < 0) return;
+        if (F.research && typeof F.research.isRecipeUnlocked === 'function' && !F.research.isRecipeUnlocked(id)) return;
+        seen[id] = true;
+        ids.push(id);
+      });
+    });
+    return ids;
+  }
+
   function ENTITY_ASSEMBLER(root, e, def) {
     renderGenericHeader(root, e, def);
     if (!e.recipe) {
       root.appendChild(sectionTitle(F.t('ui.chooseRecipe')));
       var picker = el('div', 'f-recipe-picker');
-      CRAFT_TABS.forEach(function (tab) {
-        var ids = (F.data.order.recipesByTab[tab] || []).filter(function (id) {
-          return F.research ? F.research.isRecipeUnlocked(id) : true;
-        });
-        if (!ids.length) return;
+      var byTab = {};
+      machineRecipeIds(e, def).forEach(function (id) {
+        var rdef = F.data.recipes[id];
+        var tab = (rdef && rdef.tab) || 'intermediate';
+        (byTab[tab] = byTab[tab] || []).push(id);
+      });
+      var tabOrder = CRAFT_TABS.concat(['intermediate']).filter(function (t, i, a) { return a.indexOf(t) === i; });
+      Object.keys(byTab).forEach(function (t) { if (tabOrder.indexOf(t) < 0) tabOrder.push(t); });
+      var onPick = function (id) {
+        if (F.api && typeof F.api.setRecipe === 'function') F.api.setRecipe(e, id);
+        else if (F.machines && typeof F.machines.setRecipe === 'function') F.machines.setRecipe(e, id);
+      };
+      tabOrder.forEach(function (tab) {
+        var ids = byTab[tab];
+        if (!ids || !ids.length) return;
         picker.appendChild(el('div', 'f-tab-label', F.t('cat.' + tab)));
-        var grid = el('div', 'f-recipe-grid');
-        ids.forEach(function (id) {
-          var rdef = F.data.recipes[id];
-          var resultId = rdef.results[0][0];
-          var cell = buildIcon(resultId, 34);
-          cell.classList.add('f-recipe-cell');
-          cell.style.pointerEvents = 'auto'; // .f-icon is pointer-events:none by default (70-ui.js); this one is clickable
-          cell.style.cursor = 'pointer';
-          attachTooltip(cell, function () { return recipeTooltipHtml(id); });
-          cell.addEventListener('click', function () {
-            if (F.api && typeof F.api.setRecipe === 'function') F.api.setRecipe(e, id);
-            else if (F.machines && typeof F.machines.setRecipe === 'function') F.machines.setRecipe(e, id);
-          });
-          grid.appendChild(cell);
-        });
-        picker.appendChild(grid);
+        picker.appendChild(hRecipePicker(e, ids, e.recipe, onPick));
       });
       root.appendChild(picker);
       return;
     }
+    var curDef = F.data.recipes[e.recipe];
+    var curIconId = curDef ? recipeIconId(curDef) : null;
+    var curFluidId = (curDef && curDef.fluidResults && curDef.fluidResults.length) ? curDef.fluidResults[0][0] : null;
+    var curName = curIconId ? F.t('item.' + curIconId) : (curFluidId ? F.t('fluid.' + curFluidId) : e.recipe);
     var head2 = el('div', 'f-recipe-current');
-    head2.appendChild(buildIcon(F.data.recipes[e.recipe] ? F.data.recipes[e.recipe].results[0][0] : e.recipe, 32));
-    head2.appendChild(el('span', null, F.t('item.' + (F.data.recipes[e.recipe] ? F.data.recipes[e.recipe].results[0][0] : e.recipe))));
+    head2.appendChild(curIconId ? buildIcon(curIconId, 32) : buildFluidIcon(curFluidId, 32));
+    head2.appendChild(el('span', null, curName));
     var change = button('↺', 'f-btn-small', function () {
       if (F.api && typeof F.api.setRecipe === 'function') F.api.setRecipe(e, null);
       else if (F.machines && typeof F.machines.setRecipe === 'function') F.machines.setRecipe(e, null);
@@ -774,6 +891,94 @@
     return wrap;
   }
 
+  // =========================================================================
+  // F.ui.registerEntityGUI() support (design/EXPANSION.md §6.6). The registry
+  // itself (F._entityGUIs, behaviour -> fn(root,e,def,h)) is created/owned by
+  // 70-ui.js (which loads just before this file) so early feature modules
+  // (37/38/39/45-*.js, which load BEFORE 70-ui.js) can register directly onto
+  // it without needing F.ui to exist yet; see that file's header comment and
+  // the snippet appended to EXPANSION.md §6.6. A registered GUI always wins
+  // over the built-in ENTITY_RENDERERS table below.
+  //
+  // buildEntityGuiHelpers(root, e, def) -> h — the helper object handed to a
+  // registered GUI fn. Thin wrappers around this module's own DOM builders so
+  // custom GUIs look and behave exactly like the built-in ones (same slot
+  // widget, same tooltip/status/bar look, same recipe-picker semantics).
+  // =========================================================================
+  function hBar(value01, color, text) {
+    // `color` is a real colour (hex/rgb/var(...)), not one of bar()'s fixed
+    // f-bar-* classes — lets custom GUIs tint by fluid colour, status colour,
+    // etc. Falls back to treating it as a class name for anything that
+    // doesn't look like a colour literal, so passing 'f-bar-blue' etc. still
+    // works exactly like the internal bar() helper.
+    var literal = color && (color[0] === '#' || color.indexOf('rgb') === 0 || color.indexOf('var(') === 0);
+    var wrap = bar(value01, literal ? null : color, text);
+    if (literal) {
+      var fill = wrap.querySelector('.f-bar-fill');
+      if (fill) fill.style.background = color;
+    }
+    return wrap;
+  }
+  function hFluidBar(box, label) {
+    box = box || { fluid: null, amount: 0, cap: 0 };
+    var fluidId = box.fluid || null;
+    var color = fluidId ? fluidColorSafe(fluidId) : '#4a4a4a';
+    var name = label != null ? label : (fluidId ? F.t('fluid.' + fluidId) : F.t('ui.fluidEmpty'));
+    var cap = box.cap || 0, amt = box.amount || 0;
+    var text = U.fmt(amt, 0) + (cap ? '/' + U.fmt(cap, 0) : '');
+    return labeled(name, hBar(cap ? amt / cap : 0, color, text));
+  }
+  // Grid of recipe buttons (icon of the first item result, or a fluid icon
+  // when the recipe has no item result — design/EXPANSION.md §4 fluid-only
+  // recipes) with a full ingredients/results/time tooltip; onPick(id) fires
+  // on click. `e` (the entity) is accepted for signature parity with the
+  // documented API but not required by this implementation.
+  function hRecipePicker(e, recipeIds, currentId, onPick) {
+    var grid = el('div', 'f-recipe-grid');
+    (recipeIds || []).forEach(function (id) {
+      var rdef = F.data.recipes[id];
+      if (!rdef) return;
+      var iconId = recipeIconId(rdef);
+      var cell;
+      if (iconId) {
+        cell = buildIcon(iconId, 34);
+      } else {
+        var fluidResults = rdef.fluidResults || [];
+        cell = buildFluidIcon(fluidResults.length ? fluidResults[0][0] : null, 34);
+      }
+      cell.classList.add('f-recipe-cell');
+      if (id === currentId) cell.classList.add('f-recipe-cell-active');
+      cell.style.pointerEvents = 'auto'; // .f-icon is pointer-events:none by default (70-ui.js)
+      cell.style.cursor = 'pointer';
+      attachTooltip(cell, function () { return recipeTooltipHtml(id); });
+      cell.addEventListener('click', function () { if (typeof onPick === 'function') onPick(id); });
+      grid.appendChild(cell);
+    });
+    return grid;
+  }
+  function hRow() {
+    var wrap = el('div', 'f-h-row');
+    for (var i = 0; i < arguments.length; i++) if (arguments[i]) wrap.appendChild(arguments[i]);
+    return wrap;
+  }
+  function buildEntityGuiHelpers(root, e, def) {
+    return {
+      header: renderGenericHeader,
+      slotGrid: function (inv, opts) {
+        opts = opts || {};
+        return slotGrid(inv, opts.cols || (inv && inv.length) || 1, opts);
+      },
+      labeled: labeled,
+      bar: hBar,
+      fluidBar: hFluidBar,
+      recipePicker: hRecipePicker,
+      button: function (text, onClick) { return button(text, null, onClick); },
+      row: hRow,
+      el: el,
+      refresh: function () { renderEntity(root, lastPayload.entity); },
+    };
+  }
+
   function renderEntity(root, payload) {
     clear(root);
     var e = resolveEntity(payload);
@@ -781,6 +986,12 @@
     var def = null;
     try { def = F.data.entityDef(e.type); } catch (err) { F.log.warn('ui-windows: unknown entity type', e.type); }
     if (!def) { root.appendChild(el('div', 'f-hint', e.type)); return; }
+    var customFn = F._entityGUIs && F._entityGUIs[def.behaviour];
+    if (customFn) {
+      var h = buildEntityGuiHelpers(root, e, def);
+      try { customFn(root, e, def, h); } catch (err) { F.log.error('ui-windows: custom entity GUI failed for', e.type, err); }
+      return;
+    }
     var fn = ENTITY_RENDERERS[def.behaviour];
     if (!fn) { renderGenericHeader(root, e, def); return; }
     try { fn(root, e, def); } catch (err) { F.log.error('ui-windows: entity GUI failed for', e.type, err); }
@@ -794,12 +1005,36 @@
   // =========================================================================
   // WINDOW: tech  (technology tree, 3 tiers/columns)
   // =========================================================================
+  // Display name/icon id for a tech "unlocks" entry: unlocks are recipe ids
+  // (F.data.recipes), which may now be fluid-only (design/EXPANSION.md §4,
+  // e.g. 'basic-oil-processing' has no item result) or, rarely, a bare
+  // item/entity id — never assume `.results[0][0]` exists.
+  function unlockIconId(u) {
+    var rdef = F.data.recipes[u];
+    if (!rdef) return u;
+    var iconId = recipeIconId(rdef);
+    return iconId; // may be null (fluid-only recipe) — caller falls back to a fluid icon
+  }
+  function unlockDisplayName(u) {
+    var rdef = F.data.recipes[u];
+    if (rdef) {
+      var iconId = recipeIconId(rdef);
+      if (iconId) return F.t('item.' + iconId);
+      var fr = rdef.fluidResults && rdef.fluidResults[0];
+      if (fr) return F.t('fluid.' + fr[0]);
+      return u;
+    }
+    if (F.i18n.has('item.' + u)) return F.t('item.' + u);
+    if (F.i18n.has('ent.' + u)) return F.t('ent.' + u);
+    return u;
+  }
   function techCard(id, root) {
     var info = F.research && typeof F.research.techInfo === 'function' ? F.research.techInfo(id) : null;
     if (!info) return el('div');
     var state = info.done ? 'done' : info.isCurrent ? 'current' : info.queued ? 'queued' : info.available ? 'available' : 'locked';
     var card = el('div', 'f-tech-card f-tech-' + state);
-    card.appendChild(buildIcon(info.unlocks[0] ? (F.data.recipes[info.unlocks[0]] ? F.data.recipes[info.unlocks[0]].results[0][0] : null) : null, 30));
+    var firstUnlockIconId = info.unlocks[0] ? unlockIconId(info.unlocks[0]) : null;
+    card.appendChild(firstUnlockIconId ? buildIcon(firstUnlockIconId, 30) : el('div', 'f-icon'));
     card.appendChild(el('div', 'f-tech-name', info.name));
     var cost = info.cost || { packs: [], count: 1, time: 1 };
     var costText = cost.packs.map(function (p) { return F.t('item.' + p[0]) + ' x' + p[1]; }).join(' + ') + ' × ' + cost.count;
@@ -808,7 +1043,7 @@
     attachTooltip(card, function () {
       var html = '<b style="color:#ffa500">' + U.escapeHtml(info.name) + '</b><br>' + U.escapeHtml(costText);
       if (info.prereq.length) html += '<br>' + U.escapeHtml(F.t('ui.research.prereqMissing')) + ': ' + info.prereq.map(function (p) { return U.escapeHtml(F.t('tech.' + p)); }).join(', ');
-      if (info.unlocks.length) html += '<br>' + U.escapeHtml(F.t('ui.research.unlocks')) + ': ' + info.unlocks.map(function (u) { return U.escapeHtml(F.t('item.' + (F.data.recipes[u] ? F.data.recipes[u].results[0][0] : u))); }).join(', ');
+      if (info.unlocks.length) html += '<br>' + U.escapeHtml(F.t('ui.research.unlocks')) + ': ' + info.unlocks.map(function (u) { return U.escapeHtml(unlockDisplayName(u)); }).join(', ');
       return html;
     });
     card.addEventListener('click', function (ev) {
@@ -819,6 +1054,10 @@
     });
     return card;
   }
+  // Tier column label (design/EXPANSION.md §5/§6.6): 1 "Red tier", 2 "Red +
+  // green tier" (both pre-existing), 3 "Blue tier", 4 "Endgame tier" (new).
+  var TIER_LABEL_KEYS = { 1: 'ui.tier1', 2: 'ui.tier2', 3: 'ui.research.tier3', 4: 'ui.research.tier4' };
+  function tierLabel(tierNum) { return F.t(TIER_LABEL_KEYS[tierNum] || 'ui.tier2'); }
   function renderTech(root, payload) {
     clear(root);
     var head = el('div', 'f-tech-head');
@@ -828,17 +1067,30 @@
     head.appendChild(bar(frac, 'f-bar-blue', (frac * 100).toFixed(0) + '%'));
     root.appendChild(head);
 
-    var cols = [[], [], []];
+    // Tier count is data-driven, not hardcoded to 3: the expansion adds
+    // tiers 3 (blue) and 4 (purple/yellow, "endgame") on top of the base
+    // game's 1/2 — see design/EXPANSION.md §5. ~45 techs total once the
+    // expansion's tech table is in; the whole window scrolls via .f-body's
+    // max-height (70-ui.js), and each column additionally scrolls on its
+    // own past a sane height (style.css) so one long tier doesn't force the
+    // window to grow past the screen.
+    var maxTier = 1;
+    (F.data.order.techs || []).forEach(function (id) {
+      var t = (F.data.techs[id] && F.data.techs[id].tier) || 1;
+      if (t > maxTier) maxTier = t;
+    });
+    var cols = [];
+    for (var t2 = 0; t2 < maxTier; t2++) cols.push([]);
     (F.data.order.techs || []).forEach(function (id) {
       var def = F.data.techs[id];
-      var tier = U.clamp((def.tier || 1) - 1, 0, 2);
+      var tier = U.clamp((def.tier || 1) - 1, 0, maxTier - 1);
       cols[tier].push(id);
     });
     var tree = el('div', 'f-tech-tree');
     cols.forEach(function (ids, ci) {
       if (!ids.length) return; // no empty tier columns
       var col = el('div', 'f-tech-col');
-      col.appendChild(el('div', 'f-tech-col-title', ci === 0 ? F.t('ui.tier1') : F.t('ui.tier2')));
+      col.appendChild(el('div', 'f-tech-col-title', tierLabel(ci + 1)));
       ids.forEach(function (id) { col.appendChild(techCard(id, root)); });
       tree.appendChild(col);
     });
@@ -853,7 +1105,21 @@
   // =========================================================================
   // WINDOW: help  ("Navodila")
   // =========================================================================
+  // F.ui.addHelpTab(id) (design/EXPANSION.md §6.6): feature modules
+  // (37/38/39/45-*.js) load BEFORE this file, so they cannot call
+  // F.ui.addHelpTab() at their own load time — they push the tab id onto
+  // F._helpTabs directly instead (merge-safe: `F._helpTabs = F._helpTabs ||
+  // []`), and any ids already queued there are folded into HELP_TABS here.
+  // F.ui.addHelpTab itself (below) is sugar for the same push, for anything
+  // that registers after this file has run.
   var HELP_TABS = ['controls', 'basics', 'progression', 'ratios', 'tips', 'entities'];
+  (F._helpTabs || []).forEach(function (id) { if (HELP_TABS.indexOf(id) < 0) HELP_TABS.push(id); });
+  F.ui.addHelpTab = function (id) {
+    if (!id) return;
+    F._helpTabs = F._helpTabs || [];
+    if (F._helpTabs.indexOf(id) < 0) F._helpTabs.push(id);
+    if (HELP_TABS.indexOf(id) < 0) HELP_TABS.push(id);
+  };
   var helpTabState = { current: 'controls' };
   function readShowHelpOnStart() {
     try { return window.localStorage.getItem('factio.hideHelpOnStart') !== '1'; } catch (err) { return true; }

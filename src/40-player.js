@@ -355,6 +355,24 @@
     } catch (err) { return [0, 0]; }
   }
 
+  // F.player.addMoveOverride (design/EXPANSION.md §6.4) — fn(p, input) -> true
+  // when it handled movement this tick (used by trains: while riding, the
+  // player's position follows the locomotive instead of walking). Consulted
+  // at the very start of the movement step in tickImpl(); when one returns
+  // true, moveTick() is skipped entirely for this tick but mining/crafting/
+  // shooting/regen still run normally.
+  const moveOverrides = [];
+
+  function addMoveOverride(fn) { if (typeof fn === 'function') moveOverrides.push(fn); }
+
+  function runMoveOverrides(p, input) {
+    for (let i = 0; i < moveOverrides.length; i++) {
+      try { if (moveOverrides[i](p, input)) return true; }
+      catch (err) { F.log.error('[player] move override threw', err); }
+    }
+    return false;
+  }
+
   function moveTick(input) {
     const p = state(); if (!p) return;
     let mx = (input && input.mx) || 0, my = (input && input.my) || 0;
@@ -671,7 +689,7 @@
       if (p.respawnIn <= 0) respawn();
       return;
     }
-    moveTick(input);
+    if (!runMoveOverrides(p, input)) moveTick(input);
     mineTick(input);
     pickupTick(input);
     craftTick();
@@ -701,5 +719,6 @@
     inReach: inReach,
     damage: damage,
     respawn: respawn,
+    addMoveOverride: addMoveOverride,
   };
 })();

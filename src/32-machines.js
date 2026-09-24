@@ -359,6 +359,10 @@
 
   F.behaviours.assembler = assemblerBehaviour;
 
+  // EXPANSION.md §6.3: recipe categories an assembler will accept (default: hand + advanced,
+  // i.e. everything the crafting grid + assembler recipe picker already showed pre-expansion).
+  function assemblerCategories(def) { return (def.assembler && def.assembler.categories) || ['crafting', 'advanced']; }
+
   function assemblerSetRecipe(e, id) {
     const def = safeEntityDef(e.type);
     if (!def || def.behaviour !== 'assembler') { F.log.warn('machines.setRecipe: not an assembler', e && e.type); return false; }
@@ -367,6 +371,16 @@
     if (id == null) { e.recipe = null; e.input = []; return true; }
     const rdef = safeRecipeDef(id);
     if (!rdef) return false;
+    if (assemblerCategories(def).indexOf(rdef.category) === -1) {
+      F.log.warn('machines.setRecipe: recipe category not allowed for this assembler', id, rdef.category);
+      return false;
+    }
+    // Plain assemblers have no fluid boxes (that is the generic 'crafter' behaviour's job,
+    // see EXPANSION.md §7.1) — refuse a fluid recipe rather than silently dropping its fluids.
+    if ((rdef.fluidIngredients && rdef.fluidIngredients.length) || (rdef.fluidResults && rdef.fluidResults.length)) {
+      F.log.warn('machines.setRecipe: recipe has fluids, not settable on a plain assembler', id);
+      return false;
+    }
     e.recipe = id;
     e.input = rdef.ingredients.map(() => null);
     return true;
@@ -539,12 +553,25 @@
     return !F.inv.isEmpty(e.packs);
   }
 
+  // EXPANSION.md §6.3: lab slot count comes from def.lab.slots (default 2, existing labs).
+  function labSlots(def) { return (def && def.lab && def.lab.slots) || 2; }
+
   const labBehaviour = {
     create(e) {
-      e.packs = F.inv.create(2);
+      const def = safeEntityDef(e.type);
+      e.packs = F.inv.create(labSlots(def));
       e.progress = 0;
     },
     onRemove(e) { spillInventory(e, e.packs); },
+    // EXPANSION.md §6.3: grow an older save's smaller (e.g. 2-slot) pack inventory up to the
+    // current def size (e.g. 5 for the expansion's labs) instead of losing/ignoring extra packs.
+    wake(e) {
+      const def = safeEntityDef(e.type);
+      const slots = labSlots(def);
+      if (Array.isArray(e.packs) && e.packs.length < slots) {
+        while (e.packs.length < slots) e.packs.push(null);
+      }
+    },
     accepts(e, item) {
       const it = F.data.items[item];
       if (!it || it.category !== 'science') return 0;
@@ -714,6 +741,40 @@
 
   F.machines.activity = function (e) {
     return F.util.clamp(e._act || 0, 0, 1);
+  };
+
+  // EXPANSION.md §6.3: F.machines.recipesFor(e) -> unlocked recipe ids valid for this machine.
+  // Used by the (existing and new) recipe pickers. Two families of machine can craft recipes:
+  //  - assemblers: def.assembler.categories (default ['crafting','advanced']), and they cannot
+  //    take a recipe with fluid ingredients/results (see assemblerSetRecipe above) so those are
+  //    filtered out here too, before the player ever sees them in a picker.
+  //  - anything else whose def carries `crafter.categories` (oil refinery, chemical plant, §7.1) —
+  //    those DO handle fluids, so no filtering beyond category + unlock state.
+  // Recipes hidden from every picker regardless (category not in either list) are simply absent.
+  F.machines.recipesFor = function (e) {
+    const def = safeEntityDef(e.type);
+    if (!def) return [];
+    let categories, excludeFluidRecipes;
+    if (def.behaviour === 'assembler') {
+      categories = assemblerCategories(def);
+      excludeFluidRecipes = true;
+    } else if (def.crafter && Array.isArray(def.crafter.categories)) {
+      categories = def.crafter.categories;
+      excludeFluidRecipes = false;
+    } else {
+      return [];
+    }
+    const out = [];
+    const recipes = (F.data && F.data.recipes) || {};
+    for (const id in recipes) {
+      if (!Object.prototype.hasOwnProperty.call(recipes, id)) continue;
+      const rdef = recipes[id];
+      if (categories.indexOf(rdef.category) === -1) continue;
+      if (excludeFluidRecipes && ((rdef.fluidIngredients && rdef.fluidIngredients.length) || (rdef.fluidResults && rdef.fluidResults.length))) continue;
+      if (F.research && typeof F.research.isRecipeUnlocked === 'function' && !F.research.isRecipeUnlocked(id)) continue;
+      out.push(id);
+    }
+    return out;
   };
 
   F.machines.tick = function () {

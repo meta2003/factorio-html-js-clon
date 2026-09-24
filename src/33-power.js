@@ -28,8 +28,22 @@
   let pumps = [];
   let boilers = [];
   let fluidEngines = [];
+  let registeredFluidEnts = [];  // entities whose behaviour was registered via F.fluids.registerEntity
   let segments = [];          // [{ id, fluid, amount, capacity, boxes:[box,...] }]
   let fluidDirty = true;
+
+  // EXPANSION.md §6.2: F.fluids.registerEntity(behaviour, { boxes(e)->[[boxKey,box],...], ports(e,def)->[{x,y,dir,kind,boxKey}] })
+  // Lets feature modules (oil refinery, chemical plant, storage tank, ...) plug their entities into
+  // the exact same segment-building/mixing-guard machinery the built-in pipe/boiler/engine/pump use
+  // below, without this file knowing anything about their fields. Keyed by def.behaviour.
+  const fluidRegistry = {};
+  function registerFluidEntity(behaviour, spec) {
+    if (!behaviour || !spec || typeof spec.boxes !== 'function' || typeof spec.ports !== 'function') {
+      F.log.warn('[fluids] registerEntity: behaviour and {boxes(e),ports(e,def)} are required', behaviour);
+      return;
+    }
+    fluidRegistry[behaviour] = spec;
+  }
 
   // Ports for an entity's fluid boxes. Each port: { x, y, dir, kind, boxKey }
   // dir is the OUTWARD direction the port faces (F.C.DIRS index); (x,y) is the world tile that
@@ -82,13 +96,37 @@
         }
         break;
       }
-      default: break;
+      default: {
+        // EXPANSION.md §6.2: unknown behaviours consult the registry instead of returning nothing.
+        const spec = fluidRegistry[def.behaviour];
+        if (spec) {
+          try { return spec.ports(e, def) || []; }
+          catch (err) { F.log.error('[fluids] registered ports() threw for', def.behaviour, err); return []; }
+        }
+        break;
+      }
     }
     return ports;
   }
 
+  // Resolves an entity's fluid box by boxKey. Built-in behaviours store their box(es) directly as
+  // entity properties (e.fb, e.water, e.steam) named exactly like the boxKey portsOf() emits for
+  // them, so a plain property read is enough. Registered behaviours are free to hold their boxes
+  // however they like (e.g. an array like `e.fin[0]`) as long as boxes(e) reports them under the
+  // same boxKey strings their ports(e,def) uses — fall back to that when the direct property is
+  // missing, so §6.2's "boxes with fluid null adopt the first fluid pushed" etc. all work for them.
+  function boxForKey(e, def, boxKey) {
+    if (e[boxKey] !== undefined) return e[boxKey];
+    const spec = def && fluidRegistry[def.behaviour];
+    if (!spec) return null;
+    let boxes;
+    try { boxes = spec.boxes(e) || []; } catch (err) { F.log.error('[fluids] registered boxes() threw for', def.behaviour, err); return null; }
+    for (let i = 0; i < boxes.length; i++) if (boxes[i][0] === boxKey) return boxes[i][1];
+    return null;
+  }
+
   function rebuildFluids() {
-    pipes = []; pipeToGrounds = []; pumps = []; boilers = []; fluidEngines = [];
+    pipes = []; pipeToGrounds = []; pumps = []; boilers = []; fluidEngines = []; registeredFluidEnts = [];
     const boxRecords = [];          // { e, key, box }
     const boxIndex = new Map();     // "id:key" -> index
     function addBox(e, key, box) {
@@ -107,7 +145,19 @@
         case 'offshore-pump': pumps.push(e); addBox(e, 'fb', e.fb); break;
         case 'boiler': boilers.push(e); addBox(e, 'water', e.water); addBox(e, 'steam', e.steam); break;
         case 'engine': fluidEngines.push(e); addBox(e, 'steam', e.steam); break;
-        default: break;
+        default: {
+          // EXPANSION.md §6.2: unknown behaviours consult the registry (oil refinery,
+          // chemical plant, storage tank, ...) — same box collection as the built-ins above.
+          const spec = fluidRegistry[def.behaviour];
+          if (spec) {
+            registeredFluidEnts.push(e);
+            let boxes;
+            try { boxes = spec.boxes(e) || []; }
+            catch (err) { F.log.error('[fluids] registered boxes() threw for', def.behaviour, err); boxes = []; }
+            for (let bi = 0; bi < boxes.length; bi++) addBox(e, boxes[bi][0], boxes[bi][1]);
+          }
+          break;
+        }
       }
     }
 
@@ -125,7 +175,7 @@
     }
 
     // adjacency via ports facing each other
-    const allFluidEnts = [].concat(pipes, pipeToGrounds, pumps, boilers, fluidEngines);
+    const allFluidEnts = [].concat(pipes, pipeToGrounds, pumps, boilers, fluidEngines, registeredFluidEnts);
     const entPorts = new Map();
     const portMap = new Map(); // "x,y:dir" -> [{kind, idx}]
     for (const e of allFluidEnts) {
@@ -252,11 +302,33 @@
 
   function fluidsSegmentInfo(e, boxKey) {
     maybeRebuildFluids();
-    const box = boxKey ? e[boxKey] : (e.fb || e.steam || e.water);
+    let box;
+    if (boxKey) {
+      box = boxForKey(e, safeDef(e.type), boxKey);
+    } else {
+      box = e.fb || e.steam || e.water;
+      if (!box) {
+        // EXPANSION.md §6.2: "keeps working for new entities (first box)" — registered
+        // behaviours with no fb/water/steam property fall back to their first declared box.
+        const def = safeDef(e.type);
+        const spec = def && fluidRegistry[def.behaviour];
+        if (spec) {
+          let boxes; try { boxes = spec.boxes(e) || []; } catch (err) { boxes = []; }
+          if (boxes.length) box = boxes[0][1];
+        }
+      }
+    }
     if (!box) return null;
     const seg = box._seg;
     if (seg) return { fluid: seg.fluid, amount: seg.amount, capacity: seg.capacity };
     return { fluid: box.fluid, amount: box.amount, capacity: box.cap };
+  }
+
+  // EXPANSION.md §6.2: F.fluids.fluidOf(e) -> fluid id of the first box of a pipe/tank/registered
+  // entity, or null (used by the renderer to tint pipes/tanks by contents).
+  function fluidsFluidOf(e) {
+    const info = fluidsSegmentInfo(e);
+    return (info && info.fluid) || null;
   }
 
   function fluidsCanConnect(type, tx, ty, dir) {
@@ -275,7 +347,7 @@
       for (const op of oports) {
         if (op.x !== nx || op.y !== ny || op.dir !== ndir) continue;
         if (p.kind !== 'any' && op.kind !== 'any' && p.kind !== op.kind) return false;
-        const obox = other[op.boxKey];
+        const obox = boxForKey(other, odef, op.boxKey);
         const oseg = obox && obox._seg;
         const ofluid = oseg ? oseg.fluid : (obox && obox.fluid);
         if (ofluid) { if (seen && seen !== ofluid) return false; seen = ofluid; }
@@ -297,10 +369,12 @@
     rebuild: rebuildFluids,
     connections: fluidsConnections,
     segmentInfo: fluidsSegmentInfo,
+    fluidOf: fluidsFluidOf,
     push: fluidsPush,
     pull: fluidsPull,
     canConnect: fluidsCanConnect,
     canPlacePump: fluidsCanPlacePump,
+    registerEntity: registerFluidEntity,
   };
 
   // ===========================================================================================

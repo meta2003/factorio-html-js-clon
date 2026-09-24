@@ -34,6 +34,26 @@
   'use strict';
 
   var HEADLESS = (typeof window !== 'undefined') && !!window.HEADLESS;
+
+  // ===========================================================================
+  // Expansion registries (design/EXPANSION.md §6.6). Feature modules
+  // (src/37-oil.js, 38-trains.js, 39-robots.js, 45-rocket.js) load BEFORE this
+  // file (filename order 37/38/39/45 < 70), so F.ui does not exist yet at
+  // their load time. They therefore register directly onto a plain F.*
+  // object/array (created with `X = X || {}` so whoever runs first wins the
+  // creation and nobody clobbers an earlier registration), and the
+  // F.ui.registerEntityGUI() function below is just sugar over the same
+  // object for anything that registers after this file has run. See the
+  // exact snippet appended to design/EXPANSION.md §6.6.
+  // F._entityGUIs: behaviour -> fn(root, e, def, h). Consulted by
+  // 71-ui-windows.js's entity-window dispatch BEFORE the built-in
+  // ENTITY_RENDERERS table, so a registered GUI always takes precedence.
+  // ===========================================================================
+  F._entityGUIs = F._entityGUIs || {};
+  function registerEntityGUI(behaviour, fn) {
+    if (!behaviour || typeof fn !== 'function') { F.log.warn('F.ui.registerEntityGUI: invalid args', behaviour); return; }
+    F._entityGUIs[behaviour] = fn;
+  }
   // F.FEATURES.combat off (src/disabled/README.md): the weapon/ammo box,
   // player health bar and evolution readout are omitted from the HUD
   // entirely (not just hidden) — see buildTopLeft/buildBottomCenter/
@@ -639,6 +659,23 @@
 
   function isOpen(name) { return openWindows.has(name); }
 
+  // Every currently-open window name (any registered window, not just the
+  // handful 75-input.js knows by name) and the one with the highest z-index
+  // (i.e. topmost / most recently brought to front) — used by 75-input.js's
+  // Esc handling so it can close whichever window is on top even when it was
+  // opened directly by a feature module (e.g. a train/roboport/rocket GUI
+  // calling F.ui.open() from its own click handler) rather than through
+  // 75-input.js's own toggleWindow().
+  function listOpen() { return Array.from(openWindows.keys()); }
+  function topWindow() {
+    var top = null, topZ = -1;
+    openWindows.forEach(function (inst, name) {
+      var z = parseInt(inst.el.style.zIndex || '0', 10) || 0;
+      if (z > topZ) { topZ = z; top = name; }
+    });
+    return top;
+  }
+
   // ===========================================================================
   // Confirm dialog
   // ===========================================================================
@@ -1238,7 +1275,10 @@
     close: closeWindow,
     closeAll: closeAllWindows,
     isOpen: isOpen,
+    listOpen: listOpen,
+    topWindow: topWindow,
     registerWindow: registerWindow,
+    registerEntityGUI: registerEntityGUI,
     windowFrame: windowFrame,
     toast: toast,
     alert: alertFn,
