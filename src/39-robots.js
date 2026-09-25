@@ -169,40 +169,62 @@
     return false;
   }
 
+  // Any logistic or construction robot of this network in the air?
+  function netBusy(net) {
+    var lists = [(F.state && F.state.robots) || [], (F.state && F.state.cbots) || []];
+    for (var l = 0; l < lists.length; l++) {
+      for (var i = 0; i < lists[l].length; i++) if (lists[l][i].net === net.id) return true;
+    }
+    return false;
+  }
+
   // =====================================================================
   // Behaviours
   // =====================================================================
   if (!F.behaviours) F.behaviours = {};
 
+  // Two one-slot robot inventories: `robots` (logistic robots) and `cbots` (construction
+  // robots, flown by 53-construction.js). No onRemove on purpose: networks are rebuilt by
+  // the entity:removed listener above, and without onRemove F.api.remove hands the robots
+  // (and a logistic chest's contents) back to the player instead of destroying them.
+  function robotInv(e, item) {
+    if (item === 'logistic-robot') return e.robots;
+    if (item === 'construction-robot') return e.cbots;
+    return null;
+  }
+
   F.behaviours['roboport'] = {
     create: function (e) {
       e.robots = F.inv.create(1);
+      e.cbots = F.inv.create(1);
       e.repair = null;
       markNetworksDirty();
     },
-    onRemove: function () { markNetworksDirty(); },
     wake: function (e) {
       if (!Array.isArray(e.robots)) e.robots = F.inv.create(1);
+      if (!Array.isArray(e.cbots)) e.cbots = F.inv.create(1);
       if (e.repair === undefined) e.repair = null;
     },
     accepts: function (e, item) {
-      if (item !== 'logistic-robot') return 0;
+      var inv = robotInv(e, item);
+      if (!inv) return 0;
       var stack = F.inv.stackSize(item);
-      var have = F.inv.count(e.robots, item);
+      var have = F.inv.count(inv, item);
       return Math.max(0, stack - have);
     },
     insert: function (e, item, count) {
-      if (item !== 'logistic-robot') return 0;
-      var remaining = F.inv.add(e.robots, item, count);
+      var inv = robotInv(e, item);
+      if (!inv) return 0;
+      var remaining = F.inv.add(inv, item, count);
       return count - remaining;
     },
-    take: function (e, filter) { return F.inv.takeOne(e.robots, filter); },
-    inventories: function (e) { return [{ name: 'robots', inv: e.robots }]; },
+    take: function (e, filter) { return F.inv.takeOne(e.robots, filter) || F.inv.takeOne(e.cbots, filter); },
+    inventories: function (e) { return [{ name: 'robots', inv: e.robots }, { name: 'cbots', inv: e.cbots }]; },
     status: function (e) {
       if (!F.power || !F.power.hasNetwork(e)) return 'not_connected';
       if (F.power.satisfaction(e) <= 0) return 'no_power';
       var net = netOfRoboport[e.id];
-      if (net && (F.state.robots || []).some(function (r) { return r.net === net.id; })) return 'working';
+      if (net && netBusy(net)) return 'working';
       return 'idle';
     },
   };
@@ -216,7 +238,6 @@
       if (e.mode === 'requester') e.requests = [null, null, null, null, null, null];
       markNetworksDirty();
     },
-    onRemove: function () { markNetworksDirty(); },
     wake: function (e) {
       var def = safeDef(e.type);
       if (!e.mode) e.mode = (def && def.logistic && def.logistic.mode) || 'storage';
@@ -511,6 +532,7 @@
       };
     },
     markDirty: markNetworksDirty,
+    isPowered: function (net) { return !!net && networkPowered(net); },
     count: function () { return ((F.state && F.state.robots) || []).length; },
     ROBOT_SPEED: ROBOT_SPEED,
     ROBOT_CAPACITY: ROBOT_CAPACITY,
@@ -535,11 +557,7 @@
   // Roboport working animation: pulses while its network has any active robot.
   RH.entityOpts['roboport'] = function (e, def, tick) {
     var net = netOfRoboport[e.id];
-    var working = false;
-    if (net) {
-      var robots = (F.state && F.state.robots) || [];
-      for (var i = 0; i < robots.length; i++) { if (robots[i].net === net.id) { working = true; break; } }
-    }
+    var working = !!(net && netBusy(net));
     var frame = working ? Math.floor(tick / 4) % 16 : 0;
     return { frame: frame, opts: { working: working } };
   };
@@ -649,15 +667,18 @@
   F._entityGUIs['roboport'] = function (root, e, def, h) {
     h.header(root, e, def);
     root.appendChild(h.el('div', 'f-section-title', F.t('ui.robots.slot')));
-    root.appendChild(h.slotGrid(e.robots, { cols: 1 }));
+    if (!Array.isArray(e.cbots)) e.cbots = F.inv.create(1);
+    root.appendChild(h.row(
+      h.labeled(F.t('item.logistic-robot'), h.slotGrid(e.robots, { cols: 1 })),
+      h.labeled(F.t('item.construction-robot'), h.slotGrid(e.cbots, { cols: 1 }))));
 
     var net = F.robots.networkOf(e);
     var stats = net ? F.robots.stats(net) : null;
     if (stats) {
       var netInfo = h.el('div', 'f-hint',
-        F.t('ui.robots.total') + ': ' + stats.robots + '  ' +
-        F.t('ui.robots.idle') + ': ' + stats.idle + '  ' +
-        F.t('ui.robots.busy') + ': ' + stats.busy);
+        F.t('item.logistic-robot') + ': ' + F.t('ui.robots.total') + ' ' + stats.robots + '  ' +
+        F.t('ui.robots.idle') + ' ' + stats.idle + '  ' +
+        F.t('ui.robots.busy') + ' ' + stats.busy);
       root.appendChild(netInfo);
       var chestInfo = h.el('div', 'f-hint',
         F.t('ui.robots.chests') + ': ' +
@@ -665,6 +686,15 @@
         stats.chests.storage + ' ' + F.t('ui.robots.storage') + ', ' +
         stats.chests.requester + ' ' + F.t('ui.robots.requester'));
       root.appendChild(chestInfo);
+      var cs = (F.construction && F.construction.stats) ? F.construction.stats(net) : null;
+      if (cs) {
+        root.appendChild(h.el('div', 'f-hint',
+          F.t('item.construction-robot') + ': ' + F.t('ui.robots.idle') + ' ' + cs.idle + '  ' +
+          F.t('ui.robots.busy') + ' ' + cs.busy + '  ·  ' + F.t('ui.robots.ghosts') + ' ' + cs.ghosts));
+        if (cs.missing > 0) root.appendChild(h.el('div', 'f-hint f-warn', F.t('ui.robots.missing', { n: cs.missing })));
+        if (cs.decon > 0) root.appendChild(h.el('div', 'f-hint', F.t('ui.robots.decon', { n: cs.decon })));
+        if (cs.noStorage > 0) root.appendChild(h.el('div', 'f-hint f-warn', F.t('ui.robots.noStorage')));
+      }
     } else {
       root.appendChild(h.el('div', 'f-hint', F.t('ui.robots.noNetwork')));
     }
@@ -745,6 +775,10 @@
       'ui.robots.requester': 'requester',
       'ui.robots.requests': 'Requests',
       'ui.robots.noNetwork': 'Not in range of a roboport network',
+      'ui.robots.ghosts': 'ghosts in range',
+      'ui.robots.decon': '{n} marked for deconstruction in range',
+      'ui.robots.noStorage': 'Deconstruction waits: this network has no storage chest',
+      'ui.robots.missing': '{n} ghosts are missing materials (put the buildings in a provider or storage chest)',
     });
   }
 })();

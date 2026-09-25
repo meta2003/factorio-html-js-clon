@@ -1187,7 +1187,8 @@
     var p0 = toScreen(pv.tx, pv.ty);
     var size = F.C.TILE * camera.zoom;
     var spr = (F.sprites && F.sprites.entity) ? F.sprites.entity(pv.type, pv.dir || 0, 0) : null;
-    var tint = pv.ok ? 'rgba(60,220,90,0.45)' : 'rgba(230,60,60,0.5)';
+    // pv.ghost: planning a ghost (Shift+click or a ghost cursor, 51-ghosts.js) — blue when valid.
+    var tint = pv.ok ? (pv.ghost ? 'rgba(90,170,255,0.5)' : 'rgba(60,220,90,0.45)') : 'rgba(230,60,60,0.5)';
     ctx.save();
     ctx.globalAlpha = 0.65;
     if (spr) {

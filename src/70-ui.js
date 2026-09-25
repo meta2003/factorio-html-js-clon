@@ -742,12 +742,14 @@
     var buttons = [
       ['map', 'ui.map'], ['tech', 'ui.tech'], ['help', 'ui.help'],
       ['save', 'ui.save'], ['settings', 'ui.settings'], ['alt', 'ui.alt'],
+      ['blueprints', 'ui.blueprints'], // window from 55-blueprint-library.js
     ];
     for (var i = 0; i < buttons.length; i++) {
       var b = el('button', 'f-btn', btnRow);
       b.dataset.hudAction = buttons[i][0];
       b.dataset.i18n = buttons[i][1];
       b.textContent = F.t(buttons[i][1]);
+      if (i === buttons.length - 1 && buttons.length % 3 === 1) b.style.gridColumn = '1 / -1'; // lone last button: full row
     }
   }
 
@@ -952,8 +954,12 @@
   // ===========================================================================
   function refreshCursorStack() {
     var c = getCursor();
+    // Ghost cursor (75-input.js / 51-ghosts.js): same icon, faded, no count.
+    var ghost = !c && F.input && F.input.ghostCursor;
+    if (ghost) c = { id: F.input.ghostCursor, count: 0 };
     if (!c) { show(cursorEl, false); return; }
     show(cursorEl, true);
+    cursorEl.style.opacity = ghost ? '0.5' : '';
     cursorEl.style.left = mouse.x + 'px';
     cursorEl.style.top = mouse.y + 'px';
     if (cursorEl.dataset.id !== c.id) {
@@ -1002,6 +1008,7 @@
       case 'settings': openWindow('menu', {}); break;
       case 'save': doSave(); break;
       case 'alt': if (F.render) F.render.altMode = !F.render.altMode; break;
+      case 'blueprints': if (isOpen('blueprints')) closeWindow('blueprints'); else openWindow('blueprints', {}); break;
     }
   }
 

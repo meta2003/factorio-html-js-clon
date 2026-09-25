@@ -57,9 +57,20 @@
   // is the ghost-drawing function 61-render.js should call instead of its
   // normal sprite-tint preview. See this module's final report for exactly
   // what 61-render.js needs to do with these two fields.
-  input.preview = { type: null, tx: 0, ty: 0, dir: 0, ok: false, reason: null, virtual: false, previewDraw: null };
+  input.preview = { type: null, tx: 0, ty: 0, dir: 0, ok: false, reason: null, virtual: false, previewDraw: null, ghost: false };
   input.hover = null;
   input.mining = null;
+  // Ghost cursor (51-ghosts.js): an item id held "as a ghost" when the player has none of it
+  // (pipette / quickbar on an item not in the inventory). Clicking places ghosts. Not saved.
+  input.ghostCursor = null;
+  // Blueprints (52-blueprints.js). `selecting` = a box tool is active: { mode, start: [tx,ty]|null,
+  // end: [tx,ty]|null, unmark } while dragging. mode 'copy' (Ctrl+C / B), 'cut' (Ctrl+X: copy +
+  // mark for deconstruction) or 'decon' (X, deconstruction planner, 54-deconstruction.js;
+  // Shift+drag cancels marks, reflected in `unmark`). `blueprint` = a blueprint held for pasting:
+  // { bp }, with its top-left tile under the cursor in `blueprintAnchor`. Not saved.
+  input.selecting = null;
+  input.blueprint = null;
+  input.blueprintAnchor = null;
 
   // =========================================================================
   // Internal (DOM-bound) state — only touched after init().
@@ -69,6 +80,7 @@
   var keysDown = Object.create(null);   // lowercase key -> bool, for WASD/arrows
   var leftDown = false, rightDown = false;
   var spaceDown = false, cDown = false;
+  var shiftDown = false;                // Shift+click plans ghosts instead of building
   var cursorDirByType = Object.create(null); // remembered rotation per placeable item type
   var windowStack = [];                 // names this module opened, for Esc to unwind
   var dragging = null;                  // active drag-placement session, or null
@@ -187,8 +199,9 @@
 
   function computeMineTarget() {
     input.state.mine = null;
-    if (!rightDown) { pickerMineState = null; return; }
+    if (!rightDown) { pickerMineState = null; lastCancelTile = null; return; }
     if (textFocused()) { pickerMineState = null; return; }
+    if (cancelGhostsAlongDrag()) { pickerMineState = null; return; }
     if (!F.player || !F.player.inReach || !F.player.inReach(hoverTx, hoverTy)) { pickerMineState = null; return; }
     if (computePickerMine()) return;
     pickerMineState = null;
@@ -201,9 +214,25 @@
     if (hasTarget) input.state.mine = [hoverTx, hoverTy];
   }
 
+  // Right mouse over a ghost cancels it instantly, at any distance. While the button
+  // is held, every tile the cursor crossed since the last frame is swept too, so a
+  // fast drag cancels a whole line of ghosts. Returns true if the hovered tile had one.
+  var lastCancelTile = null;
+  function cancelGhostsAlongDrag() {
+    if (!F.ghosts) return false;
+    var from = lastCancelTile || [hoverTx, hoverTy];
+    lastCancelTile = [hoverTx, hoverTy];
+    var line = tileLine(from[0], from[1], hoverTx, hoverTy);
+    var hit = false;
+    for (var i = 0; i < line.length; i++) {
+      if (F.ghosts.removeAt(line[i][0], line[i][1]) && i === line.length - 1) hit = true;
+    }
+    return hit;
+  }
+
   function clearPreview() {
     input.preview.type = null; input.preview.ok = false; input.preview.reason = null;
-    input.preview.virtual = false; input.preview.previewDraw = null;
+    input.preview.virtual = false; input.preview.previewDraw = null; input.preview.ghost = false;
   }
 
   // Virtual placer preview (design/EXPANSION.md §6.4/§6.6): the cursor item
@@ -228,30 +257,49 @@
     return true;
   }
 
+  // Ghost planning is active when the hand holds a ghost cursor, or a real
+  // placeable stack while Shift is held.
+  function ghostMode(cursor) {
+    if (!F.ghosts) return false;
+    return cursor ? shiftDown : !!input.ghostCursor;
+  }
+
   function computePreview() {
     var cursor = getCursor();
-    if (!cursor) { clearPreview(); return; }
-    var itemDef = F.data.items[cursor.id];
+    if (cursor) { input.ghostCursor = null; input.selecting = null; input.blueprint = null; } // a real stack in hand replaces them
+    input.blueprintAnchor = null;
+    if (input.selecting) { clearPreview(); return; }
+    if (input.blueprint) {
+      clearPreview();
+      var bp = input.blueprint.bp;
+      input.blueprintAnchor = computeAnchor(hoverWx, hoverWy, bp.w, bp.h);
+      return;
+    }
+    var itemId = cursor ? cursor.id : input.ghostCursor;
+    if (!itemId) { clearPreview(); return; }
+    var itemDef = F.data.items[itemId];
     if (itemDef && itemDef.place) {
       var type = itemDef.place;
       var def = F.data.entities[type];
       if (!def) { clearPreview(); return; }
+      var ghost = ghostMode(cursor);
       input.preview.virtual = false;
       input.preview.previewDraw = null;
+      input.preview.ghost = ghost;
       var dir = def.rotatable ? (cursorDirByType[type] || 0) : 0;
       var fp = F.entities.footprint(def, dir);
       var anchor = computeAnchor(hoverWx, hoverWy, fp[0], fp[1]);
       var tx = anchor[0], ty = anchor[1];
       var chk = { ok: false, reason: null };
       try {
-        chk = F.api.canPlace(type, tx, ty, dir, { checkReach: true }) || chk;
+        chk = (ghost ? F.ghosts.canPlace(type, tx, ty, dir) : F.api.canPlace(type, tx, ty, dir, { checkReach: true })) || chk;
       } catch (e) { F.log.warn('[input] canPlace threw', e); }
       input.preview.type = type;
       input.preview.tx = tx; input.preview.ty = ty; input.preview.dir = dir;
       input.preview.ok = !!chk.ok; input.preview.reason = chk.reason || null;
       return;
     }
-    if (computeVirtualPreview(cursor)) return;
+    if (cursor && computeVirtualPreview(cursor)) { input.preview.ghost = false; return; }
     clearPreview();
   }
 
@@ -272,18 +320,126 @@
     computePreview();
 
     if (dragging && leftDown) stepDrag();
+    if (input.selecting && input.selecting.start && leftDown) input.selecting.end = [hoverTx, hoverTy];
+    if (input.selecting) input.selecting.unmark = input.selecting.mode === 'decon' && shiftDown;
   };
+
+  // =========================================================================
+  // Blueprints: Ctrl+C / B starts the copy tool (drag a box), Ctrl+V takes the
+  // last copy back into the hand. While a blueprint is held: click pastes it as
+  // ghosts, R / Shift+R rotates, Q or Esc drops it.
+  // =========================================================================
+  function emptyHand() {
+    var p = getPlayer();
+    if (p && p.cursor) {
+      if (F.player.giveOrDrop) F.player.giveOrDrop(p.cursor.id, p.cursor.count);
+      p.cursor = null;
+    }
+    input.ghostCursor = null;
+    dragging = null;
+  }
+
+  function startCopyTool(mode) {
+    mode = mode || 'copy';
+    if (mode === 'decon' ? !F.deconstruction : !F.blueprints) return;
+    emptyHand();
+    input.blueprint = null;
+    input.selecting = { mode: mode, start: null, end: null, unmark: false };
+  }
+
+  function pasteClipboard() {
+    if (!F.blueprints) return;
+    var bp = F.blueprints.clipboard();
+    if (!bp) { if (F.ui && F.ui.toast) F.ui.toast(F.t('bp.no_clipboard')); return; }
+    emptyHand();
+    input.selecting = null;
+    input.blueprint = { bp: bp };
+  }
+
+  // Put a blueprint in the hand (the library's "Use" button, 55-blueprint-library.js).
+  input.holdBlueprint = function (bp) {
+    if (!bp || !bp.entities || !bp.entities.length) return false;
+    emptyHand();
+    input.selecting = null;
+    input.blueprint = { bp: bp };
+    return true;
+  };
+
+  function clearBlueprintModes() {
+    if (!input.selecting && !input.blueprint) return false;
+    input.selecting = null;
+    input.blueprint = null;
+    input.blueprintAnchor = null;
+    return true;
+  }
+
+  function finishDecon(sel, end) {
+    var n, msg;
+    if (shiftDown) {
+      var u = F.deconstruction.unmark(sel.start[0], sel.start[1], end[0], end[1]);
+      n = u.entities + u.features;
+      msg = n ? F.t('decon.unmarked', { n: n }) : F.t('decon.nothing');
+    } else {
+      var m = F.deconstruction.mark(sel.start[0], sel.start[1], end[0], end[1]);
+      n = m.entities + m.features + m.ghosts;
+      msg = n ? F.t('decon.marked', { n: n }) : F.t('decon.nothing');
+    }
+    input.selecting = { mode: 'decon', start: null, end: null, unmark: false }; // the planner stays in hand
+    if (F.ui && F.ui.toast) F.ui.toast(msg);
+  }
+
+  function finishSelection() {
+    var sel = input.selecting;
+    if (!sel || !sel.start) return;
+    var end = sel.end || sel.start;
+    if (sel.mode === 'decon') { finishDecon(sel, end); return; }
+    var bp = F.blueprints.create(sel.start[0], sel.start[1], end[0], end[1]);
+    if (!bp) {
+      input.selecting = { mode: sel.mode, start: null, end: null, unmark: false }; // stay in the tool, try again
+      if (F.ui && F.ui.toast) F.ui.toast(F.t('bp.empty'));
+      return;
+    }
+    if (sel.mode === 'cut' && F.deconstruction) {
+      // Cut: the buildings (not trees/rocks) in the box get marked; ghosts there are dropped.
+      var ax = Math.min(sel.start[0], end[0]), bx = Math.max(sel.start[0], end[0]);
+      var ay = Math.min(sel.start[1], end[1]), by = Math.max(sel.start[1], end[1]);
+      var ents = F.entities.all();
+      for (var i = 0; i < ents.length; i++) {
+        var e = ents[i];
+        if (e && !e._removed && e.x <= bx && e.y <= by && e.x + e.w - 1 >= ax && e.y + e.h - 1 >= ay) F.deconstruction.markEntity(e);
+      }
+      var gs = F.ghosts.inRect(ax, ay, bx, by);
+      for (var k = 0; k < gs.length; k++) F.ghosts.remove(gs[k]);
+    }
+    F.blueprints.setClipboard(bp);
+    input.selecting = null;
+    input.blueprint = { bp: F.blueprints.clipboard() };
+    if (F.ui && F.ui.toast) F.ui.toast(F.t('bp.copied', { n: bp.entities.length }));
+  }
+
+  function pasteHeldBlueprint() {
+    var a = input.blueprintAnchor;
+    if (!input.blueprint || !a) return;
+    var r = F.blueprints.place(input.blueprint.bp, a[0], a[1]);
+    if (F.ui && F.ui.toast) {
+      var msg = F.t('bp.placed', { n: r.placed });
+      if (r.blocked) msg += ' — ' + F.t('bp.blocked', { n: r.blocked });
+      F.ui.toast(msg);
+    }
+  }
 
   // =========================================================================
   // Drag placement (GDD §9.11): belts auto-turn along the mouse path; poles
   // space themselves at max wire reach; walls/pipes/other placeable entities
   // chain along every tile the path touches, skipping collisions.
   // =========================================================================
-  function beginDrag(type) {
+  function beginDrag(type, ghost) {
     var def = F.data.entities[type];
     dragging = {
       type: type,
       def: def,
+      ghost: !!ghost, // plan ghosts along the path instead of consuming items
+      ghostIds: Object.create(null), // ghosts placed by this drag (see overlapsOwnDragGhost)
       beltLike: def.behaviour === 'belt' || def.behaviour === 'underground' || def.behaviour === 'splitter',
       poleLike: def.behaviour === 'pole',
       // 'line' drag kinds (F.input.addDragKind, design/EXPANSION.md §6.6 —
@@ -329,7 +485,9 @@
         // Factorio-style drag: the belt we are leaving turns to face the drag direction
         // (covers the first belt of a drag and corners, including drags started on an existing belt).
         try {
-          var pe = F.world.entityAt(prevTx, prevTy);
+          var pg = dragging.ghost ? F.ghosts.at(prevTx, prevTy) : null;
+          if (pg && pg.type === type && pg.dir !== dir && dragging.visited[prevTx + ',' + prevTy] && def.behaviour === 'belt') F.ghosts.setDir(pg, dir);
+          var pe = dragging.ghost ? null : F.world.entityAt(prevTx, prevTy);
           if (pe && pe.type === type && pe.dir !== dir && dragging.visited[prevTx + ',' + prevTy] && def.behaviour === 'belt') {
             pe.dir = dir;
             if (F.belts && F.belts.onRotate) F.belts.onRotate(pe);
@@ -356,7 +514,7 @@
       placed = safePlace(type, anchor[0], anchor[1], dir2);
     }
 
-    if (placed) {
+    if (placed && !dragging.ghost) {
       if (remainingOf(type) <= 0) dragging = null; // stops the drag when the hand and the inventory are empty
     }
   }
@@ -367,7 +525,25 @@
     var p = getPlayer();
     return !!(p && p.cursor && p.cursor.id === type && p.cursor.count > 0);
   }
+  function overlapsOwnDragGhost(type, tx, ty, dir) {
+    var fp = F.entities.footprint(F.data.entities[type], dir);
+    for (var j = 0; j < fp[1]; j++) for (var i = 0; i < fp[0]; i++) {
+      var o = F.ghosts.at(tx + i, ty + j);
+      if (o && dragging.ghostIds[o.id] && !(o.type === type && o.x === tx && o.y === ty && o.dir === dir)) return true;
+    }
+    return false;
+  }
   function safePlace(type, tx, ty, dir) {
+    if (dragging && dragging.ghost) {
+      try {
+        // Ghosts replace the ghosts they overlap — but never ones this same drag just
+        // placed, or dragging a 3x3 ghost would keep overwriting its own previous step.
+        if (overlapsOwnDragGhost(type, tx, ty, dir)) return null;
+        var g = F.ghosts.place(type, tx, ty, dir);
+        if (g) dragging.ghostIds[g.id] = true;
+        return g;
+      } catch (e) { F.log.warn('[input] ghost place failed', type, tx, ty, dir, e); return null; }
+    }
     try {
       var chk = F.api.canPlace(type, tx, ty, dir);
       if (!chk || !chk.ok) return null;
@@ -415,6 +591,9 @@
     if (textFocused()) return;
     input.frame();
     var cursor = getCursor();
+    if (input.selecting) { input.selecting.start = [hoverTx, hoverTy]; input.selecting.end = [hoverTx, hoverTy]; return; }
+    if (input.blueprint) { pasteHeldBlueprint(); return; }
+    if (input.preview.type && input.preview.ghost) { beginDrag(input.preview.type, true); return; }
     if (cursor && input.preview.type) {
       // Virtual placer items (design/EXPANSION.md §6.4/§6.6, e.g. vehicles):
       // placed with one click via F.api.placeVirtual, not the belt-style drag
@@ -441,6 +620,7 @@
       return;
     }
     if (!cursor && tryPicker(hoverWx, hoverWy)) return;
+    if (!cursor && buildGhostAt(hoverTx, hoverTy)) return;
     if (input.hover) {
       if (F.ui && F.ui.open) { F.ui.open('entity', input.hover); windowStack.push('entity'); }
       return;
@@ -450,6 +630,20 @@
 
   function handleLeftUp() {
     dragging = null;
+    if (input.selecting && input.selecting.start) finishSelection();
+  }
+
+  // Left click with an empty hand on a ghost builds it from the inventory (within reach).
+  function buildGhostAt(tx, ty) {
+    if (!F.ghosts) return false;
+    var g = F.ghosts.at(tx, ty);
+    if (!g) return false;
+    if (F.ghosts.build(g, { checkReach: true })) return true;
+    var why = F.ghosts.lastFailure;
+    var msg = why === 'missing' ? F.t('ghost.missing', { name: F.t('item.' + F.ghosts.itemFor(g)) })
+      : why === 'too_far' ? F.t('ghost.too_far') : F.t('ghost.blocked');
+    if (F.ui && F.ui.toast) F.ui.toast(msg);
+    return true;
   }
 
   function tryPickupGround(tx, ty) {
@@ -485,7 +679,9 @@
   }
 
   function rotate(ccw) {
+    if (input.blueprint) { input.blueprint = { bp: F.blueprints.rotate(input.blueprint.bp, ccw ? -1 : 1) }; return; }
     var cursor = getCursor();
+    if (!cursor && input.ghostCursor) cursor = { id: input.ghostCursor, count: 0 };
     if (cursor) {
       var itemDef = F.data.items[cursor.id];
       var type = itemDef && itemDef.place;
@@ -522,7 +718,9 @@
       p.cursor = null;
       return;
     }
-    var hov = input.hover;
+    if (input.ghostCursor) { input.ghostCursor = null; return; }
+    if (clearBlueprintModes()) return;
+    var hov = input.hover || (F.ghosts ? F.ghosts.at(hoverTx, hoverTy) : null);
     if (hov) {
       var def = F.data.entities[hov.type];
       var itemId = def && def.minable;
@@ -530,6 +728,10 @@
         var cnt = F.player.count(itemId);
         var taken = F.player.take(itemId, cnt);
         if (taken > 0) { p.cursor = { id: itemId, count: taken }; cursorDirByType[itemId] = hov.dir || 0; }
+      } else if (itemId && F.ghosts && F.data.items[itemId] && F.data.items[itemId].place === hov.type) {
+        // None in the inventory: pick it up as a ghost cursor instead.
+        input.ghostCursor = itemId;
+        cursorDirByType[hov.type] = hov.dir || 0;
       }
       return;
     }
@@ -586,6 +788,7 @@
   // always is — 70-ui.js defines it unconditionally — this is defensive).
   var KNOWN_WINDOWS = ['entity', 'inventory', 'tech', 'help', 'map', 'menu', 'death'];
   function onEscape() {
+    if (clearBlueprintModes()) return;
     if (!F.ui) return;
     for (var i = windowStack.length - 1; i >= 0; i--) {
       var name = windowStack[i];
@@ -619,10 +822,17 @@
       p.cursor = null;
       return;
     }
+    if (input.ghostCursor) { input.ghostCursor = null; return; }
+    if (clearBlueprintModes()) return;
     var itemId = p.quickbar[idx];
     if (!itemId || !F.player.count) return;
     var count = F.player.count(itemId);
-    if (count <= 0) return;
+    if (count <= 0) {
+      // Nothing left of a placeable item: hold it as a ghost cursor.
+      var qdef = F.data.items[itemId];
+      if (F.ghosts && qdef && qdef.place) input.ghostCursor = itemId;
+      return;
+    }
     var taken = F.player.take(itemId, count);
     if (taken > 0) p.cursor = { id: itemId, count: taken };
   }
@@ -684,11 +894,15 @@
   // DOM event wiring (lazy — only reached from init(), never at load time).
   // =========================================================================
   function onKeyDown(e) {
+    shiftDown = !!e.shiftKey;
     if (textFocused()) return;
     var key = e.key;
     var lower = key.length === 1 ? key.toLowerCase() : key.toLowerCase();
 
     if ((e.ctrlKey || e.metaKey) && lower === 's') { e.preventDefault(); quickSave(); return; }
+    if ((e.ctrlKey || e.metaKey) && lower === 'c') { e.preventDefault(); startCopyTool('copy'); return; }
+    if ((e.ctrlKey || e.metaKey) && lower === 'x') { e.preventDefault(); startCopyTool('cut'); return; }
+    if ((e.ctrlKey || e.metaKey) && lower === 'v') { e.preventDefault(); pasteClipboard(); return; }
 
     if (MOVE_KEYS[lower]) {
       keysDown[lower] = true; updateMoveAxis();
@@ -719,6 +933,8 @@
       case 'h': case 'f1': toggleWindow('help'); e.preventDefault(); break;
       case 'f': pickupNearby(); break;
       case 'z': dropOne(); break;
+      case 'b': startCopyTool('copy'); break;
+      case 'x': startCopyTool('decon'); break;
       case 'alt': toggleAlt(); e.preventDefault(); break;
       case 'escape': onEscape(); break;
       case ' ': case 'spacebar': spaceDown = true; updateShoot(); e.preventDefault(); break;
@@ -732,6 +948,7 @@
   }
 
   function onKeyUp(e) {
+    shiftDown = !!e.shiftKey;
     var key = e.key;
     var lower = key.length === 1 ? key.toLowerCase() : key.toLowerCase();
     if (MOVE_KEYS[lower]) { keysDown[lower] = false; updateMoveAxis(); return; }
@@ -746,12 +963,16 @@
     mouse.y = e.clientY - rect.top;
   }
 
-  function onMouseMove(e) { updateMouseFromEvent(e); }
+  function onMouseMove(e) { updateMouseFromEvent(e); shiftDown = !!e.shiftKey; }
 
   function onMouseDown(e) {
     updateMouseFromEvent(e);
+    shiftDown = !!e.shiftKey;
     if (e.button === 0) { leftDown = true; handleLeftDown(); }
-    else if (e.button === 2) { rightDown = true; }
+    else if (e.button === 2) {
+      if (input.selecting) { input.selecting = null; return; } // right click cancels the copy tool
+      rightDown = true; lastCancelTile = null; input.frame();
+    }
   }
 
   function onMouseUp(e) {
@@ -768,7 +989,7 @@
 
   function onBlur() {
     keysDown = Object.create(null);
-    leftDown = false; rightDown = false; spaceDown = false; cDown = false;
+    leftDown = false; rightDown = false; spaceDown = false; cDown = false; shiftDown = false;
     dragging = null;
     updateMoveAxis(); updateShoot();
     input.state.mine = null;

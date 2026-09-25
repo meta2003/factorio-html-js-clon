@@ -433,7 +433,10 @@ working; refinery/chem plant working flag).
 ### 7.3 Logistic robots (`src/39-robots.js`, tests `test/scenarios-robots.js`)
 - `roboport` 4×4 behaviour 'roboport', electric: drain 50 kW, +100 kW per robot charging/active
   (just request 50 + 25 × busyRobots kW); fields `{ robots: inv(1) (logistic-robot items), repair: null }`.
-  Logistic area: square radius 25 tiles around the centre (50×50). Construction area not used.
+  Logistic area: square radius 25 tiles around the centre (50×50). Construction area (110×110,
+  `roboport.constructionRadius = 55`) is used by construction robots — see `src/53-construction.js`
+  (added later: tech `construction-robotics` now unlocks the roboport; the roboport has a second
+  robot slot `cbots`).
   Networks: roboports whose squares overlap belong to one network (union-find, rebuilt on dirty).
 - Logistic chests (1×1, behaviour 'logistic-chest', `def.logistic = { mode }`, 48 slots, 'object' layer):
   passive-provider (robots take from it), storage (robots take from it and drop surplus into it),

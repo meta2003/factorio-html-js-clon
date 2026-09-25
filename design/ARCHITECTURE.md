@@ -22,6 +22,11 @@ Read `ENGINEERING-CONSTRAINTS.md` first (it wins on any conflict). Data values (
 | `36-pollution.js` | `F.pollution` | per-chunk pollution, spreading, absorption, attack triggering, evolution factor |
 | `40-player.js` | `F.player` | player state, movement, mining, hand crafting queue, quickbar, reach, death/respawn |
 | `50-api.js` | `F.api` | high-level actions shared by UI, input and tests (place/remove/mine/craft/…) |
+| `51-ghosts.js` | `F.ghosts` | entity ghosts (planned buildings): own store `F.state.ghosts`, placement, hand building, settings hand-over, rendering — see the header comment of the file |
+| `52-blueprints.js` | `F.blueprints` | blueprints: copy an area of entities/ghosts, rotate, paste as ghosts; clipboard in `F.state.blueprints` — see the header comment of the file |
+| `53-construction.js` | `F.construction` | construction robots: build ghosts inside a roboport network's 110×110 construction areas from provider/storage chests; state `F.state.cbots` — see the header comment of the file |
+| `54-deconstruction.js` | `F.deconstruction` | deconstruction planner: marks on entities/trees/rocks (`F.state.decon`), removal for robots, red-cross overlay — see the header comment of the file |
+| `55-blueprint-library.js` | `F.blueprints.encode/decode/library` | blueprint strings (`FB1` + base64 JSON, validated on import) and the named library in `localStorage['factio.blueprints']`; window `blueprints` (L) — see the header comment of the file |
 | `60-sprites.js` | `F.sprites` | procedural sprites & item icons cached on offscreen canvases |
 | `61-render.js` | `F.render`, `F.camera` | canvas world rendering, terrain chunk cache, animations, overlays, minimap image |
 | `70-ui.js` | `F.ui` | DOM UI framework: windows, slots, tooltips, HUD, quickbar, alerts, minimap, menu |
