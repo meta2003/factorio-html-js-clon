@@ -356,6 +356,15 @@
     input.blueprint = { bp: bp };
   }
 
+  // Put a blueprint in the hand (the library's "Use" button, 55-blueprint-library.js).
+  input.holdBlueprint = function (bp) {
+    if (!bp || !bp.entities || !bp.entities.length) return false;
+    emptyHand();
+    input.selecting = null;
+    input.blueprint = { bp: bp };
+    return true;
+  };
+
   function clearBlueprintModes() {
     if (!input.selecting && !input.blueprint) return false;
     input.selecting = null;
