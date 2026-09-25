@@ -76,8 +76,25 @@
   }
   function emitPollution(e, def, sat) {
     if (F.pollution && typeof F.pollution.emit === 'function' && def.pollution) {
-      F.pollution.emit(e, def.pollution / 3600 * sat);
+      F.pollution.emit(e, def.pollution / 3600 * sat * moduleFx(e).pollution);
     }
+  }
+  // Module effects (src/35-modules.js): { speed, energy, productivity, pollution } factors.
+  const NO_MODULES = { speed: 1, energy: 1, productivity: 0, pollution: 1 };
+  function moduleFx(e) {
+    return (F.modules && typeof F.modules.effects === 'function') ? F.modules.effects(e) : NO_MODULES;
+  }
+  function returnModules(e) {
+    if (F.modules && typeof F.modules.returnAll === 'function') F.modules.returnAll(e);
+  }
+  // Productivity bonus bar: adds fx.productivity per finished craft; returns how many free
+  // extra results are due (0 or 1 in practice).
+  function productivityBonus(e, fx) {
+    if (!(fx.productivity > 0)) return 0;
+    e.prodProgress = (e.prodProgress || 0) + fx.productivity;
+    let extra = 0;
+    while (e.prodProgress >= 1) { e.prodProgress -= 1; extra++; }
+    return extra;
   }
   function spillInventory(e, inv) {
     if (!inv) return;
@@ -112,7 +129,7 @@
     if (energy.type === 'electric') {
       const usage = energy.usage || 0;
       const drain = energy.drain || 0;
-      const kW = working ? usage + drain : drain;
+      const kW = working ? usage * moduleFx(e).energy + drain : drain;
       if (F.power && typeof F.power.request === 'function') return F.power.request(e, kW);
       return 1; // power module not present yet — assume unlimited so other modules can be tested
     }
@@ -174,7 +191,9 @@
 
   const furnaceBehaviour = {
     create(e) {
-      e.fuel = F.inv.create(1);
+      const def = safeEntityDef(e.type);
+      // electric furnaces have no fuel slot
+      e.fuel = (def && def.energy && def.energy.type === 'electric') ? null : F.inv.create(1);
       e.input = F.inv.create(1);
       e.output = F.inv.create(1);
       e.recipe = null;
@@ -185,9 +204,10 @@
       spillInventory(e, e.fuel);
       spillInventory(e, e.input);
       spillInventory(e, e.output);
+      returnModules(e);
     },
     accepts(e, item) {
-      if (isFuelItem(item)) return Math.max(0, 5 - F.inv.count(e.fuel, item));
+      if (e.fuel && isFuelItem(item)) return Math.max(0, 5 - F.inv.count(e.fuel, item));
       const recipeId = smeltRecipeFor(item);
       if (!recipeId) return 0;
       if (e.input[0] && e.input[0].id !== item) return 0;
@@ -196,11 +216,11 @@
       const def = safeEntityDef(e.type);
       const ing = rdef.ingredients.find(([id]) => id === item) || rdef.ingredients[0];
       const amount = ing ? ing[1] : 1;
-      const limit = craftsLimit(rdef.time, furnaceSpeed(def)) * amount;
+      const limit = craftsLimit(rdef.time, furnaceSpeed(def) * moduleFx(e).speed) * amount;
       return Math.max(0, limit - F.inv.count(e.input, item));
     },
     insert(e, item, count) {
-      if (isFuelItem(item)) {
+      if (e.fuel && isFuelItem(item)) {
         const remaining = F.inv.add(e.fuel, item, count, { ignoreStack: true });
         return count - remaining;
       }
@@ -214,11 +234,10 @@
     },
     take(e, filter) { return F.inv.takeOne(e.output, filter); },
     inventories(e) {
-      return [
-        { name: 'fuel', inv: e.fuel },
-        { name: 'input', inv: e.input },
-        { name: 'output', inv: e.output },
-      ];
+      const list = [];
+      if (e.fuel) list.push({ name: 'fuel', inv: e.fuel });
+      list.push({ name: 'input', inv: e.input }, { name: 'output', inv: e.output });
+      return list;
     },
     status(e) { return e._status || 'idle'; },
     tick(e, def) { furnaceTick(e, def || safeEntityDef(e.type)); },
@@ -251,11 +270,13 @@
 
     const sat = chargePower(e, def, canStart);
     if (canStart && sat > 0) {
+      const fx = moduleFx(e);
       if (!midCraft) F.inv.remove(e.input, ing[0], ing[1]);
-      e.progress += (speedVal / rdef.time / 60) * sat;
+      e.progress += (speedVal * fx.speed / rdef.time / 60) * sat;
       if (e.progress >= 1) {
         e.progress = 0;
-        F.inv.add(e.output, res[0], res[1], { ignoreStack: true });
+        const n = res[1] * (1 + productivityBonus(e, fx));
+        F.inv.add(e.output, res[0], n, { ignoreStack: true });
       }
       e._act = sat;
       e._status = 'working';
@@ -288,6 +309,7 @@
     onRemove(e) {
       returnToPlayer(e, e.input);
       spillInventory(e, e.output);
+      returnModules(e);
     },
     accepts(e, item) {
       if (!e.recipe) return 0;
@@ -296,7 +318,7 @@
       const ing = rdef.ingredients.find(([id]) => id === item);
       if (!ing) return 0;
       const def = safeEntityDef(e.type);
-      const limit = craftsLimit(rdef.time, assemblerSpeed(def)) * ing[1];
+      const limit = craftsLimit(rdef.time, assemblerSpeed(def) * moduleFx(e).speed) * ing[1];
       return Math.max(0, limit - F.inv.count(e.input, item));
     },
     insert(e, item, count) {
@@ -339,12 +361,14 @@
 
     const sat = chargePower(e, def, canStart);
     if (canStart && sat > 0) {
+      const fx = moduleFx(e);
       if (!midCraft) rdef.ingredients.forEach(([id, amt]) => F.inv.remove(e.input, id, amt));
-      e.progress += (speedVal / rdef.time / 60) * sat;
+      e.progress += (speedVal * fx.speed / rdef.time / 60) * sat;
       if (e.progress >= 1) {
         e.progress = 0;
         const res = rdef.results[0];
-        F.inv.add(e.output, res[0], res[1], { ignoreStack: true });
+        const n = res[1] * (1 + productivityBonus(e, fx));
+        F.inv.add(e.output, res[0], n, { ignoreStack: true });
       }
       e._act = sat;
       e._status = 'working';
@@ -368,6 +392,7 @@
     if (!def || def.behaviour !== 'assembler') { F.log.warn('machines.setRecipe: not an assembler', e && e.type); return false; }
     returnToPlayer(e, e.input);
     e.progress = 0;
+    e.prodProgress = 0;
     if (id == null) { e.recipe = null; e.input = []; return true; }
     const rdef = safeRecipeDef(id);
     if (!rdef) return false;
@@ -383,6 +408,7 @@
     }
     e.recipe = id;
     e.input = rdef.ingredients.map(() => null);
+    if (F.modules && typeof F.modules.onRecipeChanged === 'function') F.modules.onRecipeChanged(e);
     return true;
   }
 
@@ -429,7 +455,10 @@
     if (target) {
       if (F.belts && typeof F.belts.isBeltLike === 'function' && F.belts.isBeltLike(target)) {
         const sideDir = F.util.oppDir(e.dir);
-        if (F.belts.insertFromSide(target, sideDir, e.held.id)) { e.held = null; return true; }
+        // one item per call (a productivity bonus can make held.count 2)
+        if (F.belts.insertFromSide(target, sideDir, e.held.id)) {
+          if (--e.held.count <= 0) { e.held = null; return true; }
+        }
         return false;
       }
       if (F.entities && typeof F.entities.insertItem === 'function') {
@@ -463,6 +492,7 @@
     },
     onRemove(e) {
       if (e.fuel) spillInventory(e, e.fuel);
+      returnModules(e);
       if (e.held) {
         if (F.ground && typeof F.ground.dropNear === 'function') F.ground.dropNear(e.x, e.y, e.held.id, e.held.count);
         e.held = null;
@@ -506,11 +536,13 @@
     const speedVal = drillSpeed(def);
     const sat = chargePower(e, def, working);
     if (working && sat > 0) {
-      e.progress += (speedVal / MINING_TIME / 60) * sat;
+      const fx = moduleFx(e);
+      e.progress += (speedVal * fx.speed / MINING_TIME / 60) * sat;
       if (e.progress >= 1) {
         e.progress -= 1;
         const item = F.world.mineResource(e.target.tx, e.target.ty, 1);
-        if (item) e.held = { id: item, count: 1 };
+        // productivity: the bonus ore comes free, without depleting the tile
+        if (item) e.held = { id: item, count: 1 + productivityBonus(e, fx) };
         const res = F.world.resource(e.target.tx, e.target.ty);
         if (!res || res.amount <= 0) e.target = null;
         emitPollution(e, def, sat);
@@ -716,11 +748,11 @@
     if (!def) return 0;
     if (def.behaviour === 'furnace') {
       const rdef = safeRecipeDef(e.recipe);
-      return rdef ? rdef.time / furnaceSpeed(def) : 0;
+      return rdef ? rdef.time / (furnaceSpeed(def) * moduleFx(e).speed) : 0;
     }
     if (def.behaviour === 'assembler') {
       const rdef = safeRecipeDef(e.recipe);
-      return rdef ? rdef.time / assemblerSpeed(def) : 0;
+      return rdef ? rdef.time / (assemblerSpeed(def) * moduleFx(e).speed) : 0;
     }
     return 0;
   };
