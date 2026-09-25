@@ -952,8 +952,12 @@
   // ===========================================================================
   function refreshCursorStack() {
     var c = getCursor();
+    // Ghost cursor (75-input.js / 51-ghosts.js): same icon, faded, no count.
+    var ghost = !c && F.input && F.input.ghostCursor;
+    if (ghost) c = { id: F.input.ghostCursor, count: 0 };
     if (!c) { show(cursorEl, false); return; }
     show(cursorEl, true);
+    cursorEl.style.opacity = ghost ? '0.5' : '';
     cursorEl.style.left = mouse.x + 'px';
     cursorEl.style.top = mouse.y + 'px';
     if (cursorEl.dataset.id !== c.id) {

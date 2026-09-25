@@ -254,7 +254,8 @@
       }
     }
     // Never build on top of the player (0.4x0.4 collision box) unless the entity is walkable (belts etc.).
-    if (def.collides !== false && F.state && F.state.player && !F.state.player.dead) {
+    // opts.ignorePlayer skips this for ghosts (51-ghosts.js), which may be planned under the player.
+    if (!opts.ignorePlayer && def.collides !== false && F.state && F.state.player && !F.state.player.dead) {
       const pl = F.state.player;
       const x0 = Math.floor(pl.x - 0.2), x1 = Math.floor(pl.x + 0.2), y0 = Math.floor(pl.y - 0.2), y1 = Math.floor(pl.y + 0.2);
       if (x1 >= tx && x0 < tx + w && y1 >= ty && y0 < ty + h) return { ok: false, reason: 'collision' };

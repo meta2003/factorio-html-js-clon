@@ -22,6 +22,7 @@ Read `ENGINEERING-CONSTRAINTS.md` first (it wins on any conflict). Data values (
 | `36-pollution.js` | `F.pollution` | per-chunk pollution, spreading, absorption, attack triggering, evolution factor |
 | `40-player.js` | `F.player` | player state, movement, mining, hand crafting queue, quickbar, reach, death/respawn |
 | `50-api.js` | `F.api` | high-level actions shared by UI, input and tests (place/remove/mine/craft/…) |
+| `51-ghosts.js` | `F.ghosts` | entity ghosts (planned buildings): own store `F.state.ghosts`, placement, hand building, settings hand-over, rendering — see the header comment of the file |
 | `60-sprites.js` | `F.sprites` | procedural sprites & item icons cached on offscreen canvases |
 | `61-render.js` | `F.render`, `F.camera` | canvas world rendering, terrain chunk cache, animations, overlays, minimap image |
 | `70-ui.js` | `F.ui` | DOM UI framework: windows, slots, tooltips, HUD, quickbar, alerts, minimap, menu |
