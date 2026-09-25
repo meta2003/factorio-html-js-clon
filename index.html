@@ -1689,7 +1689,7 @@ var F = window.F = {};
   // In-game instructions ("Instructions"/help panel). Combat/biter/turret/
   // wall/ammunition/pistol advice removed (task A.5 — combat is disabled).
   EN["help.title"] = "Factio game instructions";
-  EN["help.controls"] = "Movement: W A S D.\n\nBuilding and mining: pick an item from the inventory or the quickbar (keys 1–10); left click (LMB) places it in the world; hold the left button and drag the mouse to continuously place belts, pipes, walls and poles. Holding the right mouse button (RMB) over ore, a tree, a rock or your own building mines or picks it up.\n\nRotation: R rotates the item in your hand or a placed building clockwise, Shift+R counter-clockwise. Pipette: Q over a building grabs the same item from your inventory into your hand; Q with a full hand empties it.\n\nWindows: E opens the inventory and crafting screen (and closes any open window), T opens technologies, M opens the map, H or F1 opens the Instructions, Esc closes the current window or opens the menu.\n\nItems on the ground: F picks them up within a one-tile radius, Z drops one item from your hand onto the ground or belt under the cursor.\n\nTransferring items in windows: Shift+click moves a whole stack to the other open inventory, Ctrl+click moves every item of that type; Ctrl+click on a world building with no window open is a quick transfer.\n\nOther: the mouse wheel zooms the view in and out, Ctrl+S saves immediately, the quickbar uses keys 1–10.";
+  EN["help.controls"] = "Movement: W A S D.\n\nBuilding and mining: pick an item from the inventory or the quickbar (keys 1–10); left click (LMB) places it in the world; hold the left button and drag the mouse to continuously place belts, pipes, walls and poles. Holding the right mouse button (RMB) over ore, a tree, a rock or your own building mines or picks it up.\n\nRotation: R rotates the item in your hand or a placed building clockwise, Shift+R counter-clockwise. Pipette: Q over a building grabs the same item from your inventory into your hand; Q with a full hand empties it.\n\nGhosts (planned buildings): Shift+click (or Shift+drag) with an item in your hand places a blue ghost instead of the building, without using the item. Pipette (Q) or a quickbar key on an item you have none of gives you a ghost cursor that only places ghosts. Left click a ghost with an empty hand to build it from your inventory; right click a ghost to cancel it (from any distance). Building the same item on top of a ghost also fulfils it.\n\nBlueprints: Ctrl+C (or B) turns the cursor into a copy tool — drag a box over buildings and ghosts to copy them, recipes and settings included. The copy is then held in your hand: R / Shift+R rotates it, left click pastes it as ghosts (parts that do not fit show red and are skipped), Q or Esc drops it. Ctrl+V takes the last copy back into your hand. Right click cancels the copy tool. L (or the Blueprints button under the minimap) opens the blueprint library: save the blueprint in your hand under a name, take saved ones back into your hand, and export/import blueprint strings (text starting with FB1) to share them. The library is kept in this browser, across all your games.\n\nDeconstruction: X gives you the deconstruction planner — drag a box to mark buildings, trees and rocks (red cross) for construction robots to take down; Shift+drag cancels marks; ghosts in the box are removed at once. Ctrl+X cuts: copies the area into your hand and marks its buildings. Ghosts may be planned over trees and rocks, which are then marked automatically.\n\nWindows: E opens the inventory and crafting screen (and closes any open window), T opens technologies, M opens the map, H or F1 opens the Instructions, Esc closes the current window or opens the menu.\n\nItems on the ground: F picks them up within a one-tile radius, Z drops one item from your hand onto the ground or belt under the cursor.\n\nTransferring items in windows: Shift+click moves a whole stack to the other open inventory, Ctrl+click moves every item of that type; Ctrl+click on a world building with no window open is a quick transfer.\n\nOther: the mouse wheel zooms the view in and out, Ctrl+S saves immediately, the quickbar uses keys 1–10.";
   EN["help.basics"] = "At the start you have a stone furnace, a burner mining drill and a little iron — enough for the first steps.\n\n1. Find ore. Iron, copper, coal and stone deposits grow around you; check the map (M) to spot them. Hold the right mouse button (RMB) to mine some stone and coal by hand before you start building.\n\n2. Place a stone furnace (needs 5 stone) and the burner mining drill you already carry. Rotate the drill (R) so its arrow points straight into the furnace — mined ore then goes straight in, with no belt or inserter needed. Put coal into both the drill and the furnace as fuel.\n\n3. This basic drill+furnace pair gives you your first iron and copper plates. Place a wooden chest (2 wood) next to the furnace as temporary storage for plates until you have belts. Two coal-burning drills facing each other refuel themselves, so you never have to feed them coal by hand.";
   EN["help.progression"] = "4. Craft transport belts (1 iron plate + 1 gear wheel → 2 belts) and burner inserters. A belt carries coal past the furnaces and drills, and the inserters load it in for you — no more carrying fuel by hand.\n\n5. Power: place an offshore pump by a lake (it must face the water), connect it with pipes to a boiler, and have the boiler feed two steam engines (ratio 1 boiler : 2 engines = 1.8 MW). Place small electric poles (1 wood + 2 copper cable → 2 poles) so their supply areas cover your machines.\n\n6. Once you have power, replace burner drills with electric drills and burner inserters with regular inserters — they need no fuel and work faster.\n\n7. Build a lab (10 circuits + 10 gears + 4 belts) and hand-craft 10 automation science packs (1 copper + 1 gear each). Research Automation (T) — it unlocks assembling machine 1 and the long-handed inserter.\n\n8. Have assembling machine 1 produce gears and circuits, then automation science packs, and belt them to your labs.\n\n9. Research the Logistic science pack (75 automation packs). A logistic pack needs 1 inserter + 1 belt; aim for a ratio of 5 automation-pack machines to 6 logistic-pack machines.\n\n10. From there: Steel processing, Automation 2 and Logistics 2 for a more efficient factory.";
   EN["help.ratios"] = "Power: 1 boiler drives exactly 2 steam engines (1.8 MW combined); a single offshore pump (1200 water/s) can supply up to 20 boilers, i.e. up to 40 steam engines, before it runs out of water.\n\nBelts: one fully loaded yellow belt (15 items/s) matches the output of 48 stone furnaces, 30 electric mining drills, or 60 burner mining drills running at full speed.\n\nMining and smelting: one electric mining drill (0.5 ore/s) roughly feeds 1.6 stone furnaces (a furnace consumes ore at 1 plate per 3.2 s); for cable-to-circuit production aim for roughly 3 copper-cable machines per 2 electronic-circuit machines.\n\nScience: aim for a ratio of 5 automation-science-pack machines to 6 logistic-science-pack machines (an automation pack takes 5 s, a logistic pack 6 s at speed 1) — this keeps labs supplied evenly with both pack types; one automation-pack machine (one pack per 10 s in assembling machine 1) roughly matches the consumption of one lab.\n\nFuel: a furnace burns 1 coal roughly every 44 s, a burner mining drill 1 coal roughly every 27 s, and a boiler 1 coal for roughly every 2.2 s of steam produced.";
@@ -1772,6 +1772,7 @@ var F = window.F = {};
     ['cargo-wagon', 5, 0, 'logistics', null, 'wagon', '#8A8F94', '#5A4636', 'cargo-wagon'],
     ['roboport', 10, 0, 'logistics', 'roboport', 'dish', '#8A8F94', '#D9A520', null],
     ['logistic-robot', 50, 0, 'logistics', null, 'robot', '#D9C040', '#8A8F94', null],
+    ['construction-robot', 50, 0, 'logistics', null, 'robot', '#E07A2A', '#8A8F94', null],
     ['passive-provider-chest', 50, 0, 'logistics', 'passive-provider-chest', 'box', '#C43A3A', null, null],
     ['storage-chest', 50, 0, 'logistics', 'storage-chest', 'box', '#D9B830', null, null],
     ['requester-chest', 50, 0, 'logistics', 'requester-chest', 'box', '#3A7FD9', null, null],
@@ -1845,7 +1846,8 @@ var F = window.F = {};
     ['locomotive', [['engine-unit', 20], ['electronic-circuit', 10], ['steel-plate', 30]], [['locomotive', 1]], 4, 'crafting', 'railway', [], []],
     ['cargo-wagon', [['iron-gear-wheel', 10], ['iron-plate', 20], ['steel-plate', 20]], [['cargo-wagon', 1]], 1, 'crafting', 'railway', [], []],
     ['train-stop', [['electronic-circuit', 5], ['iron-plate', 6], ['iron-stick', 6], ['steel-plate', 3]], [['train-stop', 1]], 0.5, 'crafting', 'automated-rail-transportation', [], []],
-    ['roboport', [['steel-plate', 45], ['iron-gear-wheel', 45], ['advanced-circuit', 45]], [['roboport', 1]], 5, 'crafting', 'logistic-robotics', [], []],
+    ['roboport', [['steel-plate', 45], ['iron-gear-wheel', 45], ['advanced-circuit', 45]], [['roboport', 1]], 5, 'crafting', 'construction-robotics', [], []],
+    ['construction-robot', [['flying-robot-frame', 1], ['electronic-circuit', 2]], [['construction-robot', 1]], 0.5, 'crafting', 'construction-robotics', [], []],
     ['logistic-robot', [['flying-robot-frame', 1], ['advanced-circuit', 2]], [['logistic-robot', 1]], 0.5, 'crafting', 'logistic-robotics', [], []],
     ['passive-provider-chest', [['steel-chest', 1], ['electronic-circuit', 3], ['advanced-circuit', 1]], [['passive-provider-chest', 1]], 0.5, 'crafting', 'logistic-robotics', [], []],
     ['storage-chest', [['steel-chest', 1], ['electronic-circuit', 3], ['advanced-circuit', 1]], [['storage-chest', 1]], 0.5, 'crafting', 'logistic-robotics', [], []],
@@ -1948,7 +1950,7 @@ var F = window.F = {};
     id: 'roboport', size: [4, 4], rotatable: false, health: 400, behaviour: 'roboport',
     minable: 'roboport', category: 'logistics', mineTime: 0.3,
     energy: { type: 'electric', usage: 50, drain: 50 },
-    roboport: { radius: 25 },
+    roboport: { radius: 25, constructionRadius: 55 }, // logistic 50x50, construction 110x110
   });
   D.entities['passive-provider-chest'] = baseEntity({
     id: 'passive-provider-chest', size: [1, 1], rotatable: false, health: 350, behaviour: 'logistic-chest',
@@ -2012,7 +2014,9 @@ var F = window.F = {};
     ['electric-engine', ['lubricant'], 'RGB', 50, 30, ['electric-engine-unit']],
     ['battery', ['sulfur-processing', 'chemical-science-pack'], 'RGB', 150, 30, ['battery']],
     ['robotics', ['electric-engine', 'battery'], 'RGB', 75, 30, ['flying-robot-frame']],
-    ['logistic-robotics', ['robotics'], 'RGB', 250, 30, ['roboport', 'logistic-robot', 'passive-provider-chest', 'storage-chest', 'requester-chest']],
+    // construction-robotics comes first and unlocks the roboport (a recipe has one unlocking tech).
+    ['construction-robotics', ['robotics'], 'RGB', 100, 30, ['roboport', 'construction-robot']],
+    ['logistic-robotics', ['construction-robotics'], 'RGB', 250, 30, ['logistic-robot', 'passive-provider-chest', 'storage-chest', 'requester-chest']],
     ['advanced-electronics-2', ['chemical-science-pack'], 'RGB', 300, 30, ['processing-unit']],
     ['low-density-structure', ['chemical-science-pack', 'plastics'], 'RGB', 300, 45, ['low-density-structure']],
     ['production-science-pack', ['advanced-electronics-2', 'railway'], 'RGB', 100, 30, ['production-science-pack']],
@@ -2158,8 +2162,10 @@ var F = window.F = {};
   EN['item.cargo-wagon'] = 'Cargo wagon';
   EN['item.cargo-wagon.desc'] = 'A 40-slot rolling inventory; place it behind a locomotive on a rail to couple it. Stack: 5.';
   EN['item.roboport'] = 'Roboport';
-  EN['item.roboport.desc'] = 'Charges and dispatches logistic robots within a 25-tile radius; also recharges you when nearby. Stack: 10.';
+  EN['item.roboport.desc'] = 'Charges and dispatches robots: logistic robots within a 25-tile radius, construction robots within 55 tiles. Stack: 10.';
   EN['item.logistic-robot'] = 'Logistic robot';
+  EN['item.construction-robot'] = 'Construction robot';
+  EN['item.construction-robot.desc'] = 'A flying robot that builds ghosts inside a roboport\'s 110×110 construction area, taking the buildings from logistic chests. Stack: 50.';
   EN['item.logistic-robot.desc'] = 'A flying robot that carries items between logistic chests within a roboport network. Stack: 50.';
   EN['item.passive-provider-chest'] = 'Passive provider chest';
   EN['item.passive-provider-chest.desc'] = 'Logistic robots freely take items from this chest to deliver elsewhere. Stack: 50.';
@@ -2228,7 +2234,9 @@ var F = window.F = {};
   EN['tech.robotics'] = 'Robotics';
   EN['tech.robotics.desc'] = 'Cost 75 automation + 75 logistic + 75 chemical science packs. Unlocks the flying robot frame.';
   EN['tech.logistic-robotics'] = 'Logistic robotics';
-  EN['tech.logistic-robotics.desc'] = 'Cost 250 automation + 250 logistic + 250 chemical science packs. Unlocks the roboport, logistic robot and the three logistic chests.';
+  EN['tech.logistic-robotics.desc'] = 'Cost 250 automation + 250 logistic + 250 chemical science packs. Unlocks the logistic robot and the three logistic chests.';
+  EN['tech.construction-robotics'] = 'Construction robotics';
+  EN['tech.construction-robotics.desc'] = 'Cost 100 automation + 100 logistic + 100 chemical science packs. Unlocks the roboport and the construction robot, which builds ghosts and blueprints for you.';
   EN['tech.advanced-electronics-2'] = 'Advanced electronics 2';
   EN['tech.advanced-electronics-2.desc'] = 'Cost 300 automation + 300 logistic + 300 chemical science packs. Unlocks the processing unit.';
   EN['tech.low-density-structure'] = 'Low density structure';
@@ -2283,7 +2291,7 @@ var F = window.F = {};
   // ---------------------------------------------------------------------
   EN['help.oil'] = 'Oil wells appear as dark, oily ground far from spawn (check the map). A pumpjack must be centred exactly on a well tile; it slowly extracts crude oil (yield decays with use but never runs dry below 20%).\n\nPipe the crude oil to an oil refinery. Basic oil processing (needs only crude oil) makes petroleum gas. Advanced oil processing (needs crude oil + water, unlocked separately) makes heavy oil, light oil and petroleum gas all at once, in larger quantities — always prefer it once available.\n\nHeavy oil is the least useful fluid on its own: crack it into light oil in a chemical plant (heavy-oil cracking, needs water), then crack light oil into petroleum gas (light-oil cracking, also needs water) if you have a surplus. Petroleum gas makes plastic bars (with coal) and, with water, sulfur. Sulfur plus iron plate and water make sulfuric acid, used for batteries and processing units. Heavy oil also makes lubricant, needed for electric engine units.\n\nSolid fuel can be made from spare petroleum gas or light oil and is a strong furnace/vehicle fuel; compressing solid fuel with light oil makes rocket fuel. Use storage tanks (25000 fluid capacity) to buffer any fluid your production or consumption is unbalanced on.';
   EN['help.trains'] = 'Place rail like a belt (drag in a line; corners are handled for you) to connect two points. Place a train stop next to a rail and give it a name — that is where trains you schedule will stop.\n\nTo create a train, place a locomotive on a rail (R rotates it to choose the facing direction before placing); place a cargo wagon on a rail directly behind it (within about 3.5 tiles) to couple it on. Right-click and hold (mine) a car to remove it and get its item back.\n\nBoard the nearest locomotive with Enter or G (within 3 tiles); the same key leaves the train. While riding: W accelerates, S brakes/reverses, and at a junction A or D picks the left or right branch for the next choice point. Open a locomotive to set fuel and edit its schedule (a list of stops with a wait condition: fixed time, until full, until empty, or until inactive); toggle Auto to let it run the schedule itself, or leave it Manual to always drive it yourself. A train waits if the rail ahead is occupied by another train, and shows "No path" if its schedule cannot be reached.\n\nWhile a train is stopped at a station, inserters can load and unload its wagons just like a chest.';
-  EN['help.robots'] = 'A roboport charges and dispatches logistic robots over a 50×50 tile area (25-tile radius) centred on itself; place a robot item into its robot slot so it has robots to send out. Overlapping roboports join into one shared network — build several to cover a larger base, and keep them powered (an unpowered network flies its robots at only 20% speed).\n\nThree kinds of logistic chest work with the network: a passive provider chest lets robots freely take items from it; a storage chest lets robots both drop off surplus items and take them again; a requester chest is where you tell the network what you need — open it, use the item picker on any of its 6 request slots to choose an item, and set how many you want. Robots then fly from provider/storage chests to fill the request automatically, as long as a roboport network with those chests is powered and stocked.\n\nEach roboport\'s GUI shows how many robots in its network are idle or busy, and how many logistic chests it covers — useful for spotting a starved or overloaded network.';
+  EN['help.robots'] = 'A roboport charges and dispatches logistic robots over a 50×50 tile area (25-tile radius) centred on itself; place a robot item into its robot slot so it has robots to send out. Overlapping roboports join into one shared network — build several to cover a larger base, and keep them powered (an unpowered network flies its robots at only 20% speed).\n\nThree kinds of logistic chest work with the network: a passive provider chest lets robots freely take items from it; a storage chest lets robots both drop off surplus items and take them again; a requester chest is where you tell the network what you need — open it, use the item picker on any of its 6 request slots to choose an item, and set how many you want. Robots then fly from provider/storage chests to fill the request automatically, as long as a roboport network with those chests is powered and stocked.\n\nEach roboport\'s GUI shows how many robots in its network are idle or busy, and how many logistic chests it covers — useful for spotting a starved or overloaded network.\n\nConstruction robots (second robot slot of the roboport) build ghosts and pasted blueprints on their own: every ghost inside a network\'s construction area (110×110 around each roboport) is built with an item taken from a provider or storage chest of that network. A ghost whose building is in no chest waits — the roboport window shows how many ghosts are missing materials. If the ghost disappears before the robot arrives, it brings the item back to a storage chest.\n\nThe deconstruction planner (X) marks buildings, trees and rocks with a red cross; construction robots take them down and carry the building, its contents or the wood/stone to the nearest storage chest. A network without a storage chest does not deconstruct.';
   EN['help.rocket'] = 'The rocket silo (9×9) crafts rocket parts from low density structure, rocket fuel and rocket control units, 20 parts per rocket. Feed its three input slots and keep it powered (1000 kW); its progress bar shows parts built so far.\n\nOnce all 20 parts are built the rocket rises into view and the silo is "Ready to launch". Drop a satellite into the satellite slot before launching to get a reward: launching without one is allowed (after a confirmation, since the rocket and any satellite aboard are lost) but produces nothing.\n\nPress Launch (or enable the auto-launch checkbox to launch automatically whenever ready and a satellite is loaded). The launch sequence takes about 20 seconds; a successful launch with a satellite fills the output slot with 1000 space science packs and starts a short cooldown before the silo can build parts again.\n\nYour first successful launch opens a victory screen with your play statistics and a "Continue playing" button — the game keeps going afterwards, and you can launch as many rockets as you like for more space science packs.';
 
   F.i18n.add('en', EN);
@@ -4301,6 +4309,32 @@ var F = window.F = {};
       }
     }
   }
+  // Force an underground's role ('in' = entrance, 'out' = exit), e.g. when a ghost or
+  // blueprint remembers it: an exit built before its entrance would otherwise become an
+  // unpaired entrance. Pairs with a matching unpaired partner in range when there is one.
+  belts.setUndergroundIO = function (e, io) {
+    if (!e || kind(e) !== 'underground' || (io !== 'in' && io !== 'out')) return false;
+    if (e.io === io && e.pairId) return true;
+    unpair(e);
+    pairUnderground(e);
+    if (e.io !== io) {
+      unpair(e);
+      e.io = io;
+      const d = def(e); const ug = (d && d.underground) || { maxGap: 4, tier: 'yellow' };
+      const v = DIRS[e.dir & 3], s = io === 'out' ? -1 : 1, want = io === 'out' ? 'in' : 'out';
+      for (let i = 1; i <= ug.maxGap + 1; i++) {
+        const o = F.world.entityAt(e.x + v[0] * i * s, e.y + v[1] * i * s);
+        if (!o || o === e) continue;
+        if (kind(o) === 'underground' && (o.dir & 3) === (e.dir & 3) && ((def(o).underground || {}).tier === ug.tier)) {
+          if (o.io === want && !o.pairId) { e.pairId = o.id; o.pairId = e.id; e.gap = o.gap = i - 1; }
+          break;
+        }
+      }
+    }
+    dirty = true;
+    return true;
+  };
+
   belts.onRotate = function (e) {
     if (!belts.isBeltLike(e)) return;
     if (kind(e) === 'underground') { unpair(e); pairUnderground(e); }
@@ -8938,40 +8972,62 @@ var F = window.F = {};
     return false;
   }
 
+  // Any logistic or construction robot of this network in the air?
+  function netBusy(net) {
+    var lists = [(F.state && F.state.robots) || [], (F.state && F.state.cbots) || []];
+    for (var l = 0; l < lists.length; l++) {
+      for (var i = 0; i < lists[l].length; i++) if (lists[l][i].net === net.id) return true;
+    }
+    return false;
+  }
+
   // =====================================================================
   // Behaviours
   // =====================================================================
   if (!F.behaviours) F.behaviours = {};
 
+  // Two one-slot robot inventories: `robots` (logistic robots) and `cbots` (construction
+  // robots, flown by 53-construction.js). No onRemove on purpose: networks are rebuilt by
+  // the entity:removed listener above, and without onRemove F.api.remove hands the robots
+  // (and a logistic chest's contents) back to the player instead of destroying them.
+  function robotInv(e, item) {
+    if (item === 'logistic-robot') return e.robots;
+    if (item === 'construction-robot') return e.cbots;
+    return null;
+  }
+
   F.behaviours['roboport'] = {
     create: function (e) {
       e.robots = F.inv.create(1);
+      e.cbots = F.inv.create(1);
       e.repair = null;
       markNetworksDirty();
     },
-    onRemove: function () { markNetworksDirty(); },
     wake: function (e) {
       if (!Array.isArray(e.robots)) e.robots = F.inv.create(1);
+      if (!Array.isArray(e.cbots)) e.cbots = F.inv.create(1);
       if (e.repair === undefined) e.repair = null;
     },
     accepts: function (e, item) {
-      if (item !== 'logistic-robot') return 0;
+      var inv = robotInv(e, item);
+      if (!inv) return 0;
       var stack = F.inv.stackSize(item);
-      var have = F.inv.count(e.robots, item);
+      var have = F.inv.count(inv, item);
       return Math.max(0, stack - have);
     },
     insert: function (e, item, count) {
-      if (item !== 'logistic-robot') return 0;
-      var remaining = F.inv.add(e.robots, item, count);
+      var inv = robotInv(e, item);
+      if (!inv) return 0;
+      var remaining = F.inv.add(inv, item, count);
       return count - remaining;
     },
-    take: function (e, filter) { return F.inv.takeOne(e.robots, filter); },
-    inventories: function (e) { return [{ name: 'robots', inv: e.robots }]; },
+    take: function (e, filter) { return F.inv.takeOne(e.robots, filter) || F.inv.takeOne(e.cbots, filter); },
+    inventories: function (e) { return [{ name: 'robots', inv: e.robots }, { name: 'cbots', inv: e.cbots }]; },
     status: function (e) {
       if (!F.power || !F.power.hasNetwork(e)) return 'not_connected';
       if (F.power.satisfaction(e) <= 0) return 'no_power';
       var net = netOfRoboport[e.id];
-      if (net && (F.state.robots || []).some(function (r) { return r.net === net.id; })) return 'working';
+      if (net && netBusy(net)) return 'working';
       return 'idle';
     },
   };
@@ -8985,7 +9041,6 @@ var F = window.F = {};
       if (e.mode === 'requester') e.requests = [null, null, null, null, null, null];
       markNetworksDirty();
     },
-    onRemove: function () { markNetworksDirty(); },
     wake: function (e) {
       var def = safeDef(e.type);
       if (!e.mode) e.mode = (def && def.logistic && def.logistic.mode) || 'storage';
@@ -9280,6 +9335,7 @@ var F = window.F = {};
       };
     },
     markDirty: markNetworksDirty,
+    isPowered: function (net) { return !!net && networkPowered(net); },
     count: function () { return ((F.state && F.state.robots) || []).length; },
     ROBOT_SPEED: ROBOT_SPEED,
     ROBOT_CAPACITY: ROBOT_CAPACITY,
@@ -9304,11 +9360,7 @@ var F = window.F = {};
   // Roboport working animation: pulses while its network has any active robot.
   RH.entityOpts['roboport'] = function (e, def, tick) {
     var net = netOfRoboport[e.id];
-    var working = false;
-    if (net) {
-      var robots = (F.state && F.state.robots) || [];
-      for (var i = 0; i < robots.length; i++) { if (robots[i].net === net.id) { working = true; break; } }
-    }
+    var working = !!(net && netBusy(net));
     var frame = working ? Math.floor(tick / 4) % 16 : 0;
     return { frame: frame, opts: { working: working } };
   };
@@ -9418,15 +9470,18 @@ var F = window.F = {};
   F._entityGUIs['roboport'] = function (root, e, def, h) {
     h.header(root, e, def);
     root.appendChild(h.el('div', 'f-section-title', F.t('ui.robots.slot')));
-    root.appendChild(h.slotGrid(e.robots, { cols: 1 }));
+    if (!Array.isArray(e.cbots)) e.cbots = F.inv.create(1);
+    root.appendChild(h.row(
+      h.labeled(F.t('item.logistic-robot'), h.slotGrid(e.robots, { cols: 1 })),
+      h.labeled(F.t('item.construction-robot'), h.slotGrid(e.cbots, { cols: 1 }))));
 
     var net = F.robots.networkOf(e);
     var stats = net ? F.robots.stats(net) : null;
     if (stats) {
       var netInfo = h.el('div', 'f-hint',
-        F.t('ui.robots.total') + ': ' + stats.robots + '  ' +
-        F.t('ui.robots.idle') + ': ' + stats.idle + '  ' +
-        F.t('ui.robots.busy') + ': ' + stats.busy);
+        F.t('item.logistic-robot') + ': ' + F.t('ui.robots.total') + ' ' + stats.robots + '  ' +
+        F.t('ui.robots.idle') + ' ' + stats.idle + '  ' +
+        F.t('ui.robots.busy') + ' ' + stats.busy);
       root.appendChild(netInfo);
       var chestInfo = h.el('div', 'f-hint',
         F.t('ui.robots.chests') + ': ' +
@@ -9434,6 +9489,15 @@ var F = window.F = {};
         stats.chests.storage + ' ' + F.t('ui.robots.storage') + ', ' +
         stats.chests.requester + ' ' + F.t('ui.robots.requester'));
       root.appendChild(chestInfo);
+      var cs = (F.construction && F.construction.stats) ? F.construction.stats(net) : null;
+      if (cs) {
+        root.appendChild(h.el('div', 'f-hint',
+          F.t('item.construction-robot') + ': ' + F.t('ui.robots.idle') + ' ' + cs.idle + '  ' +
+          F.t('ui.robots.busy') + ' ' + cs.busy + '  ·  ' + F.t('ui.robots.ghosts') + ' ' + cs.ghosts));
+        if (cs.missing > 0) root.appendChild(h.el('div', 'f-hint f-warn', F.t('ui.robots.missing', { n: cs.missing })));
+        if (cs.decon > 0) root.appendChild(h.el('div', 'f-hint', F.t('ui.robots.decon', { n: cs.decon })));
+        if (cs.noStorage > 0) root.appendChild(h.el('div', 'f-hint f-warn', F.t('ui.robots.noStorage')));
+      }
     } else {
       root.appendChild(h.el('div', 'f-hint', F.t('ui.robots.noNetwork')));
     }
@@ -9514,6 +9578,10 @@ var F = window.F = {};
       'ui.robots.requester': 'requester',
       'ui.robots.requests': 'Requests',
       'ui.robots.noNetwork': 'Not in range of a roboport network',
+      'ui.robots.ghosts': 'ghosts in range',
+      'ui.robots.decon': '{n} marked for deconstruction in range',
+      'ui.robots.noStorage': 'Deconstruction waits: this network has no storage chest',
+      'ui.robots.missing': '{n} ghosts are missing materials (put the buildings in a provider or storage chest)',
     });
   }
 })();
@@ -11089,6 +11157,9 @@ var F = window.F = {};
     } else if (F.world && typeof F.world.buildable === 'function') {
       for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
         const x = tx + i, y = ty + j;
+        // opts.ignoreFeatures: trees/rocks do not block (ghosts over them get the tree/rock
+        // marked for deconstruction instead, 51-ghosts.js / 54-deconstruction.js).
+        if (opts.ignoreFeatures && F.world.feature && F.world.feature(x, y) && F.world.isLand(x, y) && !F.world.entityAt(x, y)) continue;
         if (!F.world.buildable(x, y)) {
           if (typeof F.world.isWater === 'function' && F.world.isWater(x, y)) return { ok: false, reason: 'water' };
           return { ok: false, reason: 'collision' };
@@ -11096,7 +11167,8 @@ var F = window.F = {};
       }
     }
     // Never build on top of the player (0.4x0.4 collision box) unless the entity is walkable (belts etc.).
-    if (def.collides !== false && F.state && F.state.player && !F.state.player.dead) {
+    // opts.ignorePlayer skips this for ghosts (51-ghosts.js), which may be planned under the player.
+    if (!opts.ignorePlayer && def.collides !== false && F.state && F.state.player && !F.state.player.dead) {
       const pl = F.state.player;
       const x0 = Math.floor(pl.x - 0.2), x1 = Math.floor(pl.x + 0.2), y0 = Math.floor(pl.y - 0.2), y1 = Math.floor(pl.y + 0.2);
       if (x1 >= tx && x0 < tx + w && y1 >= ty && y0 < ty + h) return { ok: false, reason: 'collision' };
@@ -11146,9 +11218,12 @@ var F = window.F = {};
     return e;
   }
 
+  // opts.collect (array): instead of giving the entity item + contents to the player, push
+  // [itemId, count] pairs onto it (construction robots deconstructing, 54-deconstruction.js).
   function remove(tx, ty, opts) {
     opts = opts || {};
     const toInventory = opts.toInventory !== false; // default true per ARCHITECTURE §15
+    const collect = Array.isArray(opts.collect) ? opts.collect : null;
     if (!F.world || typeof F.world.entityAt !== 'function') { F.log.warn('F.api.remove: F.world not available'); return false; }
     const e = F.world.entityAt(tx, ty);
     if (!e) return false;
@@ -11181,11 +11256,13 @@ var F = window.F = {};
       for (let i = 0; i < contents.length; i++) {
         const id = contents[i][0], count = contents[i][1];
         if (!id || !count) continue;
-        if (toInventory) giveOrDropAt(id, count, cx, cy); else dropNearFallback(id, count, cx, cy);
+        if (collect) collect.push([id, count]);
+        else if (toInventory) giveOrDropAt(id, count, cx, cy); else dropNearFallback(id, count, cx, cy);
       }
     }
     if (itemId) {
-      if (toInventory) giveOrDropAt(itemId, 1, cx, cy); else dropNearFallback(itemId, 1, cx, cy);
+      if (collect) collect.push([itemId, 1]);
+      else if (toInventory) giveOrDropAt(itemId, 1, cx, cy); else dropNearFallback(itemId, 1, cx, cy);
     }
 
     afterTopologyChange(e, def);
@@ -11632,6 +11709,1934 @@ var F = window.F = {};
   // canPlace()'s `reason` codes and status strings are consumed and translated
   // by 70-ui.js (their key names are fixed by the enum in ARCHITECTURE §15 /
   // GDD §6.2, not chosen by this module).
+})();
+
+
+// ===================== 51-ghosts.js =====================
+// 51-ghosts.js — entity ghosts: planned buildings that exist only as a translucent outline
+// until someone builds them (by hand today; construction robots and blueprints build on
+// the same store later).
+//
+// Ghosts are NOT entities. They live in their own store, F.state.ghosts = { nextId, list },
+// with a tile -> ghost map kept here, so belts/power/fluids/inserters/robots never see them
+// and every existing system behaves exactly as before. A ghost is a plain JSON object:
+//   { id, type /* F.data.entities id */, x, y, dir, w, h, settings: null | {...} }
+// `settings` is what captureSettings() read off a real entity (recipe, inserter filters,
+// splitter priorities, requester slots, train-stop name, ...) and is applied to the entity
+// that eventually gets built on the ghost.
+//
+// Rules:
+//   - A ghost may only go where the real entity could go (F.api.canPlace, except that the
+//     player standing there, and trees/rocks — which get marked for deconstruction — do not
+//     block it). It never overlaps a real entity.
+//   - Placing a ghost over other ghosts replaces them (an identical ghost is kept instead).
+//   - Whenever a real entity is created (F.entities.create -> 'entity:placed'), every ghost
+//     under its footprint is removed; a ghost of the same type at the same anchor tile hands
+//     its settings over first. So building "on top of" a ghost by any route fulfils it.
+//
+// F.ghosts:
+//   canPlace(type, tx, ty, dir) -> { ok, reason }
+//   place(type, tx, ty, dir, settings?) -> ghost | null
+//   at(tx, ty) -> ghost | null        byId(id) -> ghost | null
+//   all() -> array (live list; do not mutate)       count() -> n
+//   remove(ghost) -> bool             removeAt(tx, ty) -> bool
+//   setDir(ghost, dir) -> bool        (same footprint only; used by belt drags)
+//   itemFor(ghostOrType) -> item id that builds it
+//   build(ghost, opts?) -> entity | null   hand-build from the player's inventory
+//                                          (opts.fromInventory default true, opts.checkReach)
+//   captureSettings(entity) -> settings | null     applySettings(entity, settings)
+//   inRect(x0, y0, x1, y1) -> ghosts overlapping the tile rect (inclusive)
+//   blockedByFeature(ghost) -> bool      a tree/rock still stands on it (planned over one: it
+//                                          is marked for deconstruction, 54-deconstruction.js)
+//   drawSprite(ctx, cam, type, dir, tx, ty, settings, bad)  draw a planned entity (blue, or
+//                                          red when `bad`); also used by blueprint previews
+//
+// Registers: onNewGame/onRebuild hooks (queue pattern, design/EXPANSION.md §6.1) and an
+// 'objects' + 'overlay' render layer (F._renderHooks, EXPANSION §6.5). Headless safe.
+(function () {
+  'use strict';
+
+  F.i18n.add('en', {
+    'ghost.label': 'Ghost: {name}',
+    'ghost.missing': 'Missing {name}',
+    'ghost.too_far': 'Too far to build',
+    'ghost.blocked': 'Cannot build here',
+  });
+
+  // =====================================================================
+  // State + tile map
+  // =====================================================================
+  var tileMap = new Map(); // "x,y" -> ghost (runtime cache, rebuilt on load)
+
+  function store() {
+    if (!F.state) return null;
+    var g = F.state.ghosts;
+    if (!g || typeof g !== 'object' || !Array.isArray(g.list)) {
+      g = F.state.ghosts = { nextId: 1, list: [] };
+    }
+    if (typeof g.nextId !== 'number') g.nextId = 1;
+    return g;
+  }
+
+  function key(x, y) { return x + ',' + y; }
+
+  function setTiles(g, present) {
+    for (var j = 0; j < g.h; j++) {
+      for (var i = 0; i < g.w; i++) {
+        var k = key(g.x + i, g.y + j);
+        if (present) tileMap.set(k, g);
+        else if (tileMap.get(k) === g) tileMap.delete(k);
+      }
+    }
+  }
+
+  function rebuild() {
+    tileMap = new Map();
+    var s = store();
+    if (!s) return;
+    var maxId = 0;
+    var kept = [];
+    for (var i = 0; i < s.list.length; i++) {
+      var g = s.list[i];
+      if (!g || typeof g.type !== 'string' || !F.data.entities[g.type]) continue; // removed content
+      var fp = F.entities.footprint(F.data.entities[g.type], g.dir & 3);
+      g.w = fp[0]; g.h = fp[1];
+      kept.push(g);
+      setTiles(g, true);
+      if (g.id > maxId) maxId = g.id;
+    }
+    s.list = kept;
+    if (s.nextId <= maxId) s.nextId = maxId + 1;
+  }
+
+  F.game = F.game || {};
+  (F.game._onNewGame = F.game._onNewGame || []).push(function () {
+    F.state.ghosts = { nextId: 1, list: [] };
+    tileMap = new Map();
+  });
+  (F.game._onRebuild = F.game._onRebuild || []).push(rebuild);
+
+  // =====================================================================
+  // Queries
+  // =====================================================================
+  function at(tx, ty) { return tileMap.get(key(tx, ty)) || null; }
+
+  function byId(id) {
+    var s = store();
+    if (!s) return null;
+    for (var i = 0; i < s.list.length; i++) if (s.list[i].id === id) return s.list[i];
+    return null;
+  }
+
+  function all() { var s = store(); return s ? s.list : []; }
+  function count() { return all().length; }
+
+  function itemFor(g) {
+    var type = typeof g === 'string' ? g : (g && g.type);
+    var def = type && F.data.entities[type];
+    return (def && def.minable) || type || null;
+  }
+
+  // Unique ghosts overlapping a tile rect (inclusive bounds).
+  function inRect(x0, y0, x1, y1) {
+    var out = [];
+    var list = all();
+    for (var i = 0; i < list.length; i++) {
+      var g = list[i];
+      if (g.x > x1 || g.y > y1 || g.x + g.w - 1 < x0 || g.y + g.h - 1 < y0) continue;
+      out.push(g);
+    }
+    return out;
+  }
+
+  function overlapping(tx, ty, w, h) {
+    var seen = [];
+    for (var j = 0; j < h; j++) {
+      for (var i = 0; i < w; i++) {
+        var g = tileMap.get(key(tx + i, ty + j));
+        if (g && seen.indexOf(g) < 0) seen.push(g);
+      }
+    }
+    return seen;
+  }
+
+  // =====================================================================
+  // Place / remove
+  // =====================================================================
+  function placeableDef(type) {
+    var def = F.data.entities[type];
+    if (!def || def.natural) return null;
+    var item = def.minable;
+    if (!item || !F.data.items[item] || F.data.items[item].place !== type) return null;
+    return def;
+  }
+
+  function canPlace(type, tx, ty, dir) {
+    if (!placeableDef(type)) return { ok: false, reason: 'collision' };
+    tx = tx | 0; ty = ty | 0;
+    // Trees and rocks do not block a ghost: place() marks them for deconstruction.
+    var chk = F.api.canPlace(type, tx, ty, (dir | 0) & 3, { ignorePlayer: true, ignoreFeatures: !!F.deconstruction });
+    // A planned train stop may lean on a planned rail (blueprints place both as ghosts);
+    // building the stop by hand still needs the real rail first.
+    if (!chk.ok && chk.reason === 'no_rail' && hasGhostNeighbour(tx, ty, 'rail')) return { ok: true, reason: null };
+    return chk;
+  }
+
+  function hasGhostNeighbour(tx, ty, behaviour) {
+    for (var d = 0; d < 4; d++) {
+      var v = F.C.DIRS[d];
+      var g = tileMap.get(key(tx + v[0], ty + v[1]));
+      var gd = g && F.data.entities[g.type];
+      if (gd && gd.behaviour === behaviour) return true;
+    }
+    return false;
+  }
+
+  function cloneSettings(s) {
+    return s ? JSON.parse(JSON.stringify(s)) : null;
+  }
+
+  function place(type, tx, ty, dir, settings) {
+    var s = store();
+    if (!s) return null;
+    tx = tx | 0; ty = ty | 0; dir = (dir | 0) & 3;
+    var chk = canPlace(type, tx, ty, dir);
+    if (!chk.ok) return null;
+    var def = F.data.entities[type];
+    var fp = F.entities.footprint(def, dir);
+    var over = overlapping(tx, ty, fp[0], fp[1]);
+    for (var i = 0; i < over.length; i++) {
+      var o = over[i];
+      if (o.type === type && o.x === tx && o.y === ty && o.dir === dir) {
+        if (settings) o.settings = cloneSettings(settings);
+        return o;
+      }
+    }
+    for (var k = 0; k < over.length; k++) remove(over[k]);
+    var g = { id: s.nextId++, type: type, x: tx, y: ty, dir: dir, w: fp[0], h: fp[1], settings: cloneSettings(settings) };
+    s.list.push(g);
+    setTiles(g, true);
+    if (F.deconstruction) {
+      for (var fy = 0; fy < fp[1]; fy++) for (var fx = 0; fx < fp[0]; fx++) {
+        if (F.world.feature(tx + fx, ty + fy)) F.deconstruction.markFeature(tx + fx, ty + fy);
+      }
+    }
+    F.events.emit('ghost:placed', g);
+    return g;
+  }
+
+  function remove(g) {
+    var s = store();
+    if (!s || !g) return false;
+    var i = s.list.indexOf(g);
+    if (i < 0) return false;
+    s.list.splice(i, 1);
+    setTiles(g, false);
+    F.events.emit('ghost:removed', g);
+    return true;
+  }
+
+  // True while a tree or rock still stands on the ghost's footprint (robots wait for it).
+  function blockedByFeature(g) {
+    for (var j = 0; j < g.h; j++) for (var i = 0; i < g.w; i++) if (F.world.feature(g.x + i, g.y + j)) return true;
+    return false;
+  }
+
+  function removeAt(tx, ty) {
+    var g = at(tx, ty);
+    return g ? remove(g) : false;
+  }
+
+  function setDir(g, dir) {
+    if (!g) return false;
+    dir = (dir | 0) & 3;
+    var def = F.data.entities[g.type];
+    if (!def || !def.rotatable) return false;
+    var fp = F.entities.footprint(def, dir);
+    if (fp[0] !== g.w || fp[1] !== g.h) return false;
+    g.dir = dir;
+    return true;
+  }
+
+  // =====================================================================
+  // Settings: what a ghost remembers about the entity it stands for.
+  // Plain keys are copied only when the freshly built entity already has
+  // that key (its behaviour's create() initialised it), so a setting can
+  // never leak onto an entity type that does not understand it.
+  // =====================================================================
+  var PLAIN_KEYS = ['filter', 'filterMode', 'inPrio', 'outPrio', 'requests', 'autoLaunch'];
+
+  // Values every freshly created entity already has: not worth remembering.
+  function isDefault(v) {
+    if (v === undefined || v === null || v === false || v === 0) return true;
+    if (Array.isArray(v)) {
+      for (var i = 0; i < v.length; i++) if (v[i] !== null && v[i] !== undefined) return false;
+      return true;
+    }
+    return false;
+  }
+
+  function captureSettings(e) {
+    if (!e) return null;
+    var def = F.data.entities[e.type];
+    var out = {};
+    var any = false;
+    if (e.recipe && def && (def.behaviour === 'assembler' || def.behaviour === 'crafter')) { out.recipe = e.recipe; any = true; }
+    for (var i = 0; i < PLAIN_KEYS.length; i++) {
+      var k = PLAIN_KEYS[i];
+      if (isDefault(e[k])) continue;
+      out[k] = JSON.parse(JSON.stringify(e[k]));
+      any = true;
+    }
+    // A filter mode means nothing without a filter (every inserter carries one).
+    if (out.filterMode !== undefined && out.filter === undefined) {
+      delete out.filterMode;
+      any = Object.keys(out).length > 0;
+    }
+    if (def && def.behaviour === 'train-stop' && e.name) { out.name = e.name; any = true; }
+    // Entrance or exit: an exit built before its entrance must not turn into an entrance.
+    if (def && def.behaviour === 'underground' && (e.io === 'in' || e.io === 'out')) { out.io = e.io; any = true; }
+    return any ? out : null;
+  }
+
+  function applySettings(e, s) {
+    if (!e || !s) return;
+    var def = F.data.entities[e.type];
+    if (!def) return;
+    if (s.recipe) {
+      try {
+        if (def.behaviour === 'crafter' && F.oil && typeof F.oil.setRecipe === 'function') F.oil.setRecipe(e, s.recipe);
+        else if (def.behaviour === 'assembler') F.api.setRecipe(e, s.recipe);
+      } catch (err) { F.log.warn('[ghosts] recipe not applied', e.type, s.recipe, err); }
+    }
+    for (var i = 0; i < PLAIN_KEYS.length; i++) {
+      var k = PLAIN_KEYS[i];
+      if (s[k] === undefined || !(k in e)) continue;
+      e[k] = JSON.parse(JSON.stringify(s[k]));
+    }
+    if (def.behaviour === 'train-stop' && typeof s.name === 'string' && s.name) e.name = s.name.slice(0, 40);
+    if (def.behaviour === 'underground' && s.io && F.belts && typeof F.belts.setUndergroundIO === 'function') F.belts.setUndergroundIO(e, s.io);
+  }
+
+  // A real entity appeared: clear every ghost under it, handing the settings of a
+  // matching ghost (same type, same anchor) to the new entity.
+  F.events.on('entity:placed', function (e) {
+    if (!e || e._removed || !tileMap.size) return;
+    var over = overlapping(e.x, e.y, e.w || 1, e.h || 1);
+    for (var i = 0; i < over.length; i++) {
+      var g = over[i];
+      if (g.type === e.type && g.x === e.x && g.y === e.y && g.settings) applySettings(e, g.settings);
+      remove(g);
+    }
+  });
+
+  // =====================================================================
+  // Hand building
+  // =====================================================================
+  // Builds `g` from the player's inventory. Returns the entity, or null with
+  // F.ghosts.lastFailure set to 'missing' | 'too_far' | 'blocked'.
+  function build(g, opts) {
+    opts = opts || {};
+    ghosts.lastFailure = null;
+    if (!g || all().indexOf(g) < 0) { ghosts.lastFailure = 'blocked'; return null; }
+    var fromInventory = opts.fromInventory !== false;
+    var item = itemFor(g);
+    if (fromInventory && F.api.inventoryCount(item) < 1) { ghosts.lastFailure = 'missing'; return null; }
+    var chk = F.api.canPlace(g.type, g.x, g.y, g.dir, { checkReach: !!opts.checkReach });
+    if (!chk.ok) { ghosts.lastFailure = chk.reason === 'out_of_reach' ? 'too_far' : 'blocked'; return null; }
+    var e = F.api.place(g.type, g.x, g.y, g.dir, { fromInventory: fromInventory });
+    if (!e) { ghosts.lastFailure = 'blocked'; return null; }
+    // The 'entity:placed' listener above already removed the ghost and applied its settings.
+    return e;
+  }
+
+  // =====================================================================
+  // Rendering (browser only; no-ops headless because F.sprites is disabled)
+  // =====================================================================
+  var GHOST_TINT = 'rgba(110,190,255,0.6)';
+  var BAD_TINT = 'rgba(255,80,70,0.65)';
+  var tintCaches = Object.create(null); // colour -> WeakMap(sprite canvas -> tinted copy)
+
+  function tinted(spr, color) {
+    if (!spr || !spr.width || typeof WeakMap !== 'function' || typeof document === 'undefined') return null;
+    var cache = tintCaches[color] || (tintCaches[color] = new WeakMap());
+    var c = cache.get(spr);
+    if (c) return c;
+    c = document.createElement('canvas');
+    c.width = spr.width; c.height = spr.height;
+    var x = c.getContext('2d');
+    x.drawImage(spr, 0, 0);
+    x.globalCompositeOperation = 'source-atop';
+    x.fillStyle = color;
+    x.fillRect(0, 0, c.width, c.height);
+    cache.set(spr, c);
+    return c;
+  }
+
+  // Draws one planned entity (a ghost, or an entry of a blueprint preview) at tile
+  // (tx, ty): the entity sprite tinted blue — or red when `bad` — with a dashed outline.
+  function drawSprite(ctx, cam, type, dir, tx, ty, settings, bad) {
+    var def = F.data.entities[type];
+    if (!def) return;
+    var fp = F.entities.footprint(def, dir & 3);
+    var size = F.C.TILE * (cam.zoom || 1);
+    var p = cam.toScreen(tx, ty);
+    var w = fp[0] * size, h = fp[1] * size;
+    var opts = (def.behaviour === 'underground' && settings && settings.io) ? { io: settings.io } : null;
+    var spr = null;
+    try { spr = F.sprites.entity(type, dir & 3, 0, opts); } catch (err) { spr = null; }
+    var color = bad ? BAD_TINT : GHOST_TINT;
+    var t = tinted(spr, color);
+    ctx.save();
+    if (t) {
+      ctx.globalAlpha = 0.55;
+      ctx.drawImage(t, p[0], p[1], w, h);
+    } else {
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = color;
+      ctx.fillRect(p[0], p[1], w, h);
+    }
+    ctx.globalAlpha = 0.8;
+    ctx.strokeStyle = bad ? 'rgba(255,120,110,0.9)' : 'rgba(140,205,255,0.9)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.strokeRect(p[0] + 1.5, p[1] + 1.5, w - 3, h - 3);
+    ctx.restore();
+  }
+
+  F._renderHooks = F._renderHooks || {
+    layers: { floor: [], objects: [], air: [], overlay: [] },
+    entityOpts: {}, minimapColors: {}, hidePlayerFns: [], altOverlayFns: [],
+  };
+
+  F._renderHooks.layers.objects.push(function (ctx, rect, cam) {
+    if (!F.sprites || !F.sprites.enabled || !tileMap.size) return;
+    var list = inRect(rect.x0 - 1, rect.y0 - 1, rect.x1 + 1, rect.y1 + 1);
+    for (var i = 0; i < list.length; i++) {
+      var g = list[i];
+      drawSprite(ctx, cam, g.type, g.dir, g.x, g.y, g.settings, false);
+    }
+  });
+
+  // Hover highlight for the ghost under the cursor (real entities get the selection box).
+  F._renderHooks.layers.overlay.push(function (ctx, rect, cam) {
+    if (!F.sprites || !F.sprites.enabled || !tileMap.size || !F.input || !F.input.worldCursor) return;
+    var c = F.input.worldCursor();
+    var g = at(c[0], c[1]);
+    if (!g) return;
+    var size = F.C.TILE * (cam.zoom || 1);
+    var p = cam.toScreen(g.x, g.y);
+    ctx.save();
+    ctx.strokeStyle = '#bfe3ff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(p[0], p[1], g.w * size, g.h * size);
+    ctx.restore();
+  });
+
+  var ghosts = {
+    canPlace: canPlace,
+    place: place,
+    at: at,
+    byId: byId,
+    all: all,
+    count: count,
+    remove: remove,
+    removeAt: removeAt,
+    setDir: setDir,
+    itemFor: itemFor,
+    build: build,
+    captureSettings: captureSettings,
+    applySettings: applySettings,
+    inRect: inRect,
+    drawSprite: drawSprite,
+    blockedByFeature: blockedByFeature,
+    lastFailure: null,
+  };
+  F.ghosts = ghosts;
+})();
+
+
+// ===================== 52-blueprints.js =====================
+// 52-blueprints.js — blueprints: a copied area of buildings (and ghosts) that can be
+// rotated and pasted elsewhere as ghosts (see 51-ghosts.js), then built by hand.
+//
+// A blueprint is plain JSON:
+//   { w, h, entities: [{ type, x, y, dir, settings? }] }
+// x/y are the entity's top-left tile relative to the blueprint's top-left, w/h the size
+// of the bounding box of all entities. `settings` is F.ghosts.captureSettings() output
+// (recipe, filters, requester slots, underground role, ...). Entities are sorted rails
+// first, then top-to-bottom, left-to-right, so pasting is deterministic and planned rails
+// exist before the train stops next to them.
+//
+// F.blueprints:
+//   create(x0, y0, x1, y1) -> blueprint | null   copy every player-built entity and ghost
+//                                                 touching the tile rect (inclusive)
+//   rotate(bp, turns=1) -> new blueprint          90° clockwise per turn (negative = ccw;
+//                                                 0 = just a normalised copy)
+//   check(bp, ox, oy) -> [bool]                   per entity: can it be planned at offset?
+//   place(bp, ox, oy) -> { placed, existing, blocked }   plan ghosts with the top-left at
+//                                                 (ox, oy); an identical real building
+//                                                 already there counts as `existing`
+//   count(bp) -> { itemId: n }                    items needed to build it
+//   clipboard() / setClipboard(bp)                last copied blueprint, kept in the save
+//                                                 (F.state.blueprints.clipboard)
+//
+// The copy tool and paste cursor live in 75-input.js (F.input.selecting / F.input.blueprint);
+// this file draws them via an 'air' render layer. Headless safe.
+(function () {
+  'use strict';
+
+  F.i18n.add('en', {
+    'bp.empty': 'Nothing to copy here',
+    'bp.copied': 'Copied {n} buildings — click to place, R to rotate, Q to drop',
+    'bp.placed': 'Planned {n} ghosts',
+    'bp.blocked': '{n} could not be placed',
+    'bp.no_clipboard': 'Nothing copied yet (Ctrl+C or B, then drag over buildings)',
+  });
+
+  // =====================================================================
+  // State
+  // =====================================================================
+  function store() {
+    if (!F.state) return null;
+    var s = F.state.blueprints;
+    if (!s || typeof s !== 'object') s = F.state.blueprints = { clipboard: null };
+    return s;
+  }
+
+  F.game = F.game || {};
+  (F.game._onNewGame = F.game._onNewGame || []).push(function () { F.state.blueprints = { clipboard: null }; });
+  (F.game._onRebuild = F.game._onRebuild || []).push(function () {
+    var s = store();
+    if (s && s.clipboard) s.clipboard = sanitize(s.clipboard);
+  });
+
+  // Drop entries whose entity type no longer exists (old saves); null when nothing is left.
+  function sanitize(bp) {
+    if (!bp || !Array.isArray(bp.entities)) return null;
+    var list = bp.entities.filter(function (en) { return en && placeable(en.type); });
+    if (!list.length) return null;
+    return normalise(list.map(function (en) { return { type: en.type, x: en.x | 0, y: en.y | 0, dir: (en.dir | 0) & 3, settings: en.settings || null }; }));
+  }
+
+  function clipboard() { var s = store(); return s ? s.clipboard : null; }
+  function setClipboard(bp) { var s = store(); if (s) s.clipboard = bp ? clone(bp) : null; }
+
+  // =====================================================================
+  // Helpers
+  // =====================================================================
+  function clone(v) { return JSON.parse(JSON.stringify(v)); }
+
+  function placeable(type) {
+    var def = F.data.entities[type];
+    if (!def || def.natural || !def.minable) return false;
+    var item = F.data.items[def.minable];
+    return !!(item && item.place === type);
+  }
+
+  function footprint(type, dir) { return F.entities.footprint(F.data.entities[type], dir & 3); }
+
+  function isFloor(type) { var d = F.data.entities[type]; return !!(d && d.layer === 'floor'); }
+
+  // Shift entries so the bounding box starts at 0,0, sort them, and compute w/h.
+  function normalise(list) {
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (var i = 0; i < list.length; i++) {
+      var en = list[i], fp = footprint(en.type, en.dir);
+      if (en.x < minX) minX = en.x;
+      if (en.y < minY) minY = en.y;
+      if (en.x + fp[0] - 1 > maxX) maxX = en.x + fp[0] - 1;
+      if (en.y + fp[1] - 1 > maxY) maxY = en.y + fp[1] - 1;
+    }
+    var out = list.map(function (en) {
+      var o = { type: en.type, x: en.x - minX, y: en.y - minY, dir: en.dir & 3 };
+      if (en.settings) o.settings = clone(en.settings);
+      return o;
+    });
+    out.sort(function (a, b) {
+      var fa = isFloor(a.type) ? 0 : 1, fb = isFloor(b.type) ? 0 : 1;
+      return (fa - fb) || (a.y - b.y) || (a.x - b.x);
+    });
+    return { w: maxX - minX + 1, h: maxY - minY + 1, entities: out };
+  }
+
+  // =====================================================================
+  // create / rotate
+  // =====================================================================
+  function create(x0, y0, x1, y1) {
+    var ax = Math.min(x0, x1), bx = Math.max(x0, x1), ay = Math.min(y0, y1), by = Math.max(y0, y1);
+    var list = [];
+    var ents = F.entities.all();
+    for (var i = 0; i < ents.length; i++) {
+      var e = ents[i];
+      if (!e || e._removed || !placeable(e.type)) continue;
+      if (e.x > bx || e.y > by || e.x + e.w - 1 < ax || e.y + e.h - 1 < ay) continue;
+      list.push({ type: e.type, x: e.x, y: e.y, dir: e.dir & 3, settings: F.ghosts.captureSettings(e) });
+    }
+    var gs = F.ghosts.inRect(ax, ay, bx, by);
+    for (var j = 0; j < gs.length; j++) {
+      var g = gs[j];
+      list.push({ type: g.type, x: g.x, y: g.y, dir: g.dir & 3, settings: g.settings || null });
+    }
+    if (!list.length) return null;
+    return normalise(list);
+  }
+
+  // Direction after turning an entity clockwise `turns` times, respecting allowedDirs
+  // (a steam engine only has N/E: S and W look the same, so they fold onto them).
+  function turnDir(type, dir, turns) {
+    var def = F.data.entities[type];
+    if (!def.rotatable) return 0;
+    var d = (dir + turns) & 3;
+    if (Array.isArray(def.allowedDirs) && def.allowedDirs.indexOf(d) < 0) {
+      d = def.allowedDirs.indexOf(d & 1) >= 0 ? (d & 1) : def.allowedDirs[0];
+    }
+    return d;
+  }
+
+  function rotate(bp, turns) {
+    turns = (((turns == null ? 1 : turns) % 4) + 4) % 4;
+    var cur = normalise(bp.entities);
+    for (var t = 0; t < turns; t++) {
+      var H = cur.h;
+      var list = cur.entities.map(function (en) {
+        var fp = footprint(en.type, en.dir);
+        // A tile (x, y) moves to (H-1-y, x); the entity's new top-left follows from its
+        // footprint. Non-rotatable entities are all square, so their footprint is unchanged.
+        return { type: en.type, x: H - en.y - fp[1], y: en.x, dir: turnDir(en.type, en.dir, 1), settings: en.settings || null };
+      });
+      cur = normalise(list);
+    }
+    return cur;
+  }
+
+  // =====================================================================
+  // check / place
+  // =====================================================================
+  function existingMatch(en, tx, ty) {
+    var e = F.world.entityAt(tx, ty);
+    return !!(e && !e._removed && e.type === en.type && e.x === tx && e.y === ty && (e.dir & 3) === (en.dir & 3));
+  }
+
+  function check(bp, ox, oy) {
+    var out = [];
+    if (!bp) return out;
+    var rails = null;
+    for (var i = 0; i < bp.entities.length; i++) {
+      var en = bp.entities[i], tx = ox + en.x, ty = oy + en.y;
+      if (existingMatch(en, tx, ty)) { out.push(true); continue; }
+      var chk = F.ghosts.canPlace(en.type, tx, ty, en.dir);
+      if (!chk.ok && chk.reason === 'no_rail') {
+        // The blueprint's own rails are planned first when pasting (see normalise()).
+        if (!rails) rails = railTiles(bp);
+        chk = { ok: nextToRail(rails, en.x, en.y) };
+      }
+      out.push(!!chk.ok);
+    }
+    return out;
+  }
+
+  function railTiles(bp) {
+    var set = Object.create(null);
+    for (var i = 0; i < bp.entities.length; i++) {
+      var d = F.data.entities[bp.entities[i].type];
+      if (d && d.behaviour === 'rail') set[bp.entities[i].x + ',' + bp.entities[i].y] = true;
+    }
+    return set;
+  }
+
+  function nextToRail(set, x, y) {
+    for (var d = 0; d < 4; d++) {
+      var v = F.C.DIRS[d];
+      if (set[(x + v[0]) + ',' + (y + v[1])]) return true;
+    }
+    return false;
+  }
+
+  function place(bp, ox, oy) {
+    var res = { placed: 0, existing: 0, blocked: 0 };
+    if (!bp) return res;
+    // Earlier entries of this paste must not be replaced by later overlapping ones.
+    var own = Object.create(null);
+    for (var i = 0; i < bp.entities.length; i++) {
+      var en = bp.entities[i], tx = ox + en.x, ty = oy + en.y;
+      if (existingMatch(en, tx, ty)) { res.existing++; continue; }
+      if (overlapsOwn(en, tx, ty, own)) { res.blocked++; continue; }
+      var g = F.ghosts.place(en.type, tx, ty, en.dir, en.settings || null);
+      if (g) { own[g.id] = true; res.placed++; } else res.blocked++;
+    }
+    return res;
+  }
+
+  function overlapsOwn(en, tx, ty, own) {
+    var fp = footprint(en.type, en.dir);
+    for (var j = 0; j < fp[1]; j++) for (var i = 0; i < fp[0]; i++) {
+      var g = F.ghosts.at(tx + i, ty + j);
+      if (g && own[g.id]) return true;
+    }
+    return false;
+  }
+
+  function count(bp) {
+    var out = {};
+    if (!bp) return out;
+    for (var i = 0; i < bp.entities.length; i++) {
+      var item = F.ghosts.itemFor(bp.entities[i].type);
+      out[item] = (out[item] || 0) + 1;
+    }
+    return out;
+  }
+
+  // =====================================================================
+  // Rendering: copy-tool selection box and the paste preview (browser only)
+  // =====================================================================
+  var checkCache = { bp: null, key: '', frame: 0, result: [] };
+  var frameNo = 0;
+
+  function cachedCheck(bp, ox, oy) {
+    frameNo++;
+    var k = ox + ',' + oy;
+    // Re-validate when the cursor moves, the blueprint changes, or twice a second anyway
+    // (the world under a still cursor can change too).
+    if (checkCache.bp !== bp || checkCache.key !== k || frameNo - checkCache.frame > 30) {
+      checkCache.bp = bp; checkCache.key = k; checkCache.frame = frameNo;
+      checkCache.result = check(bp, ox, oy);
+    }
+    return checkCache.result;
+  }
+
+  F._renderHooks = F._renderHooks || {
+    layers: { floor: [], objects: [], air: [], overlay: [] },
+    entityOpts: {}, minimapColors: {}, hidePlayerFns: [], altOverlayFns: [],
+  };
+
+  F._renderHooks.layers.air.push(function (ctx, rect, cam) {
+    if (!F.sprites || !F.sprites.enabled || !F.input) return;
+    var size = F.C.TILE * (cam.zoom || 1);
+
+    var sel = F.input.selecting;
+    if (sel) {
+      var c = F.input.worldCursor();
+      var a = sel.start || c, b = sel.start ? (sel.end || c) : c;
+      var x0 = Math.min(a[0], b[0]), y0 = Math.min(a[1], b[1]);
+      var x1 = Math.max(a[0], b[0]) + 1, y1 = Math.max(a[1], b[1]) + 1;
+      var p0 = cam.toScreen(x0, y0), p1 = cam.toScreen(x1, y1);
+      // Copy: blue. Cut (copy + deconstruct): orange. Deconstruction planner: red, or green
+      // while Shift is held (cancels marks).
+      var col = sel.mode === 'decon' ? (sel.unmark ? [110, 220, 120] : [255, 90, 70]) : sel.mode === 'cut' ? [255, 170, 70] : [120, 200, 255];
+      var rgba = function (a) { return 'rgba(' + col[0] + ',' + col[1] + ',' + col[2] + ',' + a + ')'; };
+      ctx.save();
+      if (sel.start) {
+        // Outline everything the box would affect.
+        ctx.strokeStyle = rgba(0.9);
+        ctx.lineWidth = 2;
+        var ents = F.entities.all();
+        for (var i = 0; i < ents.length; i++) {
+          var e = ents[i];
+          if (!e || e._removed || !placeable(e.type)) continue;
+          if (e.x >= x1 || e.y >= y1 || e.x + e.w <= x0 || e.y + e.h <= y0) continue;
+          var q = cam.toScreen(e.x, e.y);
+          ctx.strokeRect(q[0] + 2, q[1] + 2, e.w * size - 4, e.h * size - 4);
+        }
+        if (sel.mode === 'decon' && (x1 - x0) * (y1 - y0) <= 40000) {
+          for (var fy = Math.max(y0, rect.y0 - 1); fy < Math.min(y1, rect.y1 + 2); fy++) {
+            for (var fx = Math.max(x0, rect.x0 - 1); fx < Math.min(x1, rect.x1 + 2); fx++) {
+              if (!F.world.feature(fx, fy)) continue;
+              var fq = cam.toScreen(fx, fy);
+              ctx.strokeRect(fq[0] + 3, fq[1] + 3, size - 6, size - 6);
+            }
+          }
+        }
+        ctx.fillStyle = rgba(0.12);
+        ctx.fillRect(p0[0], p0[1], p1[0] - p0[0], p1[1] - p0[1]);
+      }
+      ctx.strokeStyle = rgba(1);
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(p0[0], p0[1], p1[0] - p0[0], p1[1] - p0[1]);
+      ctx.restore();
+      return;
+    }
+
+    var held = F.input.blueprint;
+    if (held && held.bp && F.input.blueprintAnchor) {
+      var ox = F.input.blueprintAnchor[0], oy = F.input.blueprintAnchor[1];
+      var ok = cachedCheck(held.bp, ox, oy);
+      for (var k = 0; k < held.bp.entities.length; k++) {
+        var en = held.bp.entities[k];
+        F.ghosts.drawSprite(ctx, cam, en.type, en.dir, ox + en.x, oy + en.y, en.settings, !ok[k]);
+      }
+    }
+  });
+
+  F.blueprints = {
+    create: create,
+    rotate: rotate,
+    check: check,
+    place: place,
+    count: count,
+    clipboard: clipboard,
+    setClipboard: setClipboard,
+  };
+})();
+
+
+// ===================== 53-construction.js =====================
+// 53-construction.js — construction robots: they build ghosts (51-ghosts.js, and so pasted
+// blueprints from 52-blueprints.js) inside a roboport network's construction area.
+//
+// Rules (Factorio-like, simplified):
+//   - Construction robots are items ('construction-robot') kept in a roboport's second robot
+//     slot (e.cbots, see 39-robots.js). Networks are the logistic networks of 39-robots.js
+//     (roboports whose 50x50 logistic areas overlap); a network's construction area is the
+//     union of 110x110 squares (def.roboport.constructionRadius = 55) around its roboports.
+//   - Every DISPATCH ticks, each unclaimed ghost inside some network's construction area gets
+//     a robot if that network has (a) the ghost's item in a passive-provider or storage chest
+//     and (b) an idle construction robot in one of its roboports. The item and the robot are
+//     taken out right away (that is the reservation, like 39-robots.js does).
+//   - Flight: roboport -> chest (pick up) -> ghost (build, a short welding beam) -> roboport.
+//     If the ghost vanished or cannot be built (player standing on it for too long), the
+//     robot carries the item back to a storage/provider chest (or drops it on the ground).
+//   - A robot whose roboports all disappeared drops itself as an item.
+//   - Deconstruction (54-deconstruction.js marks): before building, each pass sends idle
+//     robots to marked buildings/trees/rocks in coverage — only when the network has a
+//     storage chest. The robot takes the target down (building + contents, or wood/stone/
+//     coal) and carries everything to the nearest storage chest with room (the rest lands
+//     on the ground next to it). Ghosts whose tiles still hold a tree or rock wait.
+//   - Speed 0.06 tiles/tick, 20 % without power; 25 kW per flying robot on the network.
+//
+// State: F.state.cbots = [{ id, net, x, y, task: { kind: 'build'|'decon', ghostId, type,
+//   item, target, fromId, stage, px, py, bx, by, cargo, items, t, tries, retId, dockId } }]
+//   — JSON-plain, saved with the game. `items` = [[itemId, count], ...] being carried back.
+//
+// F.construction:
+//   stats(net) -> { idle, busy, ghosts, missing, decon, noStorage }  (from the last pass)
+//   count() -> robots in the air        claimed(ghostId) -> bool
+//   networkForTile(tx, ty) -> network | null (construction coverage)
+//   DISPATCH, SPEED
+(function () {
+  'use strict';
+
+  var SPEED = 0.06;
+  var UNPOWERED = 0.2;
+  var DISPATCH = 20;          // ticks between dispatch passes
+  var MAX_PER_PASS = 40;      // robots sent per pass across all networks
+  var BUILD_TICKS = 18;       // welding beam before the building appears
+  var RETRY_TICKS = 30;       // blocked build: wait this long, then try again...
+  var MAX_TRIES = 20;         // ...at most this many times (10 s), then bring the item back
+  var KW_PER_ROBOT = 25;
+  var ITEM = 'construction-robot';
+
+  var nextId = 1;
+  var lastStats = Object.create(null); // net.id -> { ghosts, missing }
+
+  // =====================================================================
+  // Helpers
+  // =====================================================================
+  function list() { return (F.state && F.state.cbots) || []; }
+
+  function centerOf(e) { return F.entities.center(e); }
+
+  function cradius(e) {
+    var d = F.data.entities[e.type];
+    return (d && d.roboport && (d.roboport.constructionRadius || d.roboport.radius)) || 55;
+  }
+
+  function roboportsOf(net) {
+    var out = [];
+    for (var i = 0; i < net.roboports.length; i++) {
+      var e = F.entities.byId(net.roboports[i]);
+      if (e && !e._removed) out.push(e);
+    }
+    return out;
+  }
+
+  function networks() { return (F.robots && F.robots.networks) ? F.robots.networks() : []; }
+
+  function netById(id) {
+    var nets = networks();
+    for (var i = 0; i < nets.length; i++) if (nets[i].id === id) return nets[i];
+    return null;
+  }
+
+  function covers(net, x, y) {
+    var rps = roboportsOf(net);
+    for (var i = 0; i < rps.length; i++) {
+      var c = centerOf(rps[i]), r = cradius(rps[i]);
+      if (Math.abs(x - c[0]) <= r && Math.abs(y - c[1]) <= r) return true;
+    }
+    return false;
+  }
+
+  function networkForPoint(x, y) {
+    var nets = networks();
+    for (var i = 0; i < nets.length; i++) if (covers(nets[i], x, y)) return nets[i];
+    return null;
+  }
+
+  function ghostCenter(g) { return [g.x + g.w / 2, g.y + g.h / 2]; }
+
+  function dist(ax, ay, bx, by) { var dx = ax - bx, dy = ay - by; return Math.sqrt(dx * dx + dy * dy); }
+
+  function nearest(entities, x, y, pred) {
+    var best = null, bestD = Infinity;
+    for (var i = 0; i < entities.length; i++) {
+      var e = entities[i];
+      if (!e || e._removed || (pred && !pred(e))) continue;
+      var c = centerOf(e), d = dist(x, y, c[0], c[1]);
+      if (d < bestD) { bestD = d; best = e; }
+    }
+    return best;
+  }
+
+  function chestsOf(net, kinds) {
+    var out = [];
+    for (var k = 0; k < kinds.length; k++) {
+      var ids = net[kinds[k]] || [];
+      for (var i = 0; i < ids.length; i++) {
+        var e = F.entities.byId(ids[i]);
+        if (e && !e._removed && Array.isArray(e.inv)) out.push(e);
+      }
+    }
+    return out;
+  }
+
+  function moveToward(r, tx, ty, speed) {
+    var dx = tx - r.x, dy = ty - r.y;
+    var d = Math.sqrt(dx * dx + dy * dy);
+    if (d <= speed || d < 1e-6) { r.x = tx; r.y = ty; return true; }
+    r.x += dx / d * speed; r.y += dy / d * speed;
+    return false;
+  }
+
+  function removeRobot(r) {
+    var arr = list();
+    var i = arr.indexOf(r);
+    if (i >= 0) arr.splice(i, 1);
+  }
+
+  function claimedSet() {
+    var set = Object.create(null);
+    var arr = list();
+    for (var i = 0; i < arr.length; i++) {
+      var t = arr[i].task;
+      if (!t) continue;
+      if (t.ghostId) set[t.ghostId] = true;
+      if (t.target) set[t.target] = true;
+    }
+    return set;
+  }
+
+  function launch(net, rp, task) {
+    F.inv.remove(rp.cbots, ITEM, 1);
+    var hc = centerOf(rp);
+    list().push({ id: nextId++, net: net.id, x: hc[0], y: hc[1], task: task });
+  }
+
+  function idleRoboportNear(net, x, y) {
+    return nearest(roboportsOf(net), x, y, function (e) { return Array.isArray(e.cbots) && F.inv.count(e.cbots, ITEM) > 0; });
+  }
+
+  // Marked buildings/trees/rocks first, so ghosts planned over trees can follow.
+  function dispatchDecon(claimed, budget, hasIdle) {
+    if (!F.deconstruction) return 0;
+    var list0 = F.deconstruction.targets();
+    var sent = 0;
+    var storage = Object.create(null);
+    for (var i = 0; i < list0.length; i++) {
+      var tg = list0[i];
+      var net = networkForPoint(tg.x, tg.y);
+      if (!net) continue;
+      var st = lastStats[net.id];
+      st.decon++;
+      if (claimed[tg.key]) continue;
+      if (storage[net.id] === undefined) storage[net.id] = chestsOf(net, ['storage']).length > 0;
+      if (!storage[net.id]) { st.noStorage++; continue; }
+      if (sent >= budget || hasIdle[net.id] === false) continue;
+      var rp = idleRoboportNear(net, tg.x, tg.y);
+      if (!rp) { hasIdle[net.id] = false; continue; }
+      launch(net, rp, {
+        kind: 'decon', target: tg.key, ghostId: null, stage: 'toBuild',
+        bx: tg.x, by: tg.y, cargo: false, items: null, t: 0, tries: 0, retId: null, dockId: null,
+      });
+      claimed[tg.key] = true;
+      sent++;
+    }
+    return sent;
+  }
+
+  // =====================================================================
+  // Dispatch
+  // =====================================================================
+  function dispatch() {
+    var ghosts = F.ghosts ? F.ghosts.all() : [];
+    var nets = networks();
+    lastStats = Object.create(null);
+    for (var n = 0; n < nets.length; n++) lastStats[nets[n].id] = { ghosts: 0, missing: 0, decon: 0, noStorage: 0 };
+    if (!nets.length) return;
+
+    var claimed = claimedSet();
+    var hasIdle = Object.create(null);     // net.id -> false once no robot is left
+    var sent = dispatchDecon(claimed, MAX_PER_PASS, hasIdle);
+    var sourceCache = Object.create(null); // net|item -> chest|null for this pass
+    var sources = Object.create(null);     // net.id -> provider+storage chests
+
+    for (var i = 0; i < ghosts.length; i++) {
+      var g = ghosts[i];
+      var c = ghostCenter(g);
+      var net = networkForPoint(c[0], c[1]);
+      if (!net) continue;
+      var st = lastStats[net.id];
+      st.ghosts++;
+      if (claimed[g.id]) continue;
+      if (F.ghosts.blockedByFeature(g)) continue; // a marked tree/rock goes first
+
+      var item = F.ghosts.itemFor(g);
+      var key = net.id + '|' + item;
+      var src = sourceCache[key];
+      if (src === undefined || (src && F.inv.count(src.inv, item) <= 0)) {
+        if (!sources[net.id]) sources[net.id] = chestsOf(net, ['provider', 'storage']);
+        src = nearest(sources[net.id], c[0], c[1], function (ch) { return F.inv.count(ch.inv, item) > 0; });
+        sourceCache[key] = src;
+      }
+      if (!src) { st.missing++; continue; }
+      if (sent >= MAX_PER_PASS || hasIdle[net.id] === false) continue;
+
+      var sc = centerOf(src);
+      var rp = idleRoboportNear(net, sc[0], sc[1]);
+      if (!rp) { hasIdle[net.id] = false; continue; }
+
+      F.inv.remove(src.inv, item, 1);
+      launch(net, rp, {
+        kind: 'build', ghostId: g.id, type: g.type, item: item, fromId: src.id,
+        stage: 'toPickup', px: sc[0], py: sc[1], bx: c[0], by: c[1],
+        cargo: false, items: null, t: 0, tries: 0, retId: null, dockId: null,
+      });
+      claimed[g.id] = true;
+      sent++;
+    }
+  }
+
+  // =====================================================================
+  // Flight
+  // =====================================================================
+  function tryBuild(r) {
+    var t = r.task;
+    var g = F.ghosts.byId(t.ghostId);
+    if (!g || g.type !== t.type) return 'gone';
+    var chk = F.api.canPlace(g.type, g.x, g.y, g.dir);
+    if (!chk.ok) return 'blocked';
+    var e = F.api.place(g.type, g.x, g.y, g.dir, { fromInventory: false });
+    // F.ghosts' entity:placed listener removed the ghost and applied its settings.
+    return e ? 'built' : 'blocked';
+  }
+
+  // Where to bring items: nearest storage chest with room (for the first item), then
+  // provider chest, in the robot's network first, then anywhere. null = drop on the ground.
+  function returnTarget(r, item) {
+    var net = netById(r.net);
+    var fits = function (e) { return F.entities.canAcceptItem(e, item) > 0; };
+    var pools = [];
+    if (net) { pools.push(chestsOf(net, ['storage'])); pools.push(chestsOf(net, ['provider'])); }
+    pools.push(F.entities.ofType('storage-chest'));
+    pools.push(F.entities.ofType('passive-provider-chest'));
+    for (var i = 0; i < pools.length; i++) {
+      var e = nearest(pools[i], r.x, r.y, fits);
+      if (e) return e;
+    }
+    return null;
+  }
+
+  // Carry t.items (or the unused build item) to a chest; nothing to carry -> fly home.
+  function startReturn(r) {
+    var t = r.task;
+    if (!t.items) t.items = (t.kind !== 'decon' && t.cargo && t.item) ? [[t.item, 1]] : [];
+    t.items = t.items.filter(function (it) { return it && it[0] && it[1] > 0; });
+    if (!t.items.length) { t.cargo = false; t.stage = 'toDock'; resolveDock(r); return; }
+    t.cargo = true;
+    var dst = returnTarget(r, t.items[0][0]);
+    if (!dst) { dropItems(r.x, r.y, t.items); t.items = null; t.cargo = false; t.stage = 'toDock'; resolveDock(r); return; }
+    t.retId = dst.id;
+    t.stage = 'toReturn';
+  }
+
+  function dropItems(x, y, items) {
+    for (var i = 0; i < items.length; i++) if (items[i][1] > 0) F.ground.dropNear(x, y, items[i][0], items[i][1]);
+  }
+
+  function deliver(r, dst) {
+    var t = r.task, left = [];
+    for (var i = 0; i < t.items.length; i++) {
+      var id = t.items[i][0], n = t.items[i][1], put = 0;
+      try { put = F.entities.insertItem(dst, id, n) || 0; } catch (err) { put = 0; }
+      if (put < n) left.push([id, n - put]);
+    }
+    if (left.length) dropItems(r.x, r.y, left);
+    t.items = null; t.cargo = false; t.retId = null;
+  }
+
+  function resolveDock(r) {
+    var net = netById(r.net);
+    var cands = net ? roboportsOf(net) : [];
+    if (!cands.length) cands = F.entities.ofType('roboport');
+    var best = nearest(cands, r.x, r.y, null);
+    r.task.dockId = best ? best.id : null;
+  }
+
+  function tickRobot(r, powered) {
+    var t = r.task;
+    if (!t) { removeRobot(r); return; }
+    var speed = SPEED * (powered ? 1 : UNPOWERED);
+
+    switch (t.stage) {
+      case 'toPickup':
+        if (moveToward(r, t.px, t.py, speed)) { t.cargo = true; t.stage = 'toBuild'; }
+        return;
+      case 'toBuild': {
+        if (t.kind === 'decon') {
+          if (!F.deconstruction || !F.deconstruction.stillMarked(t.target)) { t.target = null; startReturn(r); return; }
+          if (moveToward(r, t.bx, t.by, speed)) { t.stage = 'building'; t.t = 0; }
+          return;
+        }
+        var g = F.ghosts.byId(t.ghostId);
+        if (!g) { startReturn(r); return; }
+        var c = ghostCenter(g);
+        t.bx = c[0]; t.by = c[1];
+        if (moveToward(r, t.bx, t.by, speed)) { t.stage = 'building'; t.t = 0; }
+        return;
+      }
+      case 'building':
+        if (++t.t < BUILD_TICKS) return;
+        if (t.kind === 'decon') {
+          var got = [];
+          var ok = F.deconstruction && F.deconstruction.deconstruct(t.target, got);
+          t.target = null;
+          t.items = ok ? got : null;
+          startReturn(r);
+          return;
+        }
+        var res = tryBuild(r);
+        if (res === 'built') { t.cargo = false; t.ghostId = null; t.stage = 'toDock'; resolveDock(r); return; }
+        if (res === 'gone' || ++t.tries > MAX_TRIES) { t.ghostId = null; startReturn(r); return; }
+        t.stage = 'waiting'; t.t = 0; // e.g. the player stands on the spot
+        return;
+      case 'waiting':
+        if (++t.t >= RETRY_TICKS) { t.stage = 'building'; t.t = BUILD_TICKS - 1; }
+        return;
+      case 'toReturn': {
+        var dst = t.retId != null ? F.entities.byId(t.retId) : null;
+        if (!dst || dst._removed) { startReturn(r); if (t.stage !== 'toReturn') return; dst = F.entities.byId(t.retId); }
+        var dc = centerOf(dst);
+        if (moveToward(r, dc[0], dc[1], speed)) { deliver(r, dst); t.stage = 'toDock'; resolveDock(r); }
+        return;
+      }
+      case 'toDock': {
+        var dock = t.dockId != null ? F.entities.byId(t.dockId) : null;
+        if (!dock || dock._removed) { resolveDock(r); dock = t.dockId != null ? F.entities.byId(t.dockId) : null; }
+        if (!dock) { F.ground.dropNear(r.x, r.y, ITEM, 1); removeRobot(r); return; }
+        var hc = centerOf(dock);
+        if (moveToward(r, hc[0], hc[1], speed)) {
+          if (!Array.isArray(dock.cbots)) dock.cbots = F.inv.create(1);
+          var left = F.inv.add(dock.cbots, ITEM, 1);
+          if (left > 0) F.ground.dropNear(r.x, r.y, ITEM, left);
+          removeRobot(r);
+        }
+        return;
+      }
+      default:
+        removeRobot(r);
+    }
+  }
+
+  function constructionTick() {
+    if (!F.state) return;
+    if (!Array.isArray(F.state.cbots)) F.state.cbots = [];
+    if (F.state.tick % DISPATCH === 0) dispatch();
+    var arr = F.state.cbots;
+    if (!arr.length) return;
+
+    var powered = Object.create(null), busy = Object.create(null);
+    for (var i = 0; i < arr.length; i++) busy[arr[i].net] = (busy[arr[i].net] || 0) + 1;
+    Object.keys(busy).forEach(function (id) {
+      var net = netById(id);
+      powered[id] = !!(net && F.robots.isPowered(net));
+      var rps = net ? roboportsOf(net) : [];
+      if (rps.length && F.power && F.power.request) F.power.request(rps[0], KW_PER_ROBOT * busy[id]);
+    });
+    for (var j = arr.length - 1; j >= 0; j--) tickRobot(arr[j], !!powered[arr[j].net]);
+  }
+
+  F.game = F.game || {};
+  (F.game._onNewGame = F.game._onNewGame || []).push(function () { F.state.cbots = []; lastStats = Object.create(null); });
+  (F.game._onRebuild = F.game._onRebuild || []).push(function () {
+    if (!Array.isArray(F.state.cbots)) F.state.cbots = [];
+    var max = 0;
+    for (var i = 0; i < F.state.cbots.length; i++) if (F.state.cbots[i] && F.state.cbots[i].id > max) max = F.state.cbots[i].id;
+    nextId = max + 1;
+    lastStats = Object.create(null);
+  });
+  (F.game._tickPhases = F.game._tickPhases || []).push({ name: 'construction', after: 'inserters', fn: constructionTick });
+
+  // =====================================================================
+  // Rendering: robots in the air layer, welding beam while building
+  // =====================================================================
+  F._renderHooks = F._renderHooks || {
+    layers: { floor: [], objects: [], air: [], overlay: [] },
+    entityOpts: {}, minimapColors: {}, hidePlayerFns: [], altOverlayFns: [],
+  };
+
+  F._renderHooks.layers.air.push(function (ctx, rect, cam) {
+    if (!F.sprites || !F.sprites.enabled) return;
+    var arr = list();
+    if (!arr.length) return;
+    var tilePx = F.C.TILE * (cam.zoom || 1);
+    var sizePx = tilePx * 0.75, hoverPx = tilePx * 0.6;
+    var tick = F.state.tick || 0;
+    var shadow = F.sprites.robotShadow();
+    for (var i = 0; i < arr.length; i++) {
+      var r = arr[i];
+      if (r.x < rect.x0 - 2 || r.x > rect.x1 + 2 || r.y < rect.y0 - 2 || r.y > rect.y1 + 2) continue;
+      var sp = cam.toScreen(r.x, r.y);
+      var bob = Math.sin((tick + r.id * 13) / 20) * tilePx * 0.05;
+      var ry = sp[1] - hoverPx - bob;
+      if (shadow && shadow.width) ctx.drawImage(shadow, sp[0] - sizePx / 2, sp[1] - sizePx / 2, sizePx, sizePx);
+      var t = r.task;
+      if (t && (t.stage === 'building' || t.stage === 'waiting') && ((tick + r.id) % 4) < 3) {
+        var tgt = cam.toScreen(t.bx, t.by);
+        var jx = (Math.random() - 0.5) * tilePx * 0.4, jy = (Math.random() - 0.5) * tilePx * 0.4;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,190,90,0.85)';
+        ctx.lineWidth = Math.max(1, tilePx * 0.05);
+        ctx.beginPath(); ctx.moveTo(sp[0], ry + sizePx * 0.15); ctx.lineTo(tgt[0] + jx, tgt[1] + jy); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,240,180,0.9)';
+        ctx.beginPath(); ctx.arc(tgt[0] + jx, tgt[1] + jy, Math.max(1.5, tilePx * 0.06), 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+      var spr = F.sprites.robot(ITEM, Math.floor((tick + r.id * 5) / 4) % 8);
+      if (spr && spr.width) ctx.drawImage(spr, sp[0] - sizePx / 2, ry - sizePx / 2, sizePx, sizePx);
+      var cargoItem = t && t.cargo ? (t.items && t.items.length ? t.items[0][0] : t.item) : null;
+      if (cargoItem && F.sprites.item) {
+        try {
+          var pip = F.sprites.item(cargoItem, Math.max(8, sizePx * 0.4));
+          if (pip && pip.width) ctx.drawImage(pip, sp[0] - pip.width / 2, sp[1] - hoverPx * 0.35, pip.width, pip.height);
+        } catch (err) { /* never crash rendering over an icon */ }
+      }
+    }
+  });
+
+  // =====================================================================
+  // Public API
+  // =====================================================================
+  F.construction = {
+    stats: function (net) {
+      if (!net) return null;
+      var idle = 0, busy = 0;
+      var rps = roboportsOf(net);
+      for (var i = 0; i < rps.length; i++) if (Array.isArray(rps[i].cbots)) idle += F.inv.count(rps[i].cbots, ITEM);
+      var arr = list();
+      for (var j = 0; j < arr.length; j++) if (arr[j].net === net.id) busy++;
+      var s = lastStats[net.id] || { ghosts: 0, missing: 0, decon: 0, noStorage: 0 };
+      return { idle: idle, busy: busy, ghosts: s.ghosts, missing: s.missing, decon: s.decon, noStorage: s.noStorage };
+    },
+    count: function () { return list().length; },
+    claimed: function (ghostId) { return !!claimedSet()[ghostId]; },
+    networkForTile: function (tx, ty) { return networkForPoint(tx + 0.5, ty + 0.5); },
+    DISPATCH: DISPATCH,
+    SPEED: SPEED,
+  };
+})();
+
+
+// ===================== 54-deconstruction.js =====================
+// 54-deconstruction.js — deconstruction planner: marks buildings, trees and rocks for
+// removal; construction robots (53-construction.js) then take them down and carry the
+// items to storage chests. The player can still mine marked things by hand.
+//
+// State: F.state.decon = { entities: [entityId, ...], features: ["x,y", ...] } — JSON-plain.
+// Entity marks are dropped when the entity is removed; feature marks are dropped lazily
+// when the tree/rock is gone (mined by hand, say).
+//
+// F.deconstruction:
+//   mark(x0, y0, x1, y1) -> { entities, features, ghosts }   mark everything touching the
+//                         tile rect; ghosts there are cancelled right away
+//   unmark(x0, y0, x1, y1) -> { entities, features }
+//   markEntity(e) / markFeature(tx, ty) / isMarked(e) / featureMarked(tx, ty)
+//   targets() -> [{ key: 'e:<id>' | 'f:<x>,<y>', x, y }]      live marks (centre coords)
+//   deconstruct(key, collect) -> bool   remove the target, pushing [itemId, count] pairs
+//                         (building + contents, or wood/stone/coal) onto `collect`
+//   count() -> number of marks
+//
+// Ghosts may now be planned over trees and rocks: F.ghosts marks them for deconstruction
+// (see 51-ghosts.js) and robots only build a ghost once its tiles are clear.
+(function () {
+  'use strict';
+
+  F.i18n.add('en', {
+    'decon.marked': 'Marked {n} for deconstruction',
+    'decon.unmarked': 'Cancelled deconstruction of {n}',
+    'decon.nothing': 'Nothing to deconstruct here',
+  });
+
+  // =====================================================================
+  // State
+  // =====================================================================
+  var entSet = new Set();           // entity ids (runtime mirror of F.state.decon.entities)
+  var featSet = new Set();          // "x,y"
+
+  function store() {
+    if (!F.state) return null;
+    var s = F.state.decon;
+    if (!s || typeof s !== 'object') s = F.state.decon = { entities: [], features: [] };
+    if (!Array.isArray(s.entities)) s.entities = [];
+    if (!Array.isArray(s.features)) s.features = [];
+    return s;
+  }
+
+  function sync() {
+    var s = store();
+    if (!s) return;
+    s.entities = Array.from(entSet);
+    s.features = Array.from(featSet);
+  }
+
+  F.game = F.game || {};
+  (F.game._onNewGame = F.game._onNewGame || []).push(function () {
+    entSet = new Set(); featSet = new Set();
+    F.state.decon = { entities: [], features: [] };
+  });
+  (F.game._onRebuild = F.game._onRebuild || []).push(function () {
+    var s = store();
+    entSet = new Set(); featSet = new Set();
+    for (var i = 0; i < s.entities.length; i++) {
+      var e = F.entities.byId(s.entities[i]);
+      if (e && !e._removed) entSet.add(e.id);
+    }
+    for (var j = 0; j < s.features.length; j++) if (typeof s.features[j] === 'string') featSet.add(s.features[j]);
+    sync();
+  });
+
+  F.events.on('entity:removed', function (e) {
+    if (e && entSet.delete(e.id)) sync();
+  });
+
+  // =====================================================================
+  // Marking
+  // =====================================================================
+  function deconstructible(e) {
+    if (!e || e._removed) return false;
+    var def = F.data.entities[e.type];
+    return !!(def && !def.natural && def.minable);
+  }
+
+  function markEntity(e) {
+    if (!deconstructible(e) || entSet.has(e.id)) return false;
+    entSet.add(e.id); sync();
+    return true;
+  }
+
+  function markFeature(tx, ty) {
+    var k = tx + ',' + ty;
+    if (featSet.has(k) || !F.world.feature(tx, ty)) return false;
+    featSet.add(k); sync();
+    return true;
+  }
+
+  function isMarked(e) { return !!e && entSet.has(e.id); }
+  function featureMarked(tx, ty) { return featSet.has(tx + ',' + ty); }
+
+  function rectOf(x0, y0, x1, y1) {
+    return { ax: Math.min(x0, x1), bx: Math.max(x0, x1), ay: Math.min(y0, y1), by: Math.max(y0, y1) };
+  }
+
+  function entitiesIn(r) {
+    var out = [];
+    var all = F.entities.all();
+    for (var i = 0; i < all.length; i++) {
+      var e = all[i];
+      if (!deconstructible(e)) continue;
+      if (e.x > r.bx || e.y > r.by || e.x + e.w - 1 < r.ax || e.y + e.h - 1 < r.ay) continue;
+      out.push(e);
+    }
+    return out;
+  }
+
+  function mark(x0, y0, x1, y1) {
+    var r = rectOf(x0, y0, x1, y1);
+    var res = { entities: 0, features: 0, ghosts: 0 };
+    var es = entitiesIn(r);
+    for (var i = 0; i < es.length; i++) if (!entSet.has(es[i].id)) { entSet.add(es[i].id); res.entities++; }
+    for (var y = r.ay; y <= r.by; y++) {
+      for (var x = r.ax; x <= r.bx; x++) {
+        var k = x + ',' + y;
+        if (!featSet.has(k) && F.world.feature(x, y)) { featSet.add(k); res.features++; }
+      }
+    }
+    if (F.ghosts) {
+      var gs = F.ghosts.inRect(r.ax, r.ay, r.bx, r.by);
+      for (var g = 0; g < gs.length; g++) if (F.ghosts.remove(gs[g])) res.ghosts++;
+    }
+    sync();
+    return res;
+  }
+
+  function unmark(x0, y0, x1, y1) {
+    var r = rectOf(x0, y0, x1, y1);
+    var res = { entities: 0, features: 0 };
+    var es = entitiesIn(r);
+    for (var i = 0; i < es.length; i++) if (entSet.delete(es[i].id)) res.entities++;
+    for (var y = r.ay; y <= r.by; y++) {
+      for (var x = r.ax; x <= r.bx; x++) if (featSet.delete(x + ',' + y)) res.features++;
+    }
+    sync();
+    return res;
+  }
+
+  // =====================================================================
+  // Targets for robots
+  // =====================================================================
+  function targets() {
+    var out = [];
+    var stale = false;
+    entSet.forEach(function (id) {
+      var e = F.entities.byId(id);
+      if (!e || e._removed) { entSet.delete(id); stale = true; return; }
+      out.push({ key: 'e:' + id, x: e.x + e.w / 2, y: e.y + e.h / 2 });
+    });
+    featSet.forEach(function (k) {
+      var xy = F.util.unkey(k);
+      if (!F.world.feature(xy[0], xy[1])) { featSet.delete(k); stale = true; return; }
+      out.push({ key: 'f:' + k, x: xy[0] + 0.5, y: xy[1] + 0.5 });
+    });
+    if (stale) sync();
+    return out;
+  }
+
+  // Yields match hand mining in 40-player.js (completeMining).
+  function featureYield(kind, collect) {
+    if (kind === 1) collect.push(['wood', 4]);
+    else if (kind === 2) collect.push(['stone', 20]);
+    else if (kind === 3) { collect.push(['stone', 24 + F.rng.int(27)]); collect.push(['coal', 24 + F.rng.int(27)]); }
+  }
+
+  function deconstruct(key, collect) {
+    if (typeof key !== 'string') return false;
+    if (key.charAt(0) === 'e') {
+      var id = +key.slice(2);
+      var e = F.entities.byId(id);
+      if (!e || e._removed || !entSet.has(id)) return false;
+      return F.api.remove(e.x, e.y, { collect: collect });
+    }
+    var k = key.slice(2);
+    if (!featSet.has(k)) return false;
+    var xy = F.util.unkey(k);
+    var kind = F.world.feature(xy[0], xy[1]);
+    featSet.delete(k); sync();
+    if (!kind) return false;
+    F.world.removeFeature(xy[0], xy[1]);
+    featureYield(kind, collect);
+    return true;
+  }
+
+  function stillMarked(key) {
+    if (typeof key !== 'string') return false;
+    if (key.charAt(0) === 'e') return entSet.has(+key.slice(2));
+    return featSet.has(key.slice(2));
+  }
+
+  // =====================================================================
+  // Rendering: red cross over everything marked
+  // =====================================================================
+  F._renderHooks = F._renderHooks || {
+    layers: { floor: [], objects: [], air: [], overlay: [] },
+    entityOpts: {}, minimapColors: {}, hidePlayerFns: [], altOverlayFns: [],
+  };
+
+  function cross(ctx, cam, x, y, w, h) {
+    var size = F.C.TILE * (cam.zoom || 1);
+    var p = cam.toScreen(x, y);
+    var pw = w * size, ph = h * size;
+    var m = Math.min(pw, ph) * 0.18;
+    ctx.fillStyle = 'rgba(200,40,30,0.18)';
+    ctx.fillRect(p[0], p[1], pw, ph);
+    ctx.strokeStyle = 'rgba(255,70,50,0.9)';
+    ctx.lineWidth = Math.max(1.5, size * 0.08);
+    ctx.beginPath();
+    ctx.moveTo(p[0] + m, p[1] + m); ctx.lineTo(p[0] + pw - m, p[1] + ph - m);
+    ctx.moveTo(p[0] + pw - m, p[1] + m); ctx.lineTo(p[0] + m, p[1] + ph - m);
+    ctx.stroke();
+  }
+
+  F._renderHooks.layers.overlay.push(function (ctx, rect, cam) {
+    if (!F.sprites || !F.sprites.enabled || (!entSet.size && !featSet.size)) return;
+    ctx.save();
+    entSet.forEach(function (id) {
+      var e = F.entities.byId(id);
+      if (!e || e.x > rect.x1 + 1 || e.y > rect.y1 + 1 || e.x + e.w < rect.x0 - 1 || e.y + e.h < rect.y0 - 1) return;
+      cross(ctx, cam, e.x, e.y, e.w, e.h);
+    });
+    featSet.forEach(function (k) {
+      var xy = F.util.unkey(k);
+      if (xy[0] < rect.x0 - 1 || xy[0] > rect.x1 + 1 || xy[1] < rect.y0 - 1 || xy[1] > rect.y1 + 1) return;
+      cross(ctx, cam, xy[0], xy[1], 1, 1);
+    });
+    ctx.restore();
+  });
+
+  F.deconstruction = {
+    mark: mark,
+    unmark: unmark,
+    markEntity: markEntity,
+    markFeature: markFeature,
+    isMarked: isMarked,
+    featureMarked: featureMarked,
+    targets: targets,
+    deconstruct: deconstruct,
+    stillMarked: stillMarked,
+    count: function () { return entSet.size + featSet.size; },
+  };
+})();
+
+
+// ===================== 55-blueprint-library.js =====================
+// 55-blueprint-library.js — blueprint library and blueprint strings.
+//
+// Library: named blueprints kept across games (like Factorio's personal library) in the
+// browser's localStorage under 'factio.blueprints' — or only in memory when there is no
+// storage (headless tests, private mode). Not part of the save file.
+//
+// Blueprint strings: "FB1" + base64(UTF-8 JSON { n: name, e: [[type, x, y, dir, settings?]] }).
+// Decoding validates everything, since strings come from other players: unknown entity
+// types are skipped, settings are reduced to known keys with sane values, and sizes/counts
+// are capped. Positions are re-normalised (F.blueprints.rotate(bp, 0)).
+//
+// Extends F.blueprints (52-blueprints.js):
+//   encode(bp, name?) -> string
+//   decode(str) -> { name, bp, skipped } | null   (null: F.blueprints.lastError says why:
+//                                                  'format' | 'empty' | 'too_big')
+//   sanitizeSettings(settings) -> settings | null
+//   library.list() -> [{ id, name, bp, created }]   (newest first; do not mutate)
+//   library.add(name, bp) -> entry     library.get(id)     library.remove(id) -> bool
+//   library.rename(id, name) -> bool   library.clear()
+//
+// UI: window 'blueprints' (L key or the HUD "Blueprints" button): save the blueprint in
+// hand / the last copy, import a string, and per entry use (take it into the hand),
+// export (string, also copied to the system clipboard when allowed), rename, delete.
+(function () {
+  'use strict';
+
+  F.i18n.add('en', {
+    'ui.blueprints': 'Blueprints',
+    'bpl.title': 'Blueprint library',
+    'bpl.current': 'Blueprint in hand / last copy',
+    'bpl.none': 'Nothing copied yet — press Ctrl+C (or B) and drag over buildings.',
+    'bpl.save': 'Save to library',
+    'bpl.default_name': 'Blueprint {n}',
+    'bpl.import': 'Import a blueprint string',
+    'bpl.import_btn': 'Import',
+    'bpl.import_ph': 'Paste a string starting with FB1…',
+    'bpl.imported': 'Imported "{name}"',
+    'bpl.skipped': '{n} unknown buildings were left out',
+    'bpl.err.format': 'Not a valid blueprint string',
+    'bpl.err.empty': 'The string holds no buildings this game knows',
+    'bpl.err.too_big': 'Blueprint is too big',
+    'bpl.library': 'Library',
+    'bpl.empty': 'The library is empty.',
+    'bpl.size': '{w}×{h}, {n} buildings',
+    'bpl.use': 'Use',
+    'bpl.export': 'Export',
+    'bpl.delete': 'Delete',
+    'bpl.delete_q': 'Delete blueprint "{name}"?',
+    'bpl.copied': 'Blueprint string copied',
+    'bpl.string': 'Blueprint string (select and copy):',
+    'bpl.saved': 'Saved "{name}" to the library',
+  });
+
+  var PREFIX = 'FB1';
+  var MAX_ENTITIES = 20000;
+  var MAX_COORD = 2000;
+  var STORAGE_KEY = 'factio.blueprints';
+
+  // =====================================================================
+  // base64 + UTF-8 (own implementation: works headless and in any browser)
+  // =====================================================================
+  var B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  var B64_INDEX = (function () { var m = Object.create(null); for (var i = 0; i < 64; i++) m[B64.charAt(i)] = i; return m; })();
+
+  function utf8Bytes(str) {
+    var bin = encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function (m, h) { return String.fromCharCode(parseInt(h, 16)); });
+    var out = new Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+
+  function utf8String(bytes) {
+    var parts = [];
+    for (var i = 0; i < bytes.length; i++) parts.push('%' + (bytes[i] < 16 ? '0' : '') + bytes[i].toString(16));
+    return decodeURIComponent(parts.join(''));
+  }
+
+  function b64encode(bytes) {
+    var out = '';
+    for (var i = 0; i < bytes.length; i += 3) {
+      var a = bytes[i], b = bytes[i + 1], c = bytes[i + 2];
+      var n = (a << 16) | ((b || 0) << 8) | (c || 0);
+      out += B64.charAt((n >> 18) & 63) + B64.charAt((n >> 12) & 63) +
+        (b === undefined ? '=' : B64.charAt((n >> 6) & 63)) + (c === undefined ? '=' : B64.charAt(n & 63));
+    }
+    return out;
+  }
+
+  function b64decode(str) {
+    str = str.replace(/[\s=]+/g, '');
+    if (!/^[A-Za-z0-9+/]*$/.test(str) || str.length % 4 === 1) return null;
+    var bytes = [];
+    for (var i = 0; i < str.length; i += 4) {
+      var n = 0, k = 0;
+      for (; k < 4 && i + k < str.length; k++) n |= B64_INDEX[str.charAt(i + k)] << (18 - 6 * k);
+      bytes.push((n >> 16) & 255);
+      if (k > 2) bytes.push((n >> 8) & 255);
+      if (k > 3) bytes.push(n & 255);
+    }
+    return bytes;
+  }
+
+  // =====================================================================
+  // Settings validation (strings are untrusted)
+  // =====================================================================
+  function itemOk(id) { return typeof id === 'string' && !!F.data.items[id]; }
+  function int(v, lo, hi) { return typeof v === 'number' && isFinite(v) && Math.floor(v) === v && v >= lo && v <= hi; }
+
+  function sanitizeSettings(s) {
+    if (!s || typeof s !== 'object' || Array.isArray(s)) return null;
+    var out = {};
+    if (typeof s.recipe === 'string' && F.data.recipes[s.recipe]) out.recipe = s.recipe;
+    if (Array.isArray(s.filter) && s.filter.length <= 5) {
+      var f = s.filter.map(function (v) { return itemOk(v) ? v : null; });
+      if (f.some(function (v) { return v; })) { while (f.length < 5) f.push(null); out.filter = f; }
+    } else if (itemOk(s.filter)) {
+      out.filter = s.filter; // splitter filter
+    }
+    if (out.filter && (s.filterMode === 'whitelist' || s.filterMode === 'blacklist')) out.filterMode = s.filterMode;
+    if (int(s.inPrio, -1, 1) && s.inPrio) out.inPrio = s.inPrio;
+    if (int(s.outPrio, -1, 1) && s.outPrio) out.outPrio = s.outPrio;
+    if (Array.isArray(s.requests) && s.requests.length <= 6) {
+      var r = s.requests.map(function (q) {
+        return (q && itemOk(q.id) && int(q.count, 1, 1000000)) ? { id: q.id, count: q.count } : null;
+      });
+      if (r.some(function (q) { return q; })) { while (r.length < 6) r.push(null); out.requests = r; }
+    }
+    if (s.autoLaunch === true) out.autoLaunch = true;
+    if (typeof s.name === 'string' && s.name) out.name = s.name.slice(0, 40);
+    if (s.io === 'in' || s.io === 'out') out.io = s.io;
+    return Object.keys(out).length ? out : null;
+  }
+
+  // =====================================================================
+  // Encode / decode
+  // =====================================================================
+  function encode(bp, name) {
+    var e = bp.entities.map(function (en) {
+      var row = [en.type, en.x, en.y, en.dir & 3];
+      if (en.settings) row.push(en.settings);
+      return row;
+    });
+    var json = JSON.stringify({ n: String(name || ''), e: e });
+    return PREFIX + b64encode(utf8Bytes(json));
+  }
+
+  function fail(why) { F.blueprints.lastError = why; return null; }
+
+  function decode(str) {
+    F.blueprints.lastError = null;
+    if (typeof str !== 'string') return fail('format');
+    str = str.trim();
+    if (str.slice(0, PREFIX.length) !== PREFIX) return fail('format');
+    var bytes = b64decode(str.slice(PREFIX.length));
+    if (!bytes) return fail('format');
+    var obj;
+    try { obj = JSON.parse(utf8String(bytes)); } catch (err) { return fail('format'); }
+    if (!obj || typeof obj !== 'object' || !Array.isArray(obj.e)) return fail('format');
+    if (obj.e.length > MAX_ENTITIES) return fail('too_big');
+    var list = [], skipped = 0;
+    for (var i = 0; i < obj.e.length; i++) {
+      var row = obj.e[i];
+      if (!Array.isArray(row) || typeof row[0] !== 'string' || !int(row[1], -MAX_COORD, MAX_COORD) ||
+          !int(row[2], -MAX_COORD, MAX_COORD) || !int(row[3], 0, 3)) return fail('format');
+      if (!placeable(row[0])) { skipped++; continue; }
+      list.push({ type: row[0], x: row[1], y: row[2], dir: row[3], settings: sanitizeSettings(row[4]) });
+    }
+    if (!list.length) return fail('empty');
+    var bp = F.blueprints.rotate({ entities: list }, 0); // normalise position + order
+    if (bp.w > MAX_COORD || bp.h > MAX_COORD) return fail('too_big');
+    var name = typeof obj.n === 'string' ? obj.n.slice(0, 60) : '';
+    return { name: name, bp: bp, skipped: skipped };
+  }
+
+  function placeable(type) {
+    var def = F.data.entities[type];
+    if (!def || def.natural || !def.minable) return false;
+    var item = F.data.items[def.minable];
+    return !!(item && item.place === type);
+  }
+
+  // =====================================================================
+  // Library (localStorage, or memory)
+  // =====================================================================
+  var entries = null; // loaded lazily (never at load time: headless contract)
+  var nextId = 1;
+
+  function storage() {
+    try {
+      if (typeof window === 'undefined' || window.HEADLESS || !window.localStorage) return null;
+      return window.localStorage;
+    } catch (err) { return null; }
+  }
+
+  function load() {
+    if (entries) return entries;
+    entries = [];
+    var st = storage();
+    if (!st) return entries;
+    var raw = null;
+    try { raw = st.getItem(STORAGE_KEY); } catch (err) { raw = null; }
+    if (!raw) return entries;
+    var data;
+    try { data = JSON.parse(raw); } catch (err) { F.log.warn('[blueprints] library unreadable, starting empty'); return entries; }
+    var list = (data && Array.isArray(data.entries)) ? data.entries : [];
+    for (var i = 0; i < list.length; i++) {
+      var en = list[i];
+      if (!en || typeof en.s !== 'string') continue;
+      // Stored as strings: the same validation as imports (types may have changed since).
+      var d = decode(en.s);
+      if (!d) continue;
+      var id = int(en.id, 1, 1e9) ? en.id : nextId;
+      entries.push({ id: id, name: typeof en.name === 'string' ? en.name : d.name, bp: d.bp, created: en.created || 0 });
+      if (id >= nextId) nextId = id + 1;
+    }
+    return entries;
+  }
+
+  function persist() {
+    var st = storage();
+    if (!st) return;
+    var data = { v: 1, entries: entries.map(function (en) { return { id: en.id, name: en.name, created: en.created, s: encode(en.bp, en.name) }; }) };
+    try { st.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (err) { F.log.warn('[blueprints] could not store the library', err); }
+  }
+
+  function cleanName(name, fallbackN) {
+    name = (typeof name === 'string' ? name : '').trim().slice(0, 60);
+    return name || F.t('bpl.default_name', { n: fallbackN });
+  }
+
+  var library = {
+    list: function () { return load(); },
+    get: function (id) {
+      var l = load();
+      for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i];
+      return null;
+    },
+    add: function (name, bp) {
+      if (!bp || !Array.isArray(bp.entities) || !bp.entities.length) return null;
+      var l = load();
+      var en = { id: nextId++, name: cleanName(name, l.length + 1), bp: JSON.parse(JSON.stringify(bp)), created: Date.now() };
+      l.unshift(en);
+      persist();
+      return en;
+    },
+    remove: function (id) {
+      var l = load();
+      for (var i = 0; i < l.length; i++) if (l[i].id === id) { l.splice(i, 1); persist(); return true; }
+      return false;
+    },
+    rename: function (id, name) {
+      var en = library.get(id);
+      if (!en) return false;
+      en.name = cleanName(name, id);
+      persist();
+      return true;
+    },
+    clear: function () { entries = []; persist(); },
+  };
+
+  F.blueprints = F.blueprints || {};
+  F.blueprints.encode = encode;
+  F.blueprints.decode = decode;
+  F.blueprints.sanitizeSettings = sanitizeSettings;
+  F.blueprints.library = library;
+  F.blueprints.lastError = null;
+
+  // =====================================================================
+  // UI (browser only). The window is registered from an onRebuild hook, which only runs
+  // after every file (70-ui.js included) has loaded — same approach as 45-rocket.js.
+  // =====================================================================
+  function el(tag, css, text) {
+    var e = document.createElement(tag);
+    if (css) e.style.cssText = css;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function button(text, onClick, css) {
+    var b = el('button', css || '', text);
+    b.className = 'f-btn';
+    b.addEventListener('click', function (ev) { ev.preventDefault(); onClick(); });
+    return b;
+  }
+
+  function toast(msg) { if (F.ui && F.ui.toast) F.ui.toast(msg); }
+
+  // Small top-down sketch: each building as a rectangle in its item colour.
+  function preview(bp, px) {
+    var c = document.createElement('canvas');
+    c.width = px; c.height = px;
+    c.style.cssText = 'background:#1b1b1b;border:1px solid #0f0f0f;flex:0 0 auto;';
+    var ctx = c.getContext && c.getContext('2d');
+    if (!ctx) return c;
+    var s = Math.min((px - 4) / bp.w, (px - 4) / bp.h);
+    var ox = (px - bp.w * s) / 2, oy = (px - bp.h * s) / 2;
+    for (var i = 0; i < bp.entities.length; i++) {
+      var en = bp.entities[i];
+      var def = F.data.entities[en.type];
+      var fp = F.entities.footprint(def, en.dir);
+      var item = F.data.items[def.minable];
+      ctx.fillStyle = (item && item.icon && item.icon.color) || '#8a8f94';
+      var inset = s >= 4 ? 0.5 : 0;
+      ctx.fillRect(ox + en.x * s + inset, oy + en.y * s + inset, fp[0] * s - inset * 2, fp[1] * s - inset * 2);
+    }
+    return c;
+  }
+
+  function sizeText(bp) { return F.t('bpl.size', { w: bp.w, h: bp.h, n: bp.entities.length }); }
+
+  function section(body, title) {
+    var h = el('div', 'color:#ffe6c0;font-weight:600;margin:10px 0 4px;', title);
+    body.appendChild(h);
+  }
+
+  function currentBlueprint() {
+    if (F.input && F.input.blueprint && F.input.blueprint.bp) return F.input.blueprint.bp;
+    return F.blueprints.clipboard ? F.blueprints.clipboard() : null;
+  }
+
+  var exportBox = null; // textarea showing the last exported string
+
+  function render(body) {
+    while (body.firstChild) body.removeChild(body.firstChild);
+    body.style.cssText = 'min-width:420px;max-width:480px;max-height:70vh;overflow:auto;padding:2px 4px;';
+
+    // --- current blueprint ---
+    section(body, F.t('bpl.current'));
+    var cur = currentBlueprint();
+    if (!cur) {
+      body.appendChild(el('div', 'color:#aaa;', F.t('bpl.none')));
+    } else {
+      var row = el('div', 'display:flex;gap:8px;align-items:center;');
+      row.appendChild(preview(cur, 56));
+      var col = el('div', 'display:flex;flex-direction:column;gap:4px;flex:1;');
+      col.appendChild(el('div', 'color:#aaa;', sizeText(cur)));
+      var nameIn = el('input', 'width:100%;box-sizing:border-box;');
+      nameIn.type = 'text';
+      nameIn.className = 'f-input';
+      nameIn.value = F.t('bpl.default_name', { n: library.list().length + 1 });
+      col.appendChild(nameIn);
+      col.appendChild(button(F.t('bpl.save'), function () {
+        var en = library.add(nameIn.value, cur);
+        if (en) toast(F.t('bpl.saved', { name: en.name }));
+        render(body);
+      }));
+      row.appendChild(col);
+      body.appendChild(row);
+    }
+
+    // --- import ---
+    section(body, F.t('bpl.import'));
+    var ta = el('textarea', 'min-height:46px;height:46px;box-sizing:border-box;');
+    ta.className = 'f-textarea';
+    ta.placeholder = F.t('bpl.import_ph');
+    body.appendChild(ta);
+    var msg = el('div', 'color:#ff8e8e;min-height:14px;');
+    var imp = button(F.t('bpl.import_btn'), function () {
+      var d = decode(ta.value);
+      if (!d) { msg.textContent = F.t('bpl.err.' + (F.blueprints.lastError || 'format')); return; }
+      var en = library.add(d.name, d.bp);
+      toast(F.t('bpl.imported', { name: en.name }) + (d.skipped ? ' — ' + F.t('bpl.skipped', { n: d.skipped }) : ''));
+      render(body);
+    });
+    body.appendChild(imp);
+    body.appendChild(msg);
+
+    // --- library ---
+    section(body, F.t('bpl.library'));
+    exportBox = el('textarea', 'display:none;min-height:46px;height:46px;box-sizing:border-box;margin-bottom:6px;');
+    exportBox.className = 'f-textarea';
+    exportBox.readOnly = true;
+    var list = library.list();
+    if (!list.length) body.appendChild(el('div', 'color:#aaa;', F.t('bpl.empty')));
+    body.appendChild(exportBox);
+    list.forEach(function (en) { body.appendChild(entryRow(body, en)); });
+  }
+
+  function entryRow(body, en) {
+    var row = el('div', 'display:flex;gap:8px;align-items:center;padding:4px 0;border-top:1px solid #333;');
+    row.appendChild(preview(en.bp, 48));
+    var col = el('div', 'display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;');
+    var nameIn = el('input', 'width:100%;box-sizing:border-box;');
+    nameIn.type = 'text';
+    nameIn.className = 'f-input';
+    nameIn.value = en.name;
+    nameIn.addEventListener('change', function () { library.rename(en.id, nameIn.value); nameIn.value = en.name; });
+    col.appendChild(nameIn);
+    col.appendChild(el('div', 'color:#aaa;font-size:11px;', sizeText(en.bp)));
+    var btns = el('div', 'display:flex;gap:4px;');
+    btns.appendChild(button(F.t('bpl.use'), function () {
+      if (F.input && F.input.holdBlueprint) F.input.holdBlueprint(en.bp);
+      if (F.ui && F.ui.close) F.ui.close('blueprints');
+    }));
+    btns.appendChild(button(F.t('bpl.export'), function () {
+      var s = encode(en.bp, en.name);
+      exportBox.style.display = 'block';
+      exportBox.value = s;
+      exportBox.focus();
+      exportBox.select();
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(s).then(function () { toast(F.t('bpl.copied')); }, function () { /* selection is enough */ });
+        }
+      } catch (err) { /* no clipboard access: the selected text can be copied by hand */ }
+    }));
+    var del = btns.appendChild(button(F.t('bpl.delete'), function () {
+      var go = function (ok) { if (ok) { library.remove(en.id); render(body); } };
+      var q = F.t('bpl.delete_q', { name: en.name });
+      if (F.ui && F.ui.confirm) F.ui.confirm(q).then(go); else go(true);
+    }));
+    del.style.cssText = 'background:#5a2323;border-color:#2a0f0f;color:#ffd9d9;';
+    col.appendChild(btns);
+    row.appendChild(col);
+    return row;
+  }
+
+  function createWindow() {
+    if (typeof window !== 'undefined' && window.HEADLESS) return null;
+    var body = el('div');
+    render(body);
+    return F.ui.windowFrame(F.t('bpl.title'), body);
+  }
+
+  var registered = false;
+  F.game = F.game || {};
+  (F.game._onRebuild = F.game._onRebuild || []).push(function () {
+    if (registered || !F.ui || typeof F.ui.registerWindow !== 'function') return;
+    F.ui.registerWindow('blueprints', { create: createWindow });
+    registered = true;
+  });
+
+  // L toggles the library window.
+  F._inputKeys = F._inputKeys || {};
+  (F._inputKeys['l'] = F._inputKeys['l'] || []).push(function () {
+    if (!F.ui) return false;
+    if (F.ui.isOpen('blueprints')) F.ui.close('blueprints'); else F.ui.open('blueprints', {});
+    return true;
+  });
 })();
 
 
@@ -14541,7 +16546,8 @@ var F = window.F = {};
     var p0 = toScreen(pv.tx, pv.ty);
     var size = F.C.TILE * camera.zoom;
     var spr = (F.sprites && F.sprites.entity) ? F.sprites.entity(pv.type, pv.dir || 0, 0) : null;
-    var tint = pv.ok ? 'rgba(60,220,90,0.45)' : 'rgba(230,60,60,0.5)';
+    // pv.ghost: planning a ghost (Shift+click or a ghost cursor, 51-ghosts.js) — blue when valid.
+    var tint = pv.ok ? (pv.ghost ? 'rgba(90,170,255,0.5)' : 'rgba(60,220,90,0.45)') : 'rgba(230,60,60,0.5)';
     ctx.save();
     ctx.globalAlpha = 0.65;
     if (spr) {
@@ -17370,7 +19376,15 @@ var F = window.F = {};
   var robotCache = new Map();
   var robotShadowCache = null;
 
-  function paintLogisticRobot(ctx, S, frame) {
+  // Body colour and status-light colours per robot type: logistic robots are yellow with a
+  // green light, construction robots (53-construction.js) orange with an amber light.
+  var ROBOT_LOOK = {
+    'logistic-robot': { body: '#D9C040', glow: '#6FE68A', on: '#8CFCA0', off: '#3A5A3E' },
+    'construction-robot': { body: '#E07A2A', glow: '#FFC24A', on: '#FFE08A', off: '#5A4A2E' },
+  };
+
+  function paintLogisticRobot(ctx, S, frame, type) {
+    var look = ROBOT_LOOK[type] || ROBOT_LOOK['logistic-robot'];
     var cx = S / 2, cy = S / 2;
     var hover = Math.sin((frame % 8) / 8 * Math.PI * 2) * S * 0.02;
     cy += hover;
@@ -17395,7 +19409,7 @@ var F = window.F = {};
       { r: bodyH * 0.1, hi: 14, lo: 30, outlineWidth: 1.2 });
 
     // compact yellow-grey drone body: octagon-ish chassis via a rounded panel.
-    L.panel(ctx, cx - bodyW / 2, cy - bodyH / 2, bodyW, bodyH, '#D9C040',
+    L.panel(ctx, cx - bodyW / 2, cy - bodyH / 2, bodyW, bodyH, look.body,
       { r: Math.min(bodyW, bodyH) * 0.3, hi: 32, lo: 26, outlineWidth: 1.4 });
     ctx.fillStyle = '#8A8F94';
     ctx.fillRect(cx - bodyW * 0.14, cy - bodyH * 0.5, bodyW * 0.28, bodyH * 0.22);
@@ -17403,8 +19417,8 @@ var F = window.F = {};
     // eye/sensor lens (front, facing local north) + blinking status light on top.
     L.disc(ctx, cx, cy - bodyH * 0.12, bodyH * 0.14, '#2A2C2E', { hi: 40, lo: 20, outlineWidth: 1 });
     var blink = (frame % 8) < 2;
-    if (blink) L.glow(ctx, cx, cy + bodyH * 0.02, bodyH * 0.5, '#6FE68A', 0.7);
-    ctx.fillStyle = blink ? '#8CFCA0' : '#3A5A3E';
+    if (blink) L.glow(ctx, cx, cy + bodyH * 0.02, bodyH * 0.5, look.glow, 0.7);
+    ctx.fillStyle = blink ? look.on : look.off;
     ctx.beginPath(); ctx.arc(cx, cy + bodyH * 0.02, bodyH * 0.07, 0, Math.PI * 2); ctx.fill();
   }
 
@@ -17417,7 +19431,7 @@ var F = window.F = {};
     if (c) return c;
     c = L.newCanvas(ROBOT_SIZE, ROBOT_SIZE);
     var ctx = L.ctxOf(c);
-    paintLogisticRobot(ctx, ROBOT_SIZE, frame);
+    paintLogisticRobot(ctx, ROBOT_SIZE, frame, type);
     robotCache.set(key, c);
     return c;
   };
@@ -17441,15 +19455,17 @@ var F = window.F = {};
   if (F.sprites.defineIcon) {
     // 'robot' — the drone itself, front-facing mini render (reuses the body/pod/light shapes at
     // icon scale so it reads consistently with the in-world sprite).
-    F.sprites.defineIcon('robot', function (ctx, S) {
+    F.sprites.defineIcon('robot', function (ctx, S, def) {
+      var body = (def && def.icon && def.icon.color) || '#D9C040';
+      var look = (def && ROBOT_LOOK[def.id]) || ROBOT_LOOK['logistic-robot'];
       var cx = S / 2, cy = S * 0.52, bodyW = S * 0.5, bodyH = S * 0.42;
       L.panel(ctx, cx - bodyW * 0.26, cy + bodyH * 0.16, bodyW * 0.52, bodyH * 0.36, '#6E767C', { r: bodyH * 0.1, hi: 10, lo: 26 });
-      L.panel(ctx, cx - bodyW / 2, cy - bodyH / 2, bodyW, bodyH, '#D9C040', { r: Math.min(bodyW, bodyH) * 0.3, hi: 32, lo: 26 });
+      L.panel(ctx, cx - bodyW / 2, cy - bodyH / 2, bodyW, bodyH, body, { r: Math.min(bodyW, bodyH) * 0.3, hi: 32, lo: 26 });
       var nac = [[cx - bodyW * 0.52, cy - bodyH * 0.52], [cx + bodyW * 0.52, cy - bodyH * 0.52],
         [cx - bodyW * 0.52, cy + bodyH * 0.52], [cx + bodyW * 0.52, cy + bodyH * 0.52]];
       for (var i = 0; i < 4; i++) L.disc(ctx, nac[i][0], nac[i][1], S * 0.06, '#4A4E52', { hi: 30, lo: 30, outlineWidth: 1 });
       L.disc(ctx, cx, cy - bodyH * 0.1, bodyH * 0.16, '#2A2C2E', { hi: 40, lo: 20, outlineWidth: 1 });
-      ctx.fillStyle = '#6FE68A'; ctx.beginPath(); ctx.arc(cx, cy + bodyH * 0.05, bodyH * 0.09, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = look.glow; ctx.beginPath(); ctx.arc(cx, cy + bodyH * 0.05, bodyH * 0.09, 0, Math.PI * 2); ctx.fill();
     });
 
     // 'robot-frame' — unpowered grey wireframe chassis (flying-robot-frame intermediate item):
@@ -18532,12 +20548,14 @@ var F = window.F = {};
     var buttons = [
       ['map', 'ui.map'], ['tech', 'ui.tech'], ['help', 'ui.help'],
       ['save', 'ui.save'], ['settings', 'ui.settings'], ['alt', 'ui.alt'],
+      ['blueprints', 'ui.blueprints'], // window from 55-blueprint-library.js
     ];
     for (var i = 0; i < buttons.length; i++) {
       var b = el('button', 'f-btn', btnRow);
       b.dataset.hudAction = buttons[i][0];
       b.dataset.i18n = buttons[i][1];
       b.textContent = F.t(buttons[i][1]);
+      if (i === buttons.length - 1 && buttons.length % 3 === 1) b.style.gridColumn = '1 / -1'; // lone last button: full row
     }
   }
 
@@ -18742,8 +20760,12 @@ var F = window.F = {};
   // ===========================================================================
   function refreshCursorStack() {
     var c = getCursor();
+    // Ghost cursor (75-input.js / 51-ghosts.js): same icon, faded, no count.
+    var ghost = !c && F.input && F.input.ghostCursor;
+    if (ghost) c = { id: F.input.ghostCursor, count: 0 };
     if (!c) { show(cursorEl, false); return; }
     show(cursorEl, true);
+    cursorEl.style.opacity = ghost ? '0.5' : '';
     cursorEl.style.left = mouse.x + 'px';
     cursorEl.style.top = mouse.y + 'px';
     if (cursorEl.dataset.id !== c.id) {
@@ -18792,6 +20814,7 @@ var F = window.F = {};
       case 'settings': openWindow('menu', {}); break;
       case 'save': doSave(); break;
       case 'alt': if (F.render) F.render.altMode = !F.render.altMode; break;
+      case 'blueprints': if (isOpen('blueprints')) closeWindow('blueprints'); else openWindow('blueprints', {}); break;
     }
   }
 
@@ -20508,9 +22531,20 @@ var F = window.F = {};
   // is the ghost-drawing function 61-render.js should call instead of its
   // normal sprite-tint preview. See this module's final report for exactly
   // what 61-render.js needs to do with these two fields.
-  input.preview = { type: null, tx: 0, ty: 0, dir: 0, ok: false, reason: null, virtual: false, previewDraw: null };
+  input.preview = { type: null, tx: 0, ty: 0, dir: 0, ok: false, reason: null, virtual: false, previewDraw: null, ghost: false };
   input.hover = null;
   input.mining = null;
+  // Ghost cursor (51-ghosts.js): an item id held "as a ghost" when the player has none of it
+  // (pipette / quickbar on an item not in the inventory). Clicking places ghosts. Not saved.
+  input.ghostCursor = null;
+  // Blueprints (52-blueprints.js). `selecting` = a box tool is active: { mode, start: [tx,ty]|null,
+  // end: [tx,ty]|null, unmark } while dragging. mode 'copy' (Ctrl+C / B), 'cut' (Ctrl+X: copy +
+  // mark for deconstruction) or 'decon' (X, deconstruction planner, 54-deconstruction.js;
+  // Shift+drag cancels marks, reflected in `unmark`). `blueprint` = a blueprint held for pasting:
+  // { bp }, with its top-left tile under the cursor in `blueprintAnchor`. Not saved.
+  input.selecting = null;
+  input.blueprint = null;
+  input.blueprintAnchor = null;
 
   // =========================================================================
   // Internal (DOM-bound) state — only touched after init().
@@ -20520,6 +22554,7 @@ var F = window.F = {};
   var keysDown = Object.create(null);   // lowercase key -> bool, for WASD/arrows
   var leftDown = false, rightDown = false;
   var spaceDown = false, cDown = false;
+  var shiftDown = false;                // Shift+click plans ghosts instead of building
   var cursorDirByType = Object.create(null); // remembered rotation per placeable item type
   var windowStack = [];                 // names this module opened, for Esc to unwind
   var dragging = null;                  // active drag-placement session, or null
@@ -20638,8 +22673,9 @@ var F = window.F = {};
 
   function computeMineTarget() {
     input.state.mine = null;
-    if (!rightDown) { pickerMineState = null; return; }
+    if (!rightDown) { pickerMineState = null; lastCancelTile = null; return; }
     if (textFocused()) { pickerMineState = null; return; }
+    if (cancelGhostsAlongDrag()) { pickerMineState = null; return; }
     if (!F.player || !F.player.inReach || !F.player.inReach(hoverTx, hoverTy)) { pickerMineState = null; return; }
     if (computePickerMine()) return;
     pickerMineState = null;
@@ -20652,9 +22688,25 @@ var F = window.F = {};
     if (hasTarget) input.state.mine = [hoverTx, hoverTy];
   }
 
+  // Right mouse over a ghost cancels it instantly, at any distance. While the button
+  // is held, every tile the cursor crossed since the last frame is swept too, so a
+  // fast drag cancels a whole line of ghosts. Returns true if the hovered tile had one.
+  var lastCancelTile = null;
+  function cancelGhostsAlongDrag() {
+    if (!F.ghosts) return false;
+    var from = lastCancelTile || [hoverTx, hoverTy];
+    lastCancelTile = [hoverTx, hoverTy];
+    var line = tileLine(from[0], from[1], hoverTx, hoverTy);
+    var hit = false;
+    for (var i = 0; i < line.length; i++) {
+      if (F.ghosts.removeAt(line[i][0], line[i][1]) && i === line.length - 1) hit = true;
+    }
+    return hit;
+  }
+
   function clearPreview() {
     input.preview.type = null; input.preview.ok = false; input.preview.reason = null;
-    input.preview.virtual = false; input.preview.previewDraw = null;
+    input.preview.virtual = false; input.preview.previewDraw = null; input.preview.ghost = false;
   }
 
   // Virtual placer preview (design/EXPANSION.md §6.4/§6.6): the cursor item
@@ -20679,30 +22731,49 @@ var F = window.F = {};
     return true;
   }
 
+  // Ghost planning is active when the hand holds a ghost cursor, or a real
+  // placeable stack while Shift is held.
+  function ghostMode(cursor) {
+    if (!F.ghosts) return false;
+    return cursor ? shiftDown : !!input.ghostCursor;
+  }
+
   function computePreview() {
     var cursor = getCursor();
-    if (!cursor) { clearPreview(); return; }
-    var itemDef = F.data.items[cursor.id];
+    if (cursor) { input.ghostCursor = null; input.selecting = null; input.blueprint = null; } // a real stack in hand replaces them
+    input.blueprintAnchor = null;
+    if (input.selecting) { clearPreview(); return; }
+    if (input.blueprint) {
+      clearPreview();
+      var bp = input.blueprint.bp;
+      input.blueprintAnchor = computeAnchor(hoverWx, hoverWy, bp.w, bp.h);
+      return;
+    }
+    var itemId = cursor ? cursor.id : input.ghostCursor;
+    if (!itemId) { clearPreview(); return; }
+    var itemDef = F.data.items[itemId];
     if (itemDef && itemDef.place) {
       var type = itemDef.place;
       var def = F.data.entities[type];
       if (!def) { clearPreview(); return; }
+      var ghost = ghostMode(cursor);
       input.preview.virtual = false;
       input.preview.previewDraw = null;
+      input.preview.ghost = ghost;
       var dir = def.rotatable ? (cursorDirByType[type] || 0) : 0;
       var fp = F.entities.footprint(def, dir);
       var anchor = computeAnchor(hoverWx, hoverWy, fp[0], fp[1]);
       var tx = anchor[0], ty = anchor[1];
       var chk = { ok: false, reason: null };
       try {
-        chk = F.api.canPlace(type, tx, ty, dir, { checkReach: true }) || chk;
+        chk = (ghost ? F.ghosts.canPlace(type, tx, ty, dir) : F.api.canPlace(type, tx, ty, dir, { checkReach: true })) || chk;
       } catch (e) { F.log.warn('[input] canPlace threw', e); }
       input.preview.type = type;
       input.preview.tx = tx; input.preview.ty = ty; input.preview.dir = dir;
       input.preview.ok = !!chk.ok; input.preview.reason = chk.reason || null;
       return;
     }
-    if (computeVirtualPreview(cursor)) return;
+    if (cursor && computeVirtualPreview(cursor)) { input.preview.ghost = false; return; }
     clearPreview();
   }
 
@@ -20723,18 +22794,126 @@ var F = window.F = {};
     computePreview();
 
     if (dragging && leftDown) stepDrag();
+    if (input.selecting && input.selecting.start && leftDown) input.selecting.end = [hoverTx, hoverTy];
+    if (input.selecting) input.selecting.unmark = input.selecting.mode === 'decon' && shiftDown;
   };
+
+  // =========================================================================
+  // Blueprints: Ctrl+C / B starts the copy tool (drag a box), Ctrl+V takes the
+  // last copy back into the hand. While a blueprint is held: click pastes it as
+  // ghosts, R / Shift+R rotates, Q or Esc drops it.
+  // =========================================================================
+  function emptyHand() {
+    var p = getPlayer();
+    if (p && p.cursor) {
+      if (F.player.giveOrDrop) F.player.giveOrDrop(p.cursor.id, p.cursor.count);
+      p.cursor = null;
+    }
+    input.ghostCursor = null;
+    dragging = null;
+  }
+
+  function startCopyTool(mode) {
+    mode = mode || 'copy';
+    if (mode === 'decon' ? !F.deconstruction : !F.blueprints) return;
+    emptyHand();
+    input.blueprint = null;
+    input.selecting = { mode: mode, start: null, end: null, unmark: false };
+  }
+
+  function pasteClipboard() {
+    if (!F.blueprints) return;
+    var bp = F.blueprints.clipboard();
+    if (!bp) { if (F.ui && F.ui.toast) F.ui.toast(F.t('bp.no_clipboard')); return; }
+    emptyHand();
+    input.selecting = null;
+    input.blueprint = { bp: bp };
+  }
+
+  // Put a blueprint in the hand (the library's "Use" button, 55-blueprint-library.js).
+  input.holdBlueprint = function (bp) {
+    if (!bp || !bp.entities || !bp.entities.length) return false;
+    emptyHand();
+    input.selecting = null;
+    input.blueprint = { bp: bp };
+    return true;
+  };
+
+  function clearBlueprintModes() {
+    if (!input.selecting && !input.blueprint) return false;
+    input.selecting = null;
+    input.blueprint = null;
+    input.blueprintAnchor = null;
+    return true;
+  }
+
+  function finishDecon(sel, end) {
+    var n, msg;
+    if (shiftDown) {
+      var u = F.deconstruction.unmark(sel.start[0], sel.start[1], end[0], end[1]);
+      n = u.entities + u.features;
+      msg = n ? F.t('decon.unmarked', { n: n }) : F.t('decon.nothing');
+    } else {
+      var m = F.deconstruction.mark(sel.start[0], sel.start[1], end[0], end[1]);
+      n = m.entities + m.features + m.ghosts;
+      msg = n ? F.t('decon.marked', { n: n }) : F.t('decon.nothing');
+    }
+    input.selecting = { mode: 'decon', start: null, end: null, unmark: false }; // the planner stays in hand
+    if (F.ui && F.ui.toast) F.ui.toast(msg);
+  }
+
+  function finishSelection() {
+    var sel = input.selecting;
+    if (!sel || !sel.start) return;
+    var end = sel.end || sel.start;
+    if (sel.mode === 'decon') { finishDecon(sel, end); return; }
+    var bp = F.blueprints.create(sel.start[0], sel.start[1], end[0], end[1]);
+    if (!bp) {
+      input.selecting = { mode: sel.mode, start: null, end: null, unmark: false }; // stay in the tool, try again
+      if (F.ui && F.ui.toast) F.ui.toast(F.t('bp.empty'));
+      return;
+    }
+    if (sel.mode === 'cut' && F.deconstruction) {
+      // Cut: the buildings (not trees/rocks) in the box get marked; ghosts there are dropped.
+      var ax = Math.min(sel.start[0], end[0]), bx = Math.max(sel.start[0], end[0]);
+      var ay = Math.min(sel.start[1], end[1]), by = Math.max(sel.start[1], end[1]);
+      var ents = F.entities.all();
+      for (var i = 0; i < ents.length; i++) {
+        var e = ents[i];
+        if (e && !e._removed && e.x <= bx && e.y <= by && e.x + e.w - 1 >= ax && e.y + e.h - 1 >= ay) F.deconstruction.markEntity(e);
+      }
+      var gs = F.ghosts.inRect(ax, ay, bx, by);
+      for (var k = 0; k < gs.length; k++) F.ghosts.remove(gs[k]);
+    }
+    F.blueprints.setClipboard(bp);
+    input.selecting = null;
+    input.blueprint = { bp: F.blueprints.clipboard() };
+    if (F.ui && F.ui.toast) F.ui.toast(F.t('bp.copied', { n: bp.entities.length }));
+  }
+
+  function pasteHeldBlueprint() {
+    var a = input.blueprintAnchor;
+    if (!input.blueprint || !a) return;
+    var r = F.blueprints.place(input.blueprint.bp, a[0], a[1]);
+    if (F.ui && F.ui.toast) {
+      var msg = F.t('bp.placed', { n: r.placed });
+      if (r.blocked) msg += ' — ' + F.t('bp.blocked', { n: r.blocked });
+      F.ui.toast(msg);
+    }
+  }
 
   // =========================================================================
   // Drag placement (GDD §9.11): belts auto-turn along the mouse path; poles
   // space themselves at max wire reach; walls/pipes/other placeable entities
   // chain along every tile the path touches, skipping collisions.
   // =========================================================================
-  function beginDrag(type) {
+  function beginDrag(type, ghost) {
     var def = F.data.entities[type];
     dragging = {
       type: type,
       def: def,
+      ghost: !!ghost, // plan ghosts along the path instead of consuming items
+      ghostIds: Object.create(null), // ghosts placed by this drag (see overlapsOwnDragGhost)
       beltLike: def.behaviour === 'belt' || def.behaviour === 'underground' || def.behaviour === 'splitter',
       poleLike: def.behaviour === 'pole',
       // 'line' drag kinds (F.input.addDragKind, design/EXPANSION.md §6.6 —
@@ -20780,7 +22959,9 @@ var F = window.F = {};
         // Factorio-style drag: the belt we are leaving turns to face the drag direction
         // (covers the first belt of a drag and corners, including drags started on an existing belt).
         try {
-          var pe = F.world.entityAt(prevTx, prevTy);
+          var pg = dragging.ghost ? F.ghosts.at(prevTx, prevTy) : null;
+          if (pg && pg.type === type && pg.dir !== dir && dragging.visited[prevTx + ',' + prevTy] && def.behaviour === 'belt') F.ghosts.setDir(pg, dir);
+          var pe = dragging.ghost ? null : F.world.entityAt(prevTx, prevTy);
           if (pe && pe.type === type && pe.dir !== dir && dragging.visited[prevTx + ',' + prevTy] && def.behaviour === 'belt') {
             pe.dir = dir;
             if (F.belts && F.belts.onRotate) F.belts.onRotate(pe);
@@ -20807,7 +22988,7 @@ var F = window.F = {};
       placed = safePlace(type, anchor[0], anchor[1], dir2);
     }
 
-    if (placed) {
+    if (placed && !dragging.ghost) {
       if (remainingOf(type) <= 0) dragging = null; // stops the drag when the hand and the inventory are empty
     }
   }
@@ -20818,7 +22999,25 @@ var F = window.F = {};
     var p = getPlayer();
     return !!(p && p.cursor && p.cursor.id === type && p.cursor.count > 0);
   }
+  function overlapsOwnDragGhost(type, tx, ty, dir) {
+    var fp = F.entities.footprint(F.data.entities[type], dir);
+    for (var j = 0; j < fp[1]; j++) for (var i = 0; i < fp[0]; i++) {
+      var o = F.ghosts.at(tx + i, ty + j);
+      if (o && dragging.ghostIds[o.id] && !(o.type === type && o.x === tx && o.y === ty && o.dir === dir)) return true;
+    }
+    return false;
+  }
   function safePlace(type, tx, ty, dir) {
+    if (dragging && dragging.ghost) {
+      try {
+        // Ghosts replace the ghosts they overlap — but never ones this same drag just
+        // placed, or dragging a 3x3 ghost would keep overwriting its own previous step.
+        if (overlapsOwnDragGhost(type, tx, ty, dir)) return null;
+        var g = F.ghosts.place(type, tx, ty, dir);
+        if (g) dragging.ghostIds[g.id] = true;
+        return g;
+      } catch (e) { F.log.warn('[input] ghost place failed', type, tx, ty, dir, e); return null; }
+    }
     try {
       var chk = F.api.canPlace(type, tx, ty, dir);
       if (!chk || !chk.ok) return null;
@@ -20866,6 +23065,9 @@ var F = window.F = {};
     if (textFocused()) return;
     input.frame();
     var cursor = getCursor();
+    if (input.selecting) { input.selecting.start = [hoverTx, hoverTy]; input.selecting.end = [hoverTx, hoverTy]; return; }
+    if (input.blueprint) { pasteHeldBlueprint(); return; }
+    if (input.preview.type && input.preview.ghost) { beginDrag(input.preview.type, true); return; }
     if (cursor && input.preview.type) {
       // Virtual placer items (design/EXPANSION.md §6.4/§6.6, e.g. vehicles):
       // placed with one click via F.api.placeVirtual, not the belt-style drag
@@ -20892,6 +23094,7 @@ var F = window.F = {};
       return;
     }
     if (!cursor && tryPicker(hoverWx, hoverWy)) return;
+    if (!cursor && buildGhostAt(hoverTx, hoverTy)) return;
     if (input.hover) {
       if (F.ui && F.ui.open) { F.ui.open('entity', input.hover); windowStack.push('entity'); }
       return;
@@ -20901,6 +23104,20 @@ var F = window.F = {};
 
   function handleLeftUp() {
     dragging = null;
+    if (input.selecting && input.selecting.start) finishSelection();
+  }
+
+  // Left click with an empty hand on a ghost builds it from the inventory (within reach).
+  function buildGhostAt(tx, ty) {
+    if (!F.ghosts) return false;
+    var g = F.ghosts.at(tx, ty);
+    if (!g) return false;
+    if (F.ghosts.build(g, { checkReach: true })) return true;
+    var why = F.ghosts.lastFailure;
+    var msg = why === 'missing' ? F.t('ghost.missing', { name: F.t('item.' + F.ghosts.itemFor(g)) })
+      : why === 'too_far' ? F.t('ghost.too_far') : F.t('ghost.blocked');
+    if (F.ui && F.ui.toast) F.ui.toast(msg);
+    return true;
   }
 
   function tryPickupGround(tx, ty) {
@@ -20936,7 +23153,9 @@ var F = window.F = {};
   }
 
   function rotate(ccw) {
+    if (input.blueprint) { input.blueprint = { bp: F.blueprints.rotate(input.blueprint.bp, ccw ? -1 : 1) }; return; }
     var cursor = getCursor();
+    if (!cursor && input.ghostCursor) cursor = { id: input.ghostCursor, count: 0 };
     if (cursor) {
       var itemDef = F.data.items[cursor.id];
       var type = itemDef && itemDef.place;
@@ -20973,7 +23192,9 @@ var F = window.F = {};
       p.cursor = null;
       return;
     }
-    var hov = input.hover;
+    if (input.ghostCursor) { input.ghostCursor = null; return; }
+    if (clearBlueprintModes()) return;
+    var hov = input.hover || (F.ghosts ? F.ghosts.at(hoverTx, hoverTy) : null);
     if (hov) {
       var def = F.data.entities[hov.type];
       var itemId = def && def.minable;
@@ -20981,6 +23202,10 @@ var F = window.F = {};
         var cnt = F.player.count(itemId);
         var taken = F.player.take(itemId, cnt);
         if (taken > 0) { p.cursor = { id: itemId, count: taken }; cursorDirByType[itemId] = hov.dir || 0; }
+      } else if (itemId && F.ghosts && F.data.items[itemId] && F.data.items[itemId].place === hov.type) {
+        // None in the inventory: pick it up as a ghost cursor instead.
+        input.ghostCursor = itemId;
+        cursorDirByType[hov.type] = hov.dir || 0;
       }
       return;
     }
@@ -21037,6 +23262,7 @@ var F = window.F = {};
   // always is — 70-ui.js defines it unconditionally — this is defensive).
   var KNOWN_WINDOWS = ['entity', 'inventory', 'tech', 'help', 'map', 'menu', 'death'];
   function onEscape() {
+    if (clearBlueprintModes()) return;
     if (!F.ui) return;
     for (var i = windowStack.length - 1; i >= 0; i--) {
       var name = windowStack[i];
@@ -21070,10 +23296,17 @@ var F = window.F = {};
       p.cursor = null;
       return;
     }
+    if (input.ghostCursor) { input.ghostCursor = null; return; }
+    if (clearBlueprintModes()) return;
     var itemId = p.quickbar[idx];
     if (!itemId || !F.player.count) return;
     var count = F.player.count(itemId);
-    if (count <= 0) return;
+    if (count <= 0) {
+      // Nothing left of a placeable item: hold it as a ghost cursor.
+      var qdef = F.data.items[itemId];
+      if (F.ghosts && qdef && qdef.place) input.ghostCursor = itemId;
+      return;
+    }
     var taken = F.player.take(itemId, count);
     if (taken > 0) p.cursor = { id: itemId, count: taken };
   }
@@ -21135,11 +23368,15 @@ var F = window.F = {};
   // DOM event wiring (lazy — only reached from init(), never at load time).
   // =========================================================================
   function onKeyDown(e) {
+    shiftDown = !!e.shiftKey;
     if (textFocused()) return;
     var key = e.key;
     var lower = key.length === 1 ? key.toLowerCase() : key.toLowerCase();
 
     if ((e.ctrlKey || e.metaKey) && lower === 's') { e.preventDefault(); quickSave(); return; }
+    if ((e.ctrlKey || e.metaKey) && lower === 'c') { e.preventDefault(); startCopyTool('copy'); return; }
+    if ((e.ctrlKey || e.metaKey) && lower === 'x') { e.preventDefault(); startCopyTool('cut'); return; }
+    if ((e.ctrlKey || e.metaKey) && lower === 'v') { e.preventDefault(); pasteClipboard(); return; }
 
     if (MOVE_KEYS[lower]) {
       keysDown[lower] = true; updateMoveAxis();
@@ -21170,6 +23407,8 @@ var F = window.F = {};
       case 'h': case 'f1': toggleWindow('help'); e.preventDefault(); break;
       case 'f': pickupNearby(); break;
       case 'z': dropOne(); break;
+      case 'b': startCopyTool('copy'); break;
+      case 'x': startCopyTool('decon'); break;
       case 'alt': toggleAlt(); e.preventDefault(); break;
       case 'escape': onEscape(); break;
       case ' ': case 'spacebar': spaceDown = true; updateShoot(); e.preventDefault(); break;
@@ -21183,6 +23422,7 @@ var F = window.F = {};
   }
 
   function onKeyUp(e) {
+    shiftDown = !!e.shiftKey;
     var key = e.key;
     var lower = key.length === 1 ? key.toLowerCase() : key.toLowerCase();
     if (MOVE_KEYS[lower]) { keysDown[lower] = false; updateMoveAxis(); return; }
@@ -21197,12 +23437,16 @@ var F = window.F = {};
     mouse.y = e.clientY - rect.top;
   }
 
-  function onMouseMove(e) { updateMouseFromEvent(e); }
+  function onMouseMove(e) { updateMouseFromEvent(e); shiftDown = !!e.shiftKey; }
 
   function onMouseDown(e) {
     updateMouseFromEvent(e);
+    shiftDown = !!e.shiftKey;
     if (e.button === 0) { leftDown = true; handleLeftDown(); }
-    else if (e.button === 2) { rightDown = true; }
+    else if (e.button === 2) {
+      if (input.selecting) { input.selecting = null; return; } // right click cancels the copy tool
+      rightDown = true; lastCancelTile = null; input.frame();
+    }
   }
 
   function onMouseUp(e) {
@@ -21219,7 +23463,7 @@ var F = window.F = {};
 
   function onBlur() {
     keysDown = Object.create(null);
-    leftDown = false; rightDown = false; spaceDown = false; cDown = false;
+    leftDown = false; rightDown = false; spaceDown = false; cDown = false; shiftDown = false;
     dragging = null;
     updateMoveAxis(); updateShoot();
     input.state.mine = null;
