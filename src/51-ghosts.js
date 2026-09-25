@@ -12,7 +12,8 @@
 //
 // Rules:
 //   - A ghost may only go where the real entity could go (F.api.canPlace, except that the
-//     player standing there does not block it). It never overlaps a real entity.
+//     player standing there, and trees/rocks — which get marked for deconstruction — do not
+//     block it). It never overlaps a real entity.
 //   - Placing a ghost over other ghosts replaces them (an identical ghost is kept instead).
 //   - Whenever a real entity is created (F.entities.create -> 'entity:placed'), every ghost
 //     under its footprint is removed; a ghost of the same type at the same anchor tile hands
@@ -30,6 +31,8 @@
 //                                          (opts.fromInventory default true, opts.checkReach)
 //   captureSettings(entity) -> settings | null     applySettings(entity, settings)
 //   inRect(x0, y0, x1, y1) -> ghosts overlapping the tile rect (inclusive)
+//   blockedByFeature(ghost) -> bool      a tree/rock still stands on it (planned over one: it
+//                                          is marked for deconstruction, 54-deconstruction.js)
 //   drawSprite(ctx, cam, type, dir, tx, ty, settings, bad)  draw a planned entity (blue, or
 //                                          red when `bad`); also used by blueprint previews
 //
@@ -156,7 +159,8 @@
   function canPlace(type, tx, ty, dir) {
     if (!placeableDef(type)) return { ok: false, reason: 'collision' };
     tx = tx | 0; ty = ty | 0;
-    var chk = F.api.canPlace(type, tx, ty, (dir | 0) & 3, { ignorePlayer: true });
+    // Trees and rocks do not block a ghost: place() marks them for deconstruction.
+    var chk = F.api.canPlace(type, tx, ty, (dir | 0) & 3, { ignorePlayer: true, ignoreFeatures: !!F.deconstruction });
     // A planned train stop may lean on a planned rail (blueprints place both as ghosts);
     // building the stop by hand still needs the real rail first.
     if (!chk.ok && chk.reason === 'no_rail' && hasGhostNeighbour(tx, ty, 'rail')) return { ok: true, reason: null };
@@ -197,6 +201,11 @@
     var g = { id: s.nextId++, type: type, x: tx, y: ty, dir: dir, w: fp[0], h: fp[1], settings: cloneSettings(settings) };
     s.list.push(g);
     setTiles(g, true);
+    if (F.deconstruction) {
+      for (var fy = 0; fy < fp[1]; fy++) for (var fx = 0; fx < fp[0]; fx++) {
+        if (F.world.feature(tx + fx, ty + fy)) F.deconstruction.markFeature(tx + fx, ty + fy);
+      }
+    }
     F.events.emit('ghost:placed', g);
     return g;
   }
@@ -210,6 +219,12 @@
     setTiles(g, false);
     F.events.emit('ghost:removed', g);
     return true;
+  }
+
+  // True while a tree or rock still stands on the ghost's footprint (robots wait for it).
+  function blockedByFeature(g) {
+    for (var j = 0; j < g.h; j++) for (var i = 0; i < g.w; i++) if (F.world.feature(g.x + i, g.y + j)) return true;
+    return false;
   }
 
   function removeAt(tx, ty) {
@@ -419,6 +434,7 @@
     applySettings: applySettings,
     inRect: inRect,
     drawSprite: drawSprite,
+    blockedByFeature: blockedByFeature,
     lastFailure: null,
   };
   F.ghosts = ghosts;

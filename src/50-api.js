@@ -247,6 +247,9 @@
     } else if (F.world && typeof F.world.buildable === 'function') {
       for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
         const x = tx + i, y = ty + j;
+        // opts.ignoreFeatures: trees/rocks do not block (ghosts over them get the tree/rock
+        // marked for deconstruction instead, 51-ghosts.js / 54-deconstruction.js).
+        if (opts.ignoreFeatures && F.world.feature && F.world.feature(x, y) && F.world.isLand(x, y) && !F.world.entityAt(x, y)) continue;
         if (!F.world.buildable(x, y)) {
           if (typeof F.world.isWater === 'function' && F.world.isWater(x, y)) return { ok: false, reason: 'water' };
           return { ok: false, reason: 'collision' };
@@ -305,9 +308,12 @@
     return e;
   }
 
+  // opts.collect (array): instead of giving the entity item + contents to the player, push
+  // [itemId, count] pairs onto it (construction robots deconstructing, 54-deconstruction.js).
   function remove(tx, ty, opts) {
     opts = opts || {};
     const toInventory = opts.toInventory !== false; // default true per ARCHITECTURE §15
+    const collect = Array.isArray(opts.collect) ? opts.collect : null;
     if (!F.world || typeof F.world.entityAt !== 'function') { F.log.warn('F.api.remove: F.world not available'); return false; }
     const e = F.world.entityAt(tx, ty);
     if (!e) return false;
@@ -340,11 +346,13 @@
       for (let i = 0; i < contents.length; i++) {
         const id = contents[i][0], count = contents[i][1];
         if (!id || !count) continue;
-        if (toInventory) giveOrDropAt(id, count, cx, cy); else dropNearFallback(id, count, cx, cy);
+        if (collect) collect.push([id, count]);
+        else if (toInventory) giveOrDropAt(id, count, cx, cy); else dropNearFallback(id, count, cx, cy);
       }
     }
     if (itemId) {
-      if (toInventory) giveOrDropAt(itemId, 1, cx, cy); else dropNearFallback(itemId, 1, cx, cy);
+      if (collect) collect.push([itemId, 1]);
+      else if (toInventory) giveOrDropAt(itemId, 1, cx, cy); else dropNearFallback(itemId, 1, cx, cy);
     }
 
     afterTopologyChange(e, def);

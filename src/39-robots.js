@@ -692,6 +692,8 @@
           F.t('item.construction-robot') + ': ' + F.t('ui.robots.idle') + ' ' + cs.idle + '  ' +
           F.t('ui.robots.busy') + ' ' + cs.busy + '  ·  ' + F.t('ui.robots.ghosts') + ' ' + cs.ghosts));
         if (cs.missing > 0) root.appendChild(h.el('div', 'f-hint f-warn', F.t('ui.robots.missing', { n: cs.missing })));
+        if (cs.decon > 0) root.appendChild(h.el('div', 'f-hint', F.t('ui.robots.decon', { n: cs.decon })));
+        if (cs.noStorage > 0) root.appendChild(h.el('div', 'f-hint f-warn', F.t('ui.robots.noStorage')));
       }
     } else {
       root.appendChild(h.el('div', 'f-hint', F.t('ui.robots.noNetwork')));
@@ -774,6 +776,8 @@
       'ui.robots.requests': 'Requests',
       'ui.robots.noNetwork': 'Not in range of a roboport network',
       'ui.robots.ghosts': 'ghosts in range',
+      'ui.robots.decon': '{n} marked for deconstruction in range',
+      'ui.robots.noStorage': 'Deconstruction waits: this network has no storage chest',
       'ui.robots.missing': '{n} ghosts are missing materials (put the buildings in a provider or storage chest)',
     });
   }

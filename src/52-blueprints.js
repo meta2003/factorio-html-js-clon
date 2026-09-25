@@ -262,10 +262,14 @@
       var x0 = Math.min(a[0], b[0]), y0 = Math.min(a[1], b[1]);
       var x1 = Math.max(a[0], b[0]) + 1, y1 = Math.max(a[1], b[1]) + 1;
       var p0 = cam.toScreen(x0, y0), p1 = cam.toScreen(x1, y1);
+      // Copy: blue. Cut (copy + deconstruct): orange. Deconstruction planner: red, or green
+      // while Shift is held (cancels marks).
+      var col = sel.mode === 'decon' ? (sel.unmark ? [110, 220, 120] : [255, 90, 70]) : sel.mode === 'cut' ? [255, 170, 70] : [120, 200, 255];
+      var rgba = function (a) { return 'rgba(' + col[0] + ',' + col[1] + ',' + col[2] + ',' + a + ')'; };
       ctx.save();
       if (sel.start) {
-        // Outline everything that would be copied.
-        ctx.strokeStyle = 'rgba(120,200,255,0.9)';
+        // Outline everything the box would affect.
+        ctx.strokeStyle = rgba(0.9);
         ctx.lineWidth = 2;
         var ents = F.entities.all();
         for (var i = 0; i < ents.length; i++) {
@@ -275,10 +279,19 @@
           var q = cam.toScreen(e.x, e.y);
           ctx.strokeRect(q[0] + 2, q[1] + 2, e.w * size - 4, e.h * size - 4);
         }
-        ctx.fillStyle = 'rgba(90,170,255,0.12)';
+        if (sel.mode === 'decon' && (x1 - x0) * (y1 - y0) <= 40000) {
+          for (var fy = Math.max(y0, rect.y0 - 1); fy < Math.min(y1, rect.y1 + 2); fy++) {
+            for (var fx = Math.max(x0, rect.x0 - 1); fx < Math.min(x1, rect.x1 + 2); fx++) {
+              if (!F.world.feature(fx, fy)) continue;
+              var fq = cam.toScreen(fx, fy);
+              ctx.strokeRect(fq[0] + 3, fq[1] + 3, size - 6, size - 6);
+            }
+          }
+        }
+        ctx.fillStyle = rgba(0.12);
         ctx.fillRect(p0[0], p0[1], p1[0] - p0[0], p1[1] - p0[1]);
       }
-      ctx.strokeStyle = '#8fd0ff';
+      ctx.strokeStyle = rgba(1);
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 4]);
       ctx.strokeRect(p0[0], p0[1], p1[0] - p0[0], p1[1] - p0[1]);

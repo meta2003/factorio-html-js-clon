@@ -63,8 +63,10 @@
   // Ghost cursor (51-ghosts.js): an item id held "as a ghost" when the player has none of it
   // (pipette / quickbar on an item not in the inventory). Clicking places ghosts. Not saved.
   input.ghostCursor = null;
-  // Blueprints (52-blueprints.js). `selecting` = copy tool active: { start: [tx,ty]|null,
-  // end: [tx,ty]|null } while dragging a box. `blueprint` = a blueprint held for pasting:
+  // Blueprints (52-blueprints.js). `selecting` = a box tool is active: { mode, start: [tx,ty]|null,
+  // end: [tx,ty]|null, unmark } while dragging. mode 'copy' (Ctrl+C / B), 'cut' (Ctrl+X: copy +
+  // mark for deconstruction) or 'decon' (X, deconstruction planner, 54-deconstruction.js;
+  // Shift+drag cancels marks, reflected in `unmark`). `blueprint` = a blueprint held for pasting:
   // { bp }, with its top-left tile under the cursor in `blueprintAnchor`. Not saved.
   input.selecting = null;
   input.blueprint = null;
@@ -319,6 +321,7 @@
 
     if (dragging && leftDown) stepDrag();
     if (input.selecting && input.selecting.start && leftDown) input.selecting.end = [hoverTx, hoverTy];
+    if (input.selecting) input.selecting.unmark = input.selecting.mode === 'decon' && shiftDown;
   };
 
   // =========================================================================
@@ -336,11 +339,12 @@
     dragging = null;
   }
 
-  function startCopyTool() {
-    if (!F.blueprints) return;
+  function startCopyTool(mode) {
+    mode = mode || 'copy';
+    if (mode === 'decon' ? !F.deconstruction : !F.blueprints) return;
     emptyHand();
     input.blueprint = null;
-    input.selecting = { start: null, end: null };
+    input.selecting = { mode: mode, start: null, end: null, unmark: false };
   }
 
   function pasteClipboard() {
@@ -360,15 +364,43 @@
     return true;
   }
 
+  function finishDecon(sel, end) {
+    var n, msg;
+    if (shiftDown) {
+      var u = F.deconstruction.unmark(sel.start[0], sel.start[1], end[0], end[1]);
+      n = u.entities + u.features;
+      msg = n ? F.t('decon.unmarked', { n: n }) : F.t('decon.nothing');
+    } else {
+      var m = F.deconstruction.mark(sel.start[0], sel.start[1], end[0], end[1]);
+      n = m.entities + m.features + m.ghosts;
+      msg = n ? F.t('decon.marked', { n: n }) : F.t('decon.nothing');
+    }
+    input.selecting = { mode: 'decon', start: null, end: null, unmark: false }; // the planner stays in hand
+    if (F.ui && F.ui.toast) F.ui.toast(msg);
+  }
+
   function finishSelection() {
     var sel = input.selecting;
     if (!sel || !sel.start) return;
     var end = sel.end || sel.start;
+    if (sel.mode === 'decon') { finishDecon(sel, end); return; }
     var bp = F.blueprints.create(sel.start[0], sel.start[1], end[0], end[1]);
     if (!bp) {
-      input.selecting = { start: null, end: null }; // stay in the copy tool, try again
+      input.selecting = { mode: sel.mode, start: null, end: null, unmark: false }; // stay in the tool, try again
       if (F.ui && F.ui.toast) F.ui.toast(F.t('bp.empty'));
       return;
+    }
+    if (sel.mode === 'cut' && F.deconstruction) {
+      // Cut: the buildings (not trees/rocks) in the box get marked; ghosts there are dropped.
+      var ax = Math.min(sel.start[0], end[0]), bx = Math.max(sel.start[0], end[0]);
+      var ay = Math.min(sel.start[1], end[1]), by = Math.max(sel.start[1], end[1]);
+      var ents = F.entities.all();
+      for (var i = 0; i < ents.length; i++) {
+        var e = ents[i];
+        if (e && !e._removed && e.x <= bx && e.y <= by && e.x + e.w - 1 >= ax && e.y + e.h - 1 >= ay) F.deconstruction.markEntity(e);
+      }
+      var gs = F.ghosts.inRect(ax, ay, bx, by);
+      for (var k = 0; k < gs.length; k++) F.ghosts.remove(gs[k]);
     }
     F.blueprints.setClipboard(bp);
     input.selecting = null;
@@ -859,7 +891,8 @@
     var lower = key.length === 1 ? key.toLowerCase() : key.toLowerCase();
 
     if ((e.ctrlKey || e.metaKey) && lower === 's') { e.preventDefault(); quickSave(); return; }
-    if ((e.ctrlKey || e.metaKey) && lower === 'c') { e.preventDefault(); startCopyTool(); return; }
+    if ((e.ctrlKey || e.metaKey) && lower === 'c') { e.preventDefault(); startCopyTool('copy'); return; }
+    if ((e.ctrlKey || e.metaKey) && lower === 'x') { e.preventDefault(); startCopyTool('cut'); return; }
     if ((e.ctrlKey || e.metaKey) && lower === 'v') { e.preventDefault(); pasteClipboard(); return; }
 
     if (MOVE_KEYS[lower]) {
@@ -891,7 +924,8 @@
       case 'h': case 'f1': toggleWindow('help'); e.preventDefault(); break;
       case 'f': pickupNearby(); break;
       case 'z': dropOne(); break;
-      case 'b': startCopyTool(); break;
+      case 'b': startCopyTool('copy'); break;
+      case 'x': startCopyTool('decon'); break;
       case 'alt': toggleAlt(); e.preventDefault(); break;
       case 'escape': onEscape(); break;
       case ' ': case 'spacebar': spaceDown = true; updateShoot(); e.preventDefault(); break;

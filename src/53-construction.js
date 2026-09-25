@@ -14,13 +14,19 @@
 //     If the ghost vanished or cannot be built (player standing on it for too long), the
 //     robot carries the item back to a storage/provider chest (or drops it on the ground).
 //   - A robot whose roboports all disappeared drops itself as an item.
+//   - Deconstruction (54-deconstruction.js marks): before building, each pass sends idle
+//     robots to marked buildings/trees/rocks in coverage — only when the network has a
+//     storage chest. The robot takes the target down (building + contents, or wood/stone/
+//     coal) and carries everything to the nearest storage chest with room (the rest lands
+//     on the ground next to it). Ghosts whose tiles still hold a tree or rock wait.
 //   - Speed 0.06 tiles/tick, 20 % without power; 25 kW per flying robot on the network.
 //
-// State: F.state.cbots = [{ id, net, x, y, task: { ghostId, type, item, fromId, stage,
-//   px, py, bx, by, cargo, t, tries, retId, dockId } }] — JSON-plain, saved with the game.
+// State: F.state.cbots = [{ id, net, x, y, task: { kind: 'build'|'decon', ghostId, type,
+//   item, target, fromId, stage, px, py, bx, by, cargo, items, t, tries, retId, dockId } }]
+//   — JSON-plain, saved with the game. `items` = [[itemId, count], ...] being carried back.
 //
 // F.construction:
-//   stats(net) -> { idle, busy, ghosts, missing }  (ghost counts from the last dispatch pass)
+//   stats(net) -> { idle, busy, ghosts, missing, decon, noStorage }  (from the last pass)
 //   count() -> robots in the air        claimed(ghostId) -> bool
 //   networkForTile(tx, ty) -> network | null (construction coverage)
 //   DISPATCH, SPEED
@@ -128,8 +134,51 @@
   function claimedSet() {
     var set = Object.create(null);
     var arr = list();
-    for (var i = 0; i < arr.length; i++) if (arr[i].task && arr[i].task.ghostId) set[arr[i].task.ghostId] = true;
+    for (var i = 0; i < arr.length; i++) {
+      var t = arr[i].task;
+      if (!t) continue;
+      if (t.ghostId) set[t.ghostId] = true;
+      if (t.target) set[t.target] = true;
+    }
     return set;
+  }
+
+  function launch(net, rp, task) {
+    F.inv.remove(rp.cbots, ITEM, 1);
+    var hc = centerOf(rp);
+    list().push({ id: nextId++, net: net.id, x: hc[0], y: hc[1], task: task });
+  }
+
+  function idleRoboportNear(net, x, y) {
+    return nearest(roboportsOf(net), x, y, function (e) { return Array.isArray(e.cbots) && F.inv.count(e.cbots, ITEM) > 0; });
+  }
+
+  // Marked buildings/trees/rocks first, so ghosts planned over trees can follow.
+  function dispatchDecon(claimed, budget, hasIdle) {
+    if (!F.deconstruction) return 0;
+    var list0 = F.deconstruction.targets();
+    var sent = 0;
+    var storage = Object.create(null);
+    for (var i = 0; i < list0.length; i++) {
+      var tg = list0[i];
+      var net = networkForPoint(tg.x, tg.y);
+      if (!net) continue;
+      var st = lastStats[net.id];
+      st.decon++;
+      if (claimed[tg.key]) continue;
+      if (storage[net.id] === undefined) storage[net.id] = chestsOf(net, ['storage']).length > 0;
+      if (!storage[net.id]) { st.noStorage++; continue; }
+      if (sent >= budget || hasIdle[net.id] === false) continue;
+      var rp = idleRoboportNear(net, tg.x, tg.y);
+      if (!rp) { hasIdle[net.id] = false; continue; }
+      launch(net, rp, {
+        kind: 'decon', target: tg.key, ghostId: null, stage: 'toBuild',
+        bx: tg.x, by: tg.y, cargo: false, items: null, t: 0, tries: 0, retId: null, dockId: null,
+      });
+      claimed[tg.key] = true;
+      sent++;
+    }
+    return sent;
   }
 
   // =====================================================================
@@ -139,14 +188,14 @@
     var ghosts = F.ghosts ? F.ghosts.all() : [];
     var nets = networks();
     lastStats = Object.create(null);
-    for (var n = 0; n < nets.length; n++) lastStats[nets[n].id] = { ghosts: 0, missing: 0 };
-    if (!ghosts.length || !nets.length) return;
+    for (var n = 0; n < nets.length; n++) lastStats[nets[n].id] = { ghosts: 0, missing: 0, decon: 0, noStorage: 0 };
+    if (!nets.length) return;
 
     var claimed = claimedSet();
-    var sent = 0;
+    var hasIdle = Object.create(null);     // net.id -> false once no robot is left
+    var sent = dispatchDecon(claimed, MAX_PER_PASS, hasIdle);
     var sourceCache = Object.create(null); // net|item -> chest|null for this pass
     var sources = Object.create(null);     // net.id -> provider+storage chests
-    var hasIdle = Object.create(null);     // net.id -> false once no robot is left
 
     for (var i = 0; i < ghosts.length; i++) {
       var g = ghosts[i];
@@ -156,6 +205,7 @@
       var st = lastStats[net.id];
       st.ghosts++;
       if (claimed[g.id]) continue;
+      if (F.ghosts.blockedByFeature(g)) continue; // a marked tree/rock goes first
 
       var item = F.ghosts.itemFor(g);
       var key = net.id + '|' + item;
@@ -169,19 +219,14 @@
       if (sent >= MAX_PER_PASS || hasIdle[net.id] === false) continue;
 
       var sc = centerOf(src);
-      var rp = nearest(roboportsOf(net), sc[0], sc[1], function (e) { return Array.isArray(e.cbots) && F.inv.count(e.cbots, ITEM) > 0; });
+      var rp = idleRoboportNear(net, sc[0], sc[1]);
       if (!rp) { hasIdle[net.id] = false; continue; }
 
       F.inv.remove(src.inv, item, 1);
-      F.inv.remove(rp.cbots, ITEM, 1);
-      var hc = centerOf(rp);
-      list().push({
-        id: nextId++, net: net.id, x: hc[0], y: hc[1],
-        task: {
-          ghostId: g.id, type: g.type, item: item, fromId: src.id,
-          stage: 'toPickup', px: sc[0], py: sc[1], bx: c[0], by: c[1],
-          cargo: false, t: 0, tries: 0, retId: null, dockId: null,
-        },
+      launch(net, rp, {
+        kind: 'build', ghostId: g.id, type: g.type, item: item, fromId: src.id,
+        stage: 'toPickup', px: sc[0], py: sc[1], bx: c[0], by: c[1],
+        cargo: false, items: null, t: 0, tries: 0, retId: null, dockId: null,
       });
       claimed[g.id] = true;
       sent++;
@@ -202,8 +247,8 @@
     return e ? 'built' : 'blocked';
   }
 
-  // Where to bring an unused item: nearest storage chest with room, then provider chest,
-  // in the robot's network first, then anywhere. null = drop it on the ground.
+  // Where to bring items: nearest storage chest with room (for the first item), then
+  // provider chest, in the robot's network first, then anywhere. null = drop on the ground.
   function returnTarget(r, item) {
     var net = netById(r.net);
     var fits = function (e) { return F.entities.canAcceptItem(e, item) > 0; };
@@ -218,12 +263,32 @@
     return null;
   }
 
+  // Carry t.items (or the unused build item) to a chest; nothing to carry -> fly home.
   function startReturn(r) {
     var t = r.task;
-    var dst = returnTarget(r, t.item);
-    if (!dst) { F.ground.dropNear(r.x, r.y, t.item, 1); t.cargo = false; t.stage = 'toDock'; return; }
+    if (!t.items) t.items = (t.kind !== 'decon' && t.cargo && t.item) ? [[t.item, 1]] : [];
+    t.items = t.items.filter(function (it) { return it && it[0] && it[1] > 0; });
+    if (!t.items.length) { t.cargo = false; t.stage = 'toDock'; resolveDock(r); return; }
+    t.cargo = true;
+    var dst = returnTarget(r, t.items[0][0]);
+    if (!dst) { dropItems(r.x, r.y, t.items); t.items = null; t.cargo = false; t.stage = 'toDock'; resolveDock(r); return; }
     t.retId = dst.id;
     t.stage = 'toReturn';
+  }
+
+  function dropItems(x, y, items) {
+    for (var i = 0; i < items.length; i++) if (items[i][1] > 0) F.ground.dropNear(x, y, items[i][0], items[i][1]);
+  }
+
+  function deliver(r, dst) {
+    var t = r.task, left = [];
+    for (var i = 0; i < t.items.length; i++) {
+      var id = t.items[i][0], n = t.items[i][1], put = 0;
+      try { put = F.entities.insertItem(dst, id, n) || 0; } catch (err) { put = 0; }
+      if (put < n) left.push([id, n - put]);
+    }
+    if (left.length) dropItems(r.x, r.y, left);
+    t.items = null; t.cargo = false; t.retId = null;
   }
 
   function resolveDock(r) {
@@ -244,6 +309,11 @@
         if (moveToward(r, t.px, t.py, speed)) { t.cargo = true; t.stage = 'toBuild'; }
         return;
       case 'toBuild': {
+        if (t.kind === 'decon') {
+          if (!F.deconstruction || !F.deconstruction.stillMarked(t.target)) { t.target = null; startReturn(r); return; }
+          if (moveToward(r, t.bx, t.by, speed)) { t.stage = 'building'; t.t = 0; }
+          return;
+        }
         var g = F.ghosts.byId(t.ghostId);
         if (!g) { startReturn(r); return; }
         var c = ghostCenter(g);
@@ -253,6 +323,14 @@
       }
       case 'building':
         if (++t.t < BUILD_TICKS) return;
+        if (t.kind === 'decon') {
+          var got = [];
+          var ok = F.deconstruction && F.deconstruction.deconstruct(t.target, got);
+          t.target = null;
+          t.items = ok ? got : null;
+          startReturn(r);
+          return;
+        }
         var res = tryBuild(r);
         if (res === 'built') { t.cargo = false; t.ghostId = null; t.stage = 'toDock'; resolveDock(r); return; }
         if (res === 'gone' || ++t.tries > MAX_TRIES) { t.ghostId = null; startReturn(r); return; }
@@ -265,12 +343,7 @@
         var dst = t.retId != null ? F.entities.byId(t.retId) : null;
         if (!dst || dst._removed) { startReturn(r); if (t.stage !== 'toReturn') return; dst = F.entities.byId(t.retId); }
         var dc = centerOf(dst);
-        if (moveToward(r, dc[0], dc[1], speed)) {
-          var n = 0;
-          try { n = F.entities.insertItem(dst, t.item, 1) || 0; } catch (err) { n = 0; }
-          if (n < 1) F.ground.dropNear(r.x, r.y, t.item, 1);
-          t.cargo = false; t.retId = null; t.stage = 'toDock'; resolveDock(r);
-        }
+        if (moveToward(r, dc[0], dc[1], speed)) { deliver(r, dst); t.stage = 'toDock'; resolveDock(r); }
         return;
       }
       case 'toDock': {
@@ -357,9 +430,10 @@
       }
       var spr = F.sprites.robot(ITEM, Math.floor((tick + r.id * 5) / 4) % 8);
       if (spr && spr.width) ctx.drawImage(spr, sp[0] - sizePx / 2, ry - sizePx / 2, sizePx, sizePx);
-      if (t && t.cargo && F.sprites.item) {
+      var cargoItem = t && t.cargo ? (t.items && t.items.length ? t.items[0][0] : t.item) : null;
+      if (cargoItem && F.sprites.item) {
         try {
-          var pip = F.sprites.item(t.item, Math.max(8, sizePx * 0.4));
+          var pip = F.sprites.item(cargoItem, Math.max(8, sizePx * 0.4));
           if (pip && pip.width) ctx.drawImage(pip, sp[0] - pip.width / 2, sp[1] - hoverPx * 0.35, pip.width, pip.height);
         } catch (err) { /* never crash rendering over an icon */ }
       }
@@ -377,8 +451,8 @@
       for (var i = 0; i < rps.length; i++) if (Array.isArray(rps[i].cbots)) idle += F.inv.count(rps[i].cbots, ITEM);
       var arr = list();
       for (var j = 0; j < arr.length; j++) if (arr[j].net === net.id) busy++;
-      var s = lastStats[net.id] || { ghosts: 0, missing: 0 };
-      return { idle: idle, busy: busy, ghosts: s.ghosts, missing: s.missing };
+      var s = lastStats[net.id] || { ghosts: 0, missing: 0, decon: 0, noStorage: 0 };
+      return { idle: idle, busy: busy, ghosts: s.ghosts, missing: s.missing, decon: s.decon, noStorage: s.noStorage };
     },
     count: function () { return list().length; },
     claimed: function (ghostId) { return !!claimedSet()[ghostId]; },

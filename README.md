@@ -14,7 +14,8 @@ Mid and late game (see `design/EXPANSION.md`):
 - **Trains**: rails (drag to place), train stops, locomotives and cargo wagons, automatic
   schedules, inserters loading wagons at stations, riding and manual driving.
 - **Robots**: roboports, logistic robots, passive provider / storage / requester chests;
-  construction robots that build ghosts and pasted blueprints from logistic chests.
+  construction robots that build ghosts and pasted blueprints from logistic chests, and take
+  down whatever the deconstruction planner (X) marks — buildings, trees and rocks.
 - **Ghosts and blueprints**: plan buildings as ghosts (Shift+click), copy an area (Ctrl+C) and
   paste it rotated elsewhere (Ctrl+V); build ghosts by hand or let construction robots do it.
 - **Rocket silo**: build rocket parts, load a satellite and launch — the victory screen.
@@ -45,7 +46,7 @@ The headless runner loads the built game with DOM stubs and runs the scenarios i
 
 | Path | What |
 |---|---|
-| `src/NN-*.js` | game modules (expansion: `05/06` data+text, `37-oil`, `38-trains`, `39-robots`, `45-rocket`; `51-ghosts` planned buildings, `52-blueprints` copy/paste, `53-construction` construction robots), concatenated in filename order (see `design/ARCHITECTURE.md`) |
+| `src/NN-*.js` | game modules (expansion: `05/06` data+text, `37-oil`, `38-trains`, `39-robots`, `45-rocket`; `51-ghosts` planned buildings, `52-blueprints` copy/paste, `53-construction` construction robots, `54-deconstruction` deconstruction planner), concatenated in filename order (see `design/ARCHITECTURE.md`) |
 | `src/60-sprites.js`, `src/62..68-sprites-*.js` | procedural art: sprite library + building painter packs |
 | `src/disabled/` | code kept out of the build (combat, Slovenian translation) |
 | `src/template.html`, `src/style.css` | page shell and UI styles |
@@ -68,6 +69,8 @@ The headless runner loads the built game with DOM stubs and runs the scenarios i
 | Ctrl+C or B, then drag | copy an area into a blueprint |
 | Ctrl+V | take the last copied blueprint into the hand |
 | R / left click / Q (blueprint in hand) | rotate / paste as ghosts / drop |
+| X, then drag (Shift+drag cancels) | deconstruction planner: mark buildings, trees, rocks for robots |
+| Ctrl+X, then drag | cut: copy an area and mark its buildings for deconstruction |
 | E | inventory and crafting |
 | T | technologies |
 | M | map |
