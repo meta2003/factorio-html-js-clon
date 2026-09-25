@@ -165,7 +165,15 @@
   var robotCache = new Map();
   var robotShadowCache = null;
 
-  function paintLogisticRobot(ctx, S, frame) {
+  // Body colour and status-light colours per robot type: logistic robots are yellow with a
+  // green light, construction robots (53-construction.js) orange with an amber light.
+  var ROBOT_LOOK = {
+    'logistic-robot': { body: '#D9C040', glow: '#6FE68A', on: '#8CFCA0', off: '#3A5A3E' },
+    'construction-robot': { body: '#E07A2A', glow: '#FFC24A', on: '#FFE08A', off: '#5A4A2E' },
+  };
+
+  function paintLogisticRobot(ctx, S, frame, type) {
+    var look = ROBOT_LOOK[type] || ROBOT_LOOK['logistic-robot'];
     var cx = S / 2, cy = S / 2;
     var hover = Math.sin((frame % 8) / 8 * Math.PI * 2) * S * 0.02;
     cy += hover;
@@ -190,7 +198,7 @@
       { r: bodyH * 0.1, hi: 14, lo: 30, outlineWidth: 1.2 });
 
     // compact yellow-grey drone body: octagon-ish chassis via a rounded panel.
-    L.panel(ctx, cx - bodyW / 2, cy - bodyH / 2, bodyW, bodyH, '#D9C040',
+    L.panel(ctx, cx - bodyW / 2, cy - bodyH / 2, bodyW, bodyH, look.body,
       { r: Math.min(bodyW, bodyH) * 0.3, hi: 32, lo: 26, outlineWidth: 1.4 });
     ctx.fillStyle = '#8A8F94';
     ctx.fillRect(cx - bodyW * 0.14, cy - bodyH * 0.5, bodyW * 0.28, bodyH * 0.22);
@@ -198,8 +206,8 @@
     // eye/sensor lens (front, facing local north) + blinking status light on top.
     L.disc(ctx, cx, cy - bodyH * 0.12, bodyH * 0.14, '#2A2C2E', { hi: 40, lo: 20, outlineWidth: 1 });
     var blink = (frame % 8) < 2;
-    if (blink) L.glow(ctx, cx, cy + bodyH * 0.02, bodyH * 0.5, '#6FE68A', 0.7);
-    ctx.fillStyle = blink ? '#8CFCA0' : '#3A5A3E';
+    if (blink) L.glow(ctx, cx, cy + bodyH * 0.02, bodyH * 0.5, look.glow, 0.7);
+    ctx.fillStyle = blink ? look.on : look.off;
     ctx.beginPath(); ctx.arc(cx, cy + bodyH * 0.02, bodyH * 0.07, 0, Math.PI * 2); ctx.fill();
   }
 
@@ -212,7 +220,7 @@
     if (c) return c;
     c = L.newCanvas(ROBOT_SIZE, ROBOT_SIZE);
     var ctx = L.ctxOf(c);
-    paintLogisticRobot(ctx, ROBOT_SIZE, frame);
+    paintLogisticRobot(ctx, ROBOT_SIZE, frame, type);
     robotCache.set(key, c);
     return c;
   };
@@ -236,15 +244,17 @@
   if (F.sprites.defineIcon) {
     // 'robot' — the drone itself, front-facing mini render (reuses the body/pod/light shapes at
     // icon scale so it reads consistently with the in-world sprite).
-    F.sprites.defineIcon('robot', function (ctx, S) {
+    F.sprites.defineIcon('robot', function (ctx, S, def) {
+      var body = (def && def.icon && def.icon.color) || '#D9C040';
+      var look = (def && ROBOT_LOOK[def.id]) || ROBOT_LOOK['logistic-robot'];
       var cx = S / 2, cy = S * 0.52, bodyW = S * 0.5, bodyH = S * 0.42;
       L.panel(ctx, cx - bodyW * 0.26, cy + bodyH * 0.16, bodyW * 0.52, bodyH * 0.36, '#6E767C', { r: bodyH * 0.1, hi: 10, lo: 26 });
-      L.panel(ctx, cx - bodyW / 2, cy - bodyH / 2, bodyW, bodyH, '#D9C040', { r: Math.min(bodyW, bodyH) * 0.3, hi: 32, lo: 26 });
+      L.panel(ctx, cx - bodyW / 2, cy - bodyH / 2, bodyW, bodyH, body, { r: Math.min(bodyW, bodyH) * 0.3, hi: 32, lo: 26 });
       var nac = [[cx - bodyW * 0.52, cy - bodyH * 0.52], [cx + bodyW * 0.52, cy - bodyH * 0.52],
         [cx - bodyW * 0.52, cy + bodyH * 0.52], [cx + bodyW * 0.52, cy + bodyH * 0.52]];
       for (var i = 0; i < 4; i++) L.disc(ctx, nac[i][0], nac[i][1], S * 0.06, '#4A4E52', { hi: 30, lo: 30, outlineWidth: 1 });
       L.disc(ctx, cx, cy - bodyH * 0.1, bodyH * 0.16, '#2A2C2E', { hi: 40, lo: 20, outlineWidth: 1 });
-      ctx.fillStyle = '#6FE68A'; ctx.beginPath(); ctx.arc(cx, cy + bodyH * 0.05, bodyH * 0.09, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = look.glow; ctx.beginPath(); ctx.arc(cx, cy + bodyH * 0.05, bodyH * 0.09, 0, Math.PI * 2); ctx.fill();
     });
 
     // 'robot-frame' — unpowered grey wireframe chassis (flying-robot-frame intermediate item):

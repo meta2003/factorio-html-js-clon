@@ -69,6 +69,7 @@
     ['cargo-wagon', 5, 0, 'logistics', null, 'wagon', '#8A8F94', '#5A4636', 'cargo-wagon'],
     ['roboport', 10, 0, 'logistics', 'roboport', 'dish', '#8A8F94', '#D9A520', null],
     ['logistic-robot', 50, 0, 'logistics', null, 'robot', '#D9C040', '#8A8F94', null],
+    ['construction-robot', 50, 0, 'logistics', null, 'robot', '#E07A2A', '#8A8F94', null],
     ['passive-provider-chest', 50, 0, 'logistics', 'passive-provider-chest', 'box', '#C43A3A', null, null],
     ['storage-chest', 50, 0, 'logistics', 'storage-chest', 'box', '#D9B830', null, null],
     ['requester-chest', 50, 0, 'logistics', 'requester-chest', 'box', '#3A7FD9', null, null],
@@ -142,7 +143,8 @@
     ['locomotive', [['engine-unit', 20], ['electronic-circuit', 10], ['steel-plate', 30]], [['locomotive', 1]], 4, 'crafting', 'railway', [], []],
     ['cargo-wagon', [['iron-gear-wheel', 10], ['iron-plate', 20], ['steel-plate', 20]], [['cargo-wagon', 1]], 1, 'crafting', 'railway', [], []],
     ['train-stop', [['electronic-circuit', 5], ['iron-plate', 6], ['iron-stick', 6], ['steel-plate', 3]], [['train-stop', 1]], 0.5, 'crafting', 'automated-rail-transportation', [], []],
-    ['roboport', [['steel-plate', 45], ['iron-gear-wheel', 45], ['advanced-circuit', 45]], [['roboport', 1]], 5, 'crafting', 'logistic-robotics', [], []],
+    ['roboport', [['steel-plate', 45], ['iron-gear-wheel', 45], ['advanced-circuit', 45]], [['roboport', 1]], 5, 'crafting', 'construction-robotics', [], []],
+    ['construction-robot', [['flying-robot-frame', 1], ['electronic-circuit', 2]], [['construction-robot', 1]], 0.5, 'crafting', 'construction-robotics', [], []],
     ['logistic-robot', [['flying-robot-frame', 1], ['advanced-circuit', 2]], [['logistic-robot', 1]], 0.5, 'crafting', 'logistic-robotics', [], []],
     ['passive-provider-chest', [['steel-chest', 1], ['electronic-circuit', 3], ['advanced-circuit', 1]], [['passive-provider-chest', 1]], 0.5, 'crafting', 'logistic-robotics', [], []],
     ['storage-chest', [['steel-chest', 1], ['electronic-circuit', 3], ['advanced-circuit', 1]], [['storage-chest', 1]], 0.5, 'crafting', 'logistic-robotics', [], []],
@@ -245,7 +247,7 @@
     id: 'roboport', size: [4, 4], rotatable: false, health: 400, behaviour: 'roboport',
     minable: 'roboport', category: 'logistics', mineTime: 0.3,
     energy: { type: 'electric', usage: 50, drain: 50 },
-    roboport: { radius: 25 },
+    roboport: { radius: 25, constructionRadius: 55 }, // logistic 50x50, construction 110x110
   });
   D.entities['passive-provider-chest'] = baseEntity({
     id: 'passive-provider-chest', size: [1, 1], rotatable: false, health: 350, behaviour: 'logistic-chest',
@@ -309,7 +311,9 @@
     ['electric-engine', ['lubricant'], 'RGB', 50, 30, ['electric-engine-unit']],
     ['battery', ['sulfur-processing', 'chemical-science-pack'], 'RGB', 150, 30, ['battery']],
     ['robotics', ['electric-engine', 'battery'], 'RGB', 75, 30, ['flying-robot-frame']],
-    ['logistic-robotics', ['robotics'], 'RGB', 250, 30, ['roboport', 'logistic-robot', 'passive-provider-chest', 'storage-chest', 'requester-chest']],
+    // construction-robotics comes first and unlocks the roboport (a recipe has one unlocking tech).
+    ['construction-robotics', ['robotics'], 'RGB', 100, 30, ['roboport', 'construction-robot']],
+    ['logistic-robotics', ['construction-robotics'], 'RGB', 250, 30, ['logistic-robot', 'passive-provider-chest', 'storage-chest', 'requester-chest']],
     ['advanced-electronics-2', ['chemical-science-pack'], 'RGB', 300, 30, ['processing-unit']],
     ['low-density-structure', ['chemical-science-pack', 'plastics'], 'RGB', 300, 45, ['low-density-structure']],
     ['production-science-pack', ['advanced-electronics-2', 'railway'], 'RGB', 100, 30, ['production-science-pack']],

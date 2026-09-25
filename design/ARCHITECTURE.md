@@ -24,6 +24,7 @@ Read `ENGINEERING-CONSTRAINTS.md` first (it wins on any conflict). Data values (
 | `50-api.js` | `F.api` | high-level actions shared by UI, input and tests (place/remove/mine/craft/…) |
 | `51-ghosts.js` | `F.ghosts` | entity ghosts (planned buildings): own store `F.state.ghosts`, placement, hand building, settings hand-over, rendering — see the header comment of the file |
 | `52-blueprints.js` | `F.blueprints` | blueprints: copy an area of entities/ghosts, rotate, paste as ghosts; clipboard in `F.state.blueprints` — see the header comment of the file |
+| `53-construction.js` | `F.construction` | construction robots: build ghosts inside a roboport network's 110×110 construction areas from provider/storage chests; state `F.state.cbots` — see the header comment of the file |
 | `60-sprites.js` | `F.sprites` | procedural sprites & item icons cached on offscreen canvases |
 | `61-render.js` | `F.render`, `F.camera` | canvas world rendering, terrain chunk cache, animations, overlays, minimap image |
 | `70-ui.js` | `F.ui` | DOM UI framework: windows, slots, tooltips, HUD, quickbar, alerts, minimap, menu |
