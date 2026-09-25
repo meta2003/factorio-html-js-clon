@@ -30,6 +30,8 @@
 //                                          (opts.fromInventory default true, opts.checkReach)
 //   captureSettings(entity) -> settings | null     applySettings(entity, settings)
 //   inRect(x0, y0, x1, y1) -> ghosts overlapping the tile rect (inclusive)
+//   drawSprite(ctx, cam, type, dir, tx, ty, settings, bad)  draw a planned entity (blue, or
+//                                          red when `bad`); also used by blueprint previews
 //
 // Registers: onNewGame/onRebuild hooks (queue pattern, design/EXPANSION.md §6.1) and an
 // 'objects' + 'overlay' render layer (F._renderHooks, EXPANSION §6.5). Headless safe.
@@ -153,7 +155,22 @@
 
   function canPlace(type, tx, ty, dir) {
     if (!placeableDef(type)) return { ok: false, reason: 'collision' };
-    return F.api.canPlace(type, tx | 0, ty | 0, (dir | 0) & 3, { ignorePlayer: true });
+    tx = tx | 0; ty = ty | 0;
+    var chk = F.api.canPlace(type, tx, ty, (dir | 0) & 3, { ignorePlayer: true });
+    // A planned train stop may lean on a planned rail (blueprints place both as ghosts);
+    // building the stop by hand still needs the real rail first.
+    if (!chk.ok && chk.reason === 'no_rail' && hasGhostNeighbour(tx, ty, 'rail')) return { ok: true, reason: null };
+    return chk;
+  }
+
+  function hasGhostNeighbour(tx, ty, behaviour) {
+    for (var d = 0; d < 4; d++) {
+      var v = F.C.DIRS[d];
+      var g = tileMap.get(key(tx + v[0], ty + v[1]));
+      var gd = g && F.data.entities[g.type];
+      if (gd && gd.behaviour === behaviour) return true;
+    }
+    return false;
   }
 
   function cloneSettings(s) {
@@ -247,6 +264,8 @@
       any = Object.keys(out).length > 0;
     }
     if (def && def.behaviour === 'train-stop' && e.name) { out.name = e.name; any = true; }
+    // Entrance or exit: an exit built before its entrance must not turn into an entrance.
+    if (def && def.behaviour === 'underground' && (e.io === 'in' || e.io === 'out')) { out.io = e.io; any = true; }
     return any ? out : null;
   }
 
@@ -266,6 +285,7 @@
       e[k] = JSON.parse(JSON.stringify(s[k]));
     }
     if (def.behaviour === 'train-stop' && typeof s.name === 'string' && s.name) e.name = s.name.slice(0, 40);
+    if (def.behaviour === 'underground' && s.io && F.belts && typeof F.belts.setUndergroundIO === 'function') F.belts.setUndergroundIO(e, s.io);
   }
 
   // A real entity appeared: clear every ghost under it, handing the settings of a
@@ -304,21 +324,54 @@
   // Rendering (browser only; no-ops headless because F.sprites is disabled)
   // =====================================================================
   var GHOST_TINT = 'rgba(110,190,255,0.6)';
-  var tintCache = typeof WeakMap === 'function' ? new WeakMap() : null;
+  var BAD_TINT = 'rgba(255,80,70,0.65)';
+  var tintCaches = Object.create(null); // colour -> WeakMap(sprite canvas -> tinted copy)
 
-  function tinted(spr) {
-    if (!spr || !spr.width || !tintCache || typeof document === 'undefined') return null;
-    var c = tintCache.get(spr);
+  function tinted(spr, color) {
+    if (!spr || !spr.width || typeof WeakMap !== 'function' || typeof document === 'undefined') return null;
+    var cache = tintCaches[color] || (tintCaches[color] = new WeakMap());
+    var c = cache.get(spr);
     if (c) return c;
     c = document.createElement('canvas');
     c.width = spr.width; c.height = spr.height;
     var x = c.getContext('2d');
     x.drawImage(spr, 0, 0);
     x.globalCompositeOperation = 'source-atop';
-    x.fillStyle = GHOST_TINT;
+    x.fillStyle = color;
     x.fillRect(0, 0, c.width, c.height);
-    tintCache.set(spr, c);
+    cache.set(spr, c);
     return c;
+  }
+
+  // Draws one planned entity (a ghost, or an entry of a blueprint preview) at tile
+  // (tx, ty): the entity sprite tinted blue — or red when `bad` — with a dashed outline.
+  function drawSprite(ctx, cam, type, dir, tx, ty, settings, bad) {
+    var def = F.data.entities[type];
+    if (!def) return;
+    var fp = F.entities.footprint(def, dir & 3);
+    var size = F.C.TILE * (cam.zoom || 1);
+    var p = cam.toScreen(tx, ty);
+    var w = fp[0] * size, h = fp[1] * size;
+    var opts = (def.behaviour === 'underground' && settings && settings.io) ? { io: settings.io } : null;
+    var spr = null;
+    try { spr = F.sprites.entity(type, dir & 3, 0, opts); } catch (err) { spr = null; }
+    var color = bad ? BAD_TINT : GHOST_TINT;
+    var t = tinted(spr, color);
+    ctx.save();
+    if (t) {
+      ctx.globalAlpha = 0.55;
+      ctx.drawImage(t, p[0], p[1], w, h);
+    } else {
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = color;
+      ctx.fillRect(p[0], p[1], w, h);
+    }
+    ctx.globalAlpha = 0.8;
+    ctx.strokeStyle = bad ? 'rgba(255,120,110,0.9)' : 'rgba(140,205,255,0.9)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.strokeRect(p[0] + 1.5, p[1] + 1.5, w - 3, h - 3);
+    ctx.restore();
   }
 
   F._renderHooks = F._renderHooks || {
@@ -328,32 +381,11 @@
 
   F._renderHooks.layers.objects.push(function (ctx, rect, cam) {
     if (!F.sprites || !F.sprites.enabled || !tileMap.size) return;
-    var size = F.C.TILE * (cam.zoom || 1);
     var list = inRect(rect.x0 - 1, rect.y0 - 1, rect.x1 + 1, rect.y1 + 1);
-    ctx.save();
     for (var i = 0; i < list.length; i++) {
       var g = list[i];
-      var p = cam.toScreen(g.x, g.y);
-      var w = g.w * size, h = g.h * size;
-      var spr = null;
-      try { spr = F.sprites.entity(g.type, g.dir, 0, null); } catch (err) { spr = null; }
-      var t = tinted(spr);
-      if (t) {
-        ctx.globalAlpha = 0.55;
-        ctx.drawImage(t, p[0], p[1], w, h);
-      } else {
-        ctx.globalAlpha = 0.35;
-        ctx.fillStyle = GHOST_TINT;
-        ctx.fillRect(p[0], p[1], w, h);
-      }
-      ctx.globalAlpha = 0.8;
-      ctx.strokeStyle = 'rgba(140,205,255,0.9)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4, 3]);
-      ctx.strokeRect(p[0] + 1.5, p[1] + 1.5, w - 3, h - 3);
-      ctx.setLineDash([]);
+      drawSprite(ctx, cam, g.type, g.dir, g.x, g.y, g.settings, false);
     }
-    ctx.restore();
   });
 
   // Hover highlight for the ghost under the cursor (real entities get the selection box).
@@ -386,6 +418,7 @@
     captureSettings: captureSettings,
     applySettings: applySettings,
     inRect: inRect,
+    drawSprite: drawSprite,
     lastFailure: null,
   };
   F.ghosts = ghosts;

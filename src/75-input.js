@@ -63,6 +63,12 @@
   // Ghost cursor (51-ghosts.js): an item id held "as a ghost" when the player has none of it
   // (pipette / quickbar on an item not in the inventory). Clicking places ghosts. Not saved.
   input.ghostCursor = null;
+  // Blueprints (52-blueprints.js). `selecting` = copy tool active: { start: [tx,ty]|null,
+  // end: [tx,ty]|null } while dragging a box. `blueprint` = a blueprint held for pasting:
+  // { bp }, with its top-left tile under the cursor in `blueprintAnchor`. Not saved.
+  input.selecting = null;
+  input.blueprint = null;
+  input.blueprintAnchor = null;
 
   // =========================================================================
   // Internal (DOM-bound) state — only touched after init().
@@ -258,7 +264,15 @@
 
   function computePreview() {
     var cursor = getCursor();
-    if (cursor) input.ghostCursor = null; // a real stack in hand replaces the ghost cursor
+    if (cursor) { input.ghostCursor = null; input.selecting = null; input.blueprint = null; } // a real stack in hand replaces them
+    input.blueprintAnchor = null;
+    if (input.selecting) { clearPreview(); return; }
+    if (input.blueprint) {
+      clearPreview();
+      var bp = input.blueprint.bp;
+      input.blueprintAnchor = computeAnchor(hoverWx, hoverWy, bp.w, bp.h);
+      return;
+    }
     var itemId = cursor ? cursor.id : input.ghostCursor;
     if (!itemId) { clearPreview(); return; }
     var itemDef = F.data.items[itemId];
@@ -304,7 +318,74 @@
     computePreview();
 
     if (dragging && leftDown) stepDrag();
+    if (input.selecting && input.selecting.start && leftDown) input.selecting.end = [hoverTx, hoverTy];
   };
+
+  // =========================================================================
+  // Blueprints: Ctrl+C / B starts the copy tool (drag a box), Ctrl+V takes the
+  // last copy back into the hand. While a blueprint is held: click pastes it as
+  // ghosts, R / Shift+R rotates, Q or Esc drops it.
+  // =========================================================================
+  function emptyHand() {
+    var p = getPlayer();
+    if (p && p.cursor) {
+      if (F.player.giveOrDrop) F.player.giveOrDrop(p.cursor.id, p.cursor.count);
+      p.cursor = null;
+    }
+    input.ghostCursor = null;
+    dragging = null;
+  }
+
+  function startCopyTool() {
+    if (!F.blueprints) return;
+    emptyHand();
+    input.blueprint = null;
+    input.selecting = { start: null, end: null };
+  }
+
+  function pasteClipboard() {
+    if (!F.blueprints) return;
+    var bp = F.blueprints.clipboard();
+    if (!bp) { if (F.ui && F.ui.toast) F.ui.toast(F.t('bp.no_clipboard')); return; }
+    emptyHand();
+    input.selecting = null;
+    input.blueprint = { bp: bp };
+  }
+
+  function clearBlueprintModes() {
+    if (!input.selecting && !input.blueprint) return false;
+    input.selecting = null;
+    input.blueprint = null;
+    input.blueprintAnchor = null;
+    return true;
+  }
+
+  function finishSelection() {
+    var sel = input.selecting;
+    if (!sel || !sel.start) return;
+    var end = sel.end || sel.start;
+    var bp = F.blueprints.create(sel.start[0], sel.start[1], end[0], end[1]);
+    if (!bp) {
+      input.selecting = { start: null, end: null }; // stay in the copy tool, try again
+      if (F.ui && F.ui.toast) F.ui.toast(F.t('bp.empty'));
+      return;
+    }
+    F.blueprints.setClipboard(bp);
+    input.selecting = null;
+    input.blueprint = { bp: F.blueprints.clipboard() };
+    if (F.ui && F.ui.toast) F.ui.toast(F.t('bp.copied', { n: bp.entities.length }));
+  }
+
+  function pasteHeldBlueprint() {
+    var a = input.blueprintAnchor;
+    if (!input.blueprint || !a) return;
+    var r = F.blueprints.place(input.blueprint.bp, a[0], a[1]);
+    if (F.ui && F.ui.toast) {
+      var msg = F.t('bp.placed', { n: r.placed });
+      if (r.blocked) msg += ' — ' + F.t('bp.blocked', { n: r.blocked });
+      F.ui.toast(msg);
+    }
+  }
 
   // =========================================================================
   // Drag placement (GDD §9.11): belts auto-turn along the mouse path; poles
@@ -469,6 +550,8 @@
     if (textFocused()) return;
     input.frame();
     var cursor = getCursor();
+    if (input.selecting) { input.selecting.start = [hoverTx, hoverTy]; input.selecting.end = [hoverTx, hoverTy]; return; }
+    if (input.blueprint) { pasteHeldBlueprint(); return; }
     if (input.preview.type && input.preview.ghost) { beginDrag(input.preview.type, true); return; }
     if (cursor && input.preview.type) {
       // Virtual placer items (design/EXPANSION.md §6.4/§6.6, e.g. vehicles):
@@ -506,6 +589,7 @@
 
   function handleLeftUp() {
     dragging = null;
+    if (input.selecting && input.selecting.start) finishSelection();
   }
 
   // Left click with an empty hand on a ghost builds it from the inventory (within reach).
@@ -554,6 +638,7 @@
   }
 
   function rotate(ccw) {
+    if (input.blueprint) { input.blueprint = { bp: F.blueprints.rotate(input.blueprint.bp, ccw ? -1 : 1) }; return; }
     var cursor = getCursor();
     if (!cursor && input.ghostCursor) cursor = { id: input.ghostCursor, count: 0 };
     if (cursor) {
@@ -593,6 +678,7 @@
       return;
     }
     if (input.ghostCursor) { input.ghostCursor = null; return; }
+    if (clearBlueprintModes()) return;
     var hov = input.hover || (F.ghosts ? F.ghosts.at(hoverTx, hoverTy) : null);
     if (hov) {
       var def = F.data.entities[hov.type];
@@ -661,6 +747,7 @@
   // always is — 70-ui.js defines it unconditionally — this is defensive).
   var KNOWN_WINDOWS = ['entity', 'inventory', 'tech', 'help', 'map', 'menu', 'death'];
   function onEscape() {
+    if (clearBlueprintModes()) return;
     if (!F.ui) return;
     for (var i = windowStack.length - 1; i >= 0; i--) {
       var name = windowStack[i];
@@ -695,6 +782,7 @@
       return;
     }
     if (input.ghostCursor) { input.ghostCursor = null; return; }
+    if (clearBlueprintModes()) return;
     var itemId = p.quickbar[idx];
     if (!itemId || !F.player.count) return;
     var count = F.player.count(itemId);
@@ -771,6 +859,8 @@
     var lower = key.length === 1 ? key.toLowerCase() : key.toLowerCase();
 
     if ((e.ctrlKey || e.metaKey) && lower === 's') { e.preventDefault(); quickSave(); return; }
+    if ((e.ctrlKey || e.metaKey) && lower === 'c') { e.preventDefault(); startCopyTool(); return; }
+    if ((e.ctrlKey || e.metaKey) && lower === 'v') { e.preventDefault(); pasteClipboard(); return; }
 
     if (MOVE_KEYS[lower]) {
       keysDown[lower] = true; updateMoveAxis();
@@ -801,6 +891,7 @@
       case 'h': case 'f1': toggleWindow('help'); e.preventDefault(); break;
       case 'f': pickupNearby(); break;
       case 'z': dropOne(); break;
+      case 'b': startCopyTool(); break;
       case 'alt': toggleAlt(); e.preventDefault(); break;
       case 'escape': onEscape(); break;
       case ' ': case 'spacebar': spaceDown = true; updateShoot(); e.preventDefault(); break;
@@ -835,7 +926,10 @@
     updateMouseFromEvent(e);
     shiftDown = !!e.shiftKey;
     if (e.button === 0) { leftDown = true; handleLeftDown(); }
-    else if (e.button === 2) { rightDown = true; lastCancelTile = null; input.frame(); }
+    else if (e.button === 2) {
+      if (input.selecting) { input.selecting = null; return; } // right click cancels the copy tool
+      rightDown = true; lastCancelTile = null; input.frame();
+    }
   }
 
   function onMouseUp(e) {

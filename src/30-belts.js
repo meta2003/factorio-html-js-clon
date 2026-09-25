@@ -367,6 +367,32 @@
       }
     }
   }
+  // Force an underground's role ('in' = entrance, 'out' = exit), e.g. when a ghost or
+  // blueprint remembers it: an exit built before its entrance would otherwise become an
+  // unpaired entrance. Pairs with a matching unpaired partner in range when there is one.
+  belts.setUndergroundIO = function (e, io) {
+    if (!e || kind(e) !== 'underground' || (io !== 'in' && io !== 'out')) return false;
+    if (e.io === io && e.pairId) return true;
+    unpair(e);
+    pairUnderground(e);
+    if (e.io !== io) {
+      unpair(e);
+      e.io = io;
+      const d = def(e); const ug = (d && d.underground) || { maxGap: 4, tier: 'yellow' };
+      const v = DIRS[e.dir & 3], s = io === 'out' ? -1 : 1, want = io === 'out' ? 'in' : 'out';
+      for (let i = 1; i <= ug.maxGap + 1; i++) {
+        const o = F.world.entityAt(e.x + v[0] * i * s, e.y + v[1] * i * s);
+        if (!o || o === e) continue;
+        if (kind(o) === 'underground' && (o.dir & 3) === (e.dir & 3) && ((def(o).underground || {}).tier === ug.tier)) {
+          if (o.io === want && !o.pairId) { e.pairId = o.id; o.pairId = e.id; e.gap = o.gap = i - 1; }
+          break;
+        }
+      }
+    }
+    dirty = true;
+    return true;
+  };
+
   belts.onRotate = function (e) {
     if (!belts.isBeltLike(e)) return;
     if (kind(e) === 'underground') { unpair(e); pairUnderground(e); }

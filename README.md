@@ -42,7 +42,7 @@ The headless runner loads the built game with DOM stubs and runs the scenarios i
 
 | Path | What |
 |---|---|
-| `src/NN-*.js` | game modules (expansion: `05/06` data+text, `37-oil`, `38-trains`, `39-robots`, `45-rocket`; `51-ghosts` planned buildings), concatenated in filename order (see `design/ARCHITECTURE.md`) |
+| `src/NN-*.js` | game modules (expansion: `05/06` data+text, `37-oil`, `38-trains`, `39-robots`, `45-rocket`; `51-ghosts` planned buildings, `52-blueprints` copy/paste), concatenated in filename order (see `design/ARCHITECTURE.md`) |
 | `src/60-sprites.js`, `src/62..68-sprites-*.js` | procedural art: sprite library + building painter packs |
 | `src/disabled/` | code kept out of the build (combat, Slovenian translation) |
 | `src/template.html`, `src/style.css` | page shell and UI styles |
@@ -62,6 +62,9 @@ The headless runner loads the built game with DOM stubs and runs the scenarios i
 | Shift + left click / drag | place ghosts (planned buildings) instead of buildings |
 | Left click on a ghost (empty hand) | build it from the inventory |
 | Right click on a ghost | cancel it |
+| Ctrl+C or B, then drag | copy an area into a blueprint |
+| Ctrl+V | take the last copied blueprint into the hand |
+| R / left click / Q (blueprint in hand) | rotate / paste as ghosts / drop |
 | E | inventory and crafting |
 | T | technologies |
 | M | map |
