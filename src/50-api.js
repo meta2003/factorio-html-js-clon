@@ -554,6 +554,8 @@
     if (!(count > 0)) return 0;
     const def = safeEntityDef(entity.type);
     if (!def) return 0;
+    // modules go into the machine's module slots (src/35-modules.js), one per slot
+    if (F.modules && F.modules.isModule(item) && F.modules.slots(entity) > 0) return F.modules.insert(entity, item, count);
     const beh = F.behaviours[def.behaviour];
     if (beh && typeof beh.insert === 'function') {
       let n = 0;
@@ -705,6 +707,10 @@
     if (isPlayerTarget(target)) {
       toInv = playerInv();
       if (!toInv) { F.log.warn('F.api.transferStack: player inventory unavailable'); return 0; }
+    } else if (target && target.type && F.modules && F.modules.isModule(item) && F.modules.slots(target) > 0) {
+      const n = F.modules.insert(target, item, Math.min(wantCount, F.inv.count(fromInv, item)));
+      if (n > 0) { F.inv.remove(fromInv, item, n); F.events.emit('inventory:changed', { item: item, count: n }); }
+      return n;
     } else if (target && target.type) {
       const grp = pickInvGroupForItem(target, item);
       if (!grp || !grp.inv) { F.log.warn('F.api.transferStack: no matching inventory on', target.type, 'for', item); return 0; }

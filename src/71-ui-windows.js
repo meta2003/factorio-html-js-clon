@@ -626,6 +626,29 @@
     root.appendChild(statusLine(safeStatus(e)));
   }
 
+  // Module slots + combined effects (src/35-modules.js) for machines with def.moduleSlots.
+  function moduleEnergy(e) { return F.modules ? F.modules.effects(e).energy : 1; }
+  function pct(v) { return (v > 0 ? '+' : '') + Math.round(v * 100) + '%'; }
+  function moduleSection(root, e) {
+    var M = F.modules;
+    var mods = M && M.inv(e);
+    if (!mods) return;
+    var opts = {
+      target: e, transferTarget: 'player',
+      filter: function (id) { return M.canInsert(e, id); },
+      onChange: function () { M.normalize(e); },
+    };
+    root.appendChild(labeled(F.t('ui.modules'), slotGrid(mods, mods.length, opts)));
+    var t = M.totals(e);
+    var parts = [];
+    if (t.speed) parts.push(F.t('ui.modules.speed') + ' ' + pct(t.speed));
+    if (t.consumption) parts.push(F.t('ui.modules.energy') + ' ' + pct(Math.max(-0.8, t.consumption)));
+    if (t.productivity) parts.push(F.t('ui.modules.productivity') + ' ' + pct(t.productivity));
+    if (t.pollution) parts.push(F.t('ui.modules.pollution') + ' ' + pct(t.pollution));
+    if (parts.length) root.appendChild(el('div', 'f-hint', parts.join(' · ')));
+    if (t.productivity > 0) root.appendChild(labeledBar(F.t('ui.modules.productivityBar'), e.prodProgress || 0, 'f-bar-green'));
+  }
+
   function ENTITY_FURNACE(root, e, def) {
     renderGenericHeader(root, e, def);
     var row = el('div', 'f-row-slots');
@@ -638,6 +661,8 @@
     row.appendChild(mid);
     var output = invByName(e, 'output'); if (output) row.appendChild(labeled(F.t('ui.output'), slotGrid(output, 1, { target: e })));
     root.appendChild(row);
+    moduleSection(root, e);
+    if (def.energy && def.energy.type === 'electric') addRow(root, F.t('ui.energyConsumption'), U.fmtPower(def.energy.usage * moduleEnergy(e)));
   }
 
   // Recipe ids offered by an assembler's picker (design/EXPANSION.md §6.6):
@@ -712,9 +737,10 @@
     row.appendChild(mid);
     var output = invByName(e, 'output'); if (output) row.appendChild(labeled(F.t('ui.output'), slotGrid(output, 1, { target: e })));
     root.appendChild(row);
-    var speedVal = (def.assembler && def.assembler.speed) || def.speed || 1;
+    moduleSection(root, e);
+    var speedVal = ((def.assembler && def.assembler.speed) || def.speed || 1) * (F.modules ? F.modules.effects(e).speed : 1);
     addRow(root, F.t('ui.craftingSpeed'), U.fmt(speedVal, 2));
-    if (def.energy && def.energy.type === 'electric') addRow(root, F.t('ui.energyConsumption'), U.fmtPower(def.energy.usage));
+    if (def.energy && def.energy.type === 'electric') addRow(root, F.t('ui.energyConsumption'), U.fmtPower(def.energy.usage * moduleEnergy(e)));
   }
 
   function ENTITY_CHEST(root, e, def) {
@@ -742,7 +768,8 @@
     root.appendChild(bar(e.progress || 0, 'f-bar-orange'));
     var fuel = invByName(e, 'fuel');
     if (fuel) root.appendChild(labeled(F.t('ui.fuel'), slotGrid(fuel, 1, { target: e })));
-    else if (def.energy && def.energy.type === 'electric') addRow(root, F.t('ui.energyConsumption'), U.fmtPower(def.energy.usage));
+    else if (def.energy && def.energy.type === 'electric') addRow(root, F.t('ui.energyConsumption'), U.fmtPower(def.energy.usage * moduleEnergy(e)));
+    moduleSection(root, e);
   }
 
   // ENTITY_TURRET (ammo slots + range/kills) removed: no entity has
