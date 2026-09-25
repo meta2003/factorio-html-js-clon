@@ -140,8 +140,8 @@
   }
 
   F.behaviours.rail = {
-    create: function (e) { refreshRailMask(e); refreshNeighborRailMasks(e.x, e.y); railTopologyDirty = true; },
-    onRemove: function (e) { refreshNeighborRailMasks(e.x, e.y); railTopologyDirty = true; },
+    create: function (e) { refreshRailMask(e); refreshNeighborRailMasks(e.x, e.y); railTopologyDirty = true; blocksDirty = true; },
+    onRemove: function (e) { refreshNeighborRailMasks(e.x, e.y); railTopologyDirty = true; blocksDirty = true; },
     status: function () { return 'idle'; },
     accepts: function (e, item) { var car = carAtStoppedTile(e.x, e.y); return car ? buildCarResolverObj(car)._ops.accepts(item) : 0; },
     insert: function (e, item, count) { var car = carAtStoppedTile(e.x, e.y); return car ? buildCarResolverObj(car)._ops.insert(item, count) : 0; },
@@ -186,6 +186,186 @@
     for (var d = 0; d < 4; d++) { var v = F.util.dirVec(d); if (isRail(tx + v[0], ty + v[1])) return null; }
     return 'no_rail';
   }
+
+  // =========================================================================================
+  // Rail signals + chain signals (block signalling).
+  //
+  // A signal is a 1x1 entity placed orthogonally next to a rail, like a train stop; it guards
+  // ONE rail tile — the neighbour its facing direction points at (R rotates it), or the first
+  // adjacent rail when that neighbour is not a rail. Guarded rail tiles are block boundaries:
+  // a block is a connected group of rail tiles with every signal tile removed. Signals are
+  // two-way (they gate trains in both directions), so a bidirectional single track still needs
+  // a free block to pass, and two trains facing each other on one can deadlock — same as
+  // misplaced signals in Factorio.
+  //
+  //   rail signal  — open when the block right after it (along the train's route) holds no
+  //                  other train and no other train's chain reservation.
+  //   chain signal — open when that block is free AND the next signal along the route out of
+  //                  that block is open too (recursively for chained chain signals); the
+  //                  train then reserves every block up to and including the one after the
+  //                  first rail signal, so nobody slips in behind it and traps it mid-way.
+  //
+  // Only automatic trains obey signals; a train driven by hand ignores them (as in Factorio).
+  // A train sitting ON a signal tile occupies the blocks on both sides of it.
+  // =========================================================================================
+  var blocksDirty = true;
+  var signalTiles = Object.create(null); // railKey -> { chain: bool }
+  var blockOf = Object.create(null);     // railKey (non-signal rail tile) -> block id
+  var blockGen = 0;                      // bumped on every rebuild; stale reservations drop
+
+  function isSignalDef(def) { return !!(def && def.behaviour === 'rail-signal'); }
+  function signalRailTile(e) {
+    var fv = F.util.dirVec(e.dir || 0);
+    if (isRail(e.x + fv[0], e.y + fv[1])) return F.util.key(e.x + fv[0], e.y + fv[1]);
+    for (var d = 0; d < 4; d++) {
+      var v = F.util.dirVec(d);
+      if (isRail(e.x + v[0], e.y + v[1])) return F.util.key(e.x + v[0], e.y + v[1]);
+    }
+    return null;
+  }
+  function allSignals() {
+    var out = [], list = (F.entities && F.entities.ofType) ? F.entities.ofType('rail-signal') : [];
+    for (var i = 0; i < list.length; i++) out.push(list[i]);
+    list = (F.entities && F.entities.ofType) ? F.entities.ofType('rail-chain-signal') : [];
+    for (i = 0; i < list.length; i++) out.push(list[i]);
+    return out;
+  }
+  function rebuildBlocks() {
+    blocksDirty = false;
+    blockGen++;
+    signalTiles = Object.create(null);
+    blockOf = Object.create(null);
+    var sigs = allSignals();
+    for (var i = 0; i < sigs.length; i++) {
+      var k = signalRailTile(sigs[i]);
+      sigs[i]._railKey = k;
+      if (!k) continue;
+      var chain = !!(F.data.entities[sigs[i].type].signal || {}).chain;
+      // Two signals on one rail tile: a plain rail signal wins (the stricter reading).
+      if (signalTiles[k]) signalTiles[k].chain = signalTiles[k].chain && chain;
+      else signalTiles[k] = { chain: chain };
+    }
+    var rails = (F.entities && F.entities.ofType) ? F.entities.ofType('rail') : [];
+    var nextId = 1;
+    for (var r = 0; r < rails.length; r++) {
+      var start = F.util.key(rails[r].x, rails[r].y);
+      if (signalTiles[start] || blockOf[start] != null) continue;
+      var id = nextId++, queue = [start];
+      blockOf[start] = id;
+      for (var qi = 0; qi < queue.length; qi++) {
+        var nbrs = railNeighborsOf(queue[qi]);
+        for (var n = 0; n < nbrs.length; n++) {
+          var nk = nbrs[n];
+          if (signalTiles[nk] || blockOf[nk] != null) continue;
+          blockOf[nk] = id;
+          queue.push(nk);
+        }
+      }
+    }
+    var trains = (F.state && F.state.trains) || [];
+    for (var t = 0; t < trains.length; t++) trains[t]._reserved = null;
+  }
+  function ensureBlocks() { if (blocksDirty) rebuildBlocks(); }
+
+  // Blocks a tile belongs to: its own block, or — for a signal tile — every neighbouring block.
+  function blocksOfTile(key, out) {
+    if (blockOf[key] != null) { out.push(blockOf[key]); return; }
+    if (!signalTiles[key]) return;
+    var nbrs = railNeighborsOf(key);
+    for (var i = 0; i < nbrs.length; i++) if (blockOf[nbrs[i]] != null) out.push(blockOf[nbrs[i]]);
+  }
+  // Path tiles the train's cars physically cover (path[] also keeps a couple of spare tiles
+  // behind the tail, which must not hold a block that the train has already left).
+  function occupiedTiles(train) {
+    var path = train.path || [];
+    var tail = carArcOffset(train.cars.length - 1) + CAR_HALF_LEN;
+    var last = Math.min(path.length - 1, Math.ceil(tail - (train.headPos || 0)) + 1);
+    return path.slice(0, Math.max(1, last + 1));
+  }
+  function blockFree(blockId, selfId) {
+    var list = (F.state && F.state.trains) || [];
+    for (var i = 0; i < list.length; i++) {
+      var t = list[i];
+      if (t.id === selfId || !t.cars || !t.cars.length) continue;
+      if (t._reserved && t._reservedGen === blockGen && t._reserved.indexOf(blockId) !== -1) return false;
+      var tiles = occupiedTiles(t), b = [];
+      for (var k = 0; k < tiles.length; k++) blocksOfTile(tiles[k], b);
+      if (b.indexOf(blockId) !== -1) return false;
+    }
+    return true;
+  }
+  // Can `train` pass the signal on route[i]? Returns the list of blocks it must reserve when
+  // it does (empty for a rail signal), or null when the signal is red for this train.
+  function signalPass(train, route, i, depth) {
+    var sig = signalTiles[route[i]];
+    if (!sig) return [];
+    var next = route[i + 1];
+    if (next == null) return [];                      // route ends on the signal tile itself
+    if (signalTiles[next]) return sig.chain ? signalPass(train, route, i + 1, depth + 1) : [];
+    var b = blockOf[next];
+    if (b == null) return [];
+    if (!blockFree(b, train.id)) return null;
+    if (!sig.chain) return [];
+    if (depth > 64) return [b];                       // runaway chain-of-chains guard
+    for (var j = i + 2; j < route.length; j++) {
+      if (!signalTiles[route[j]]) continue;
+      var rest = signalPass(train, route, j, depth + 1);
+      if (rest === null) return null;
+      return [b].concat(rest, blockOf[route[j + 1]] != null ? [blockOf[route[j + 1]]] : []);
+    }
+    return [b];                                       // the route ends inside this block
+  }
+  function dropEnteredReservations(train, key) {
+    if (!train._reserved) return;
+    var b = blockOf[key];
+    if (b == null) return;
+    var idx = train._reserved.indexOf(b);
+    if (idx !== -1) train._reserved.splice(idx, 1);
+    if (!train._reserved.length) train._reserved = null;
+  }
+
+  // Signal colour for drawing: 0 green, 1 red, 2 yellow (chain signal: next block free but an
+  // exit further on is red). Signals are two-way, so the colour is shown for the automatic
+  // train nearest to it whose route crosses it; with no such train, red when any train stands
+  // on the guarded tile or in a block next to it.
+  function signalAspect(e) {
+    ensureBlocks();
+    var k = e._railKey;
+    if (!k || !signalTiles[k]) return 1;
+    var list = (F.state && F.state.trains) || [];
+    var best = null, bestAt = Infinity;
+    for (var t = 0; t < list.length; t++) {
+      var r = list[t]._route;
+      if (list[t].manual || !r) continue;
+      var at = r.indexOf(k);
+      if (at > 0 && at < bestAt) { best = list[t]; bestAt = at; }
+    }
+    if (best) {
+      var route = best._route, nb = blockOf[route[bestAt + 1]];
+      if (nb != null && !blockFree(nb, best.id)) return 1;
+      return signalPass(best, route, bestAt, 0) === null ? 2 : 0;
+    }
+    for (t = 0; t < list.length; t++) if (occupiedTiles(list[t]).indexOf(k) !== -1) return 1;
+    var nbrs = railNeighborsOf(k);
+    for (var i = 0; i < nbrs.length; i++) {
+      var b = blockOf[nbrs[i]];
+      if (b != null && !blockFree(b, -1)) return 1;
+    }
+    return 0;
+  }
+
+  F.behaviours['rail-signal'] = {
+    create: function (e) { blocksDirty = true; },
+    onRemove: function (e) { blocksDirty = true; },
+    status: function (e) {
+      var a = signalAspect(e);
+      return a === 1 ? 'signal_red' : (a === 2 ? 'signal_yellow' : 'signal_green');
+    },
+  };
+  function signalPlaceRule(def, tx, ty, dir) { return trainStopPlaceRule(def, tx, ty, dir); }
+  F.events.on('entity:placed', function (e) { if (e && isSignalDef(F.data.entities[e.type])) blocksDirty = true; }); // rotate
+  F.events.on('game:new', function () { blocksDirty = true; });
+  F.events.on('game:loaded', function () { blocksDirty = true; });
 
   // =========================================================================================
   // Train state helpers (EXPANSION.md §7.2 state shape).
@@ -324,7 +504,7 @@
   // supplies the next tile key to move into (auto: from the cached route; manual: from local
   // junction choice). Handles rail-missing ('no_path') and same-tile collision ('waiting')
   // without ever throwing — a broken/incomplete rail network just stops the train.
-  function moveBy(train, dist, nextTileFn) {
+  function moveBy(train, dist, nextTileFn, gateFn) {
     var remaining = dist, guard = 0;
     while (remaining > 1e-9 && guard++ < 8) {
       var toNext = 1 - train.headPos;
@@ -333,8 +513,10 @@
       var nextKey = null;
       try { nextKey = nextTileFn(); } catch (err) { F.log.error('[trains] nextTileFn threw', err); nextKey = null; }
       if (!nextKey || !isRailKey(nextKey)) { train.headPos = 1; train.state = 'no_path'; train.speed = 0; return; }
-      if (tileOccupiedByOtherTrain(nextKey, train.id)) { train.headPos = 0.999; train.state = 'waiting'; train.speed = 0; return; }
+      if (tileOccupiedByOtherTrain(nextKey, train.id)) { train.headPos = 0.999; train.state = 'wait_train'; train.speed = 0; return; }
+      if (gateFn && !gateFn(nextKey)) { train.headPos = 1; train.state = 'wait_signal'; train.speed = 0; return; }
       train.path.unshift(nextKey);
+      dropEnteredReservations(train, nextKey);
       trimPath(train);
       train.headPos = 0;
       if (train._route && train._route.length > 1) train._route.shift();
@@ -427,6 +609,7 @@
       var r = railShortestPath(train.path[0], stationKey, exclude) || railShortestPath(train.path[0], stationKey, null);
       if (!r) { train.state = 'no_path'; train.speed = Math.max(0, (train.speed || 0) - BRAKE); train._route = null; return; }
       train._route = r;
+      train._reserved = null; // a new route: reservations taken for the old one no longer apply
     }
 
     var remaining = (1 - train.headPos) + (train._route.length - 1);
@@ -436,22 +619,67 @@
       return;
     }
 
+    // Signals: brake for the first red one within braking reach (plus a little margin) as if
+    // it were the end of the route. Signals further away are not looked at yet — their state
+    // will have changed by the time the train gets there.
+    var brakeDist = (train.speed * train.speed) / (2 * BRAKE);
+    var toRed = redSignalDistance(train, brakeDist + 1.5);
+    if (toRed != null && toRed <= 0.02) {
+      train.headPos = 1; train.speed = 0; train.state = 'wait_signal';
+      return;
+    }
+    if (toRed != null && toRed < remaining) remaining = toRed;
+
     var fuelOk = ensureFuel(loco);
+    var gate = function (key) { return passSignalGate(train, key); };
     if (!fuelOk) {
       train.state = 'no_fuel';
       train.speed = Math.max(0, train.speed - BRAKE);
-      moveBy(train, train.speed, function () { return train._route && train._route.length > 1 ? train._route[1] : null; });
+      moveBy(train, train.speed, function () { return train._route && train._route.length > 1 ? train._route[1] : null; }, gate);
       return;
     }
 
-    var brakeDist = (train.speed * train.speed) / (2 * BRAKE);
     if (remaining <= brakeDist) train.speed = Math.max(0, train.speed - BRAKE);
     else train.speed = Math.min(MAX_SPEED, train.speed + ACCEL);
+    // Never step past a red signal because of the discrete braking steps.
+    if (toRed != null && train.speed > toRed) train.speed = Math.max(0, toRed);
     train.state = 'moving';
-    moveBy(train, train.speed, function () { return train._route && train._route.length > 1 ? train._route[1] : null; });
+    moveBy(train, train.speed, function () { return train._route && train._route.length > 1 ? train._route[1] : null; }, gate);
+  }
+
+  // Distance (tiles) from the train's nose to the first signal on its route within `reach`
+  // that is red for it, or null when every signal in reach is green.
+  function redSignalDistance(train, reach) {
+    var r = train._route;
+    if (!r) return null;
+    for (var i = 1; i < r.length; i++) {
+      var dist = (1 - train.headPos) + (i - 1);
+      if (dist > reach) break;
+      if (!signalTiles[r[i]]) continue;
+      if (signalPass(train, r, i, 0) === null) return dist;
+    }
+    return null;
+  }
+  // moveBy gate: re-checks a signal at the moment the nose crosses into its tile, and takes the
+  // chain reservation then.
+  function passSignalGate(train, key) {
+    if (!signalTiles[key]) return true;
+    var r = train._route;
+    var i = r ? r.indexOf(key) : -1;
+    if (i < 0) return true;
+    var res = signalPass(train, r, i, 0);
+    if (res === null) return false;
+    if (res.length) {
+      var keep = train._reserved && train._reservedGen === blockGen ? train._reserved : [];
+      for (var k = 0; k < res.length; k++) if (keep.indexOf(res[k]) === -1) keep.push(res[k]);
+      train._reserved = keep;
+      train._reservedGen = blockGen;
+    }
+    return true;
   }
 
   function manualTick(train, loco, riding) {
+    train._reserved = null; // hand-driven trains ignore signals and hold no reservations
     if (!isRail.apply(null, F.util.unkey(train.path[0]))) { train.state = 'no_path'; train.speed = Math.max(0, (train.speed || 0) - BRAKE); return; }
     var mx = 0, my = 0;
     if (riding && F.input && F.input.state) { mx = F.input.state.mx || 0; my = F.input.state.my || 0; }
@@ -482,6 +710,7 @@
   function trainsTick() {
     var trains = F.state && F.state.trains;
     if (!trains || !trains.length) return;
+    ensureBlocks();
     if (railTopologyDirty) {
       railTopologyDirty = false;
       for (var i = 0; i < trains.length; i++) trains[i]._route = null;
@@ -729,6 +958,9 @@
   F._renderHooks.layers.objects.push(function (ctx, rect, cam) { renderTrains(ctx, rect, cam); });
   F._renderHooks.entityOpts['rail'] = function (e) { return { frame: 0, opts: { mask: e.mask || 0 } }; };
   F._renderHooks.minimapColors['rail'] = '#8a8f94';
+  // Signal lamp colour rides on the sprite frame: 0 green, 1 red, 2 yellow.
+  F._renderHooks.entityOpts['rail-signal'] = function (e) { return { frame: signalAspect(e), opts: {} }; };
+  F._renderHooks.minimapColors['rail-signal'] = '#8a8f94';
   F._renderHooks.hidePlayerFns.push(function () { return !!(F.state && F.state.player && F.state.player.ridingTrain); });
 
   // =========================================================================================
@@ -940,6 +1172,7 @@
     if (apiRegistered) return;
     if (!F.api || typeof F.api.addPlaceRule !== 'function') return;
     F.api.addPlaceRule('train-stop', trainStopPlaceRule);
+    F.api.addPlaceRule('rail-signal', signalPlaceRule);
     F.api.registerVirtual('locomotive', locomotivePlacer);
     F.api.registerVirtual('cargo-wagon', wagonPlacer);
     F.api.addPicker(pickCarAt);
@@ -999,6 +1232,12 @@
     isRail: isRail,
     stationRailTile: stationRailTile,
     resolveStop: resolveStop,
+    // Signals: which rail tile a signal guards, the block id of a rail tile (null on a signal
+    // tile), and a signal's current colour (0 green, 1 red, 2 yellow).
+    signalRailTile: function (e) { ensureBlocks(); return e._railKey || signalRailTile(e); },
+    blockOf: function (tx, ty) { ensureBlocks(); var b = blockOf[F.util.key(tx, ty)]; return b == null ? null : b; },
+    signalAspect: signalAspect,
+    blockFree: function (blockId, exceptTrainId) { ensureBlocks(); return blockFree(blockId, exceptTrainId == null ? -1 : exceptTrainId); },
   };
 
   // =========================================================================================

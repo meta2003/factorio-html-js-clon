@@ -65,6 +65,8 @@
     ['storage-tank', 50, 0, 'logistics', 'storage-tank', 'tube', '#8A8F94', null, null],
     ['rail', 100, 0, 'logistics', 'rail', 'rods', '#8A8F94', '#6B4A2A', null],
     ['train-stop', 10, 0, 'logistics', 'train-stop', 'pole', '#C9A227', null, null],
+    ['rail-signal', 50, 0, 'logistics', 'rail-signal', 'rail-signal', '#3A3D40', '#3FC35A', null],
+    ['rail-chain-signal', 50, 0, 'logistics', 'rail-chain-signal', 'rail-signal', '#3A3D40', '#4A9FE0', null],
     ['locomotive', 5, 0, 'logistics', null, 'locomotive', '#C24A2A', '#3A3D40', 'locomotive'],
     ['cargo-wagon', 5, 0, 'logistics', null, 'wagon', '#8A8F94', '#5A4636', 'cargo-wagon'],
     ['roboport', 10, 0, 'logistics', 'roboport', 'dish', '#8A8F94', '#D9A520', null],
@@ -143,6 +145,8 @@
     ['locomotive', [['engine-unit', 20], ['electronic-circuit', 10], ['steel-plate', 30]], [['locomotive', 1]], 4, 'crafting', 'railway', [], []],
     ['cargo-wagon', [['iron-gear-wheel', 10], ['iron-plate', 20], ['steel-plate', 20]], [['cargo-wagon', 1]], 1, 'crafting', 'railway', [], []],
     ['train-stop', [['electronic-circuit', 5], ['iron-plate', 6], ['iron-stick', 6], ['steel-plate', 3]], [['train-stop', 1]], 0.5, 'crafting', 'automated-rail-transportation', [], []],
+    ['rail-signal', [['electronic-circuit', 1], ['iron-plate', 5]], [['rail-signal', 1]], 0.5, 'crafting', 'rail-signals', [], []],
+    ['rail-chain-signal', [['electronic-circuit', 1], ['iron-plate', 5]], [['rail-chain-signal', 1]], 0.5, 'crafting', 'rail-signals', [], []],
     ['roboport', [['steel-plate', 45], ['iron-gear-wheel', 45], ['advanced-circuit', 45]], [['roboport', 1]], 5, 'crafting', 'construction-robotics', [], []],
     ['construction-robot', [['flying-robot-frame', 1], ['electronic-circuit', 2]], [['construction-robot', 1]], 0.5, 'crafting', 'construction-robotics', [], []],
     ['logistic-robot', [['flying-robot-frame', 1], ['advanced-circuit', 2]], [['logistic-robot', 1]], 0.5, 'crafting', 'logistic-robotics', [], []],
@@ -239,6 +243,16 @@
     id: 'train-stop', size: [1, 1], rotatable: true, health: 150, behaviour: 'train-stop',
     minable: 'train-stop', category: 'logistics', mineTime: 0.2,
   });
+  // rail-signal / rail-chain-signal: 1x1 next to a rail, like the train stop; the facing
+  // direction picks which neighbouring rail tile it guards (38-trains.js "Rail signals").
+  D.entities['rail-signal'] = baseEntity({
+    id: 'rail-signal', size: [1, 1], rotatable: true, health: 100, behaviour: 'rail-signal',
+    minable: 'rail-signal', category: 'logistics', mineTime: 0.1, signal: { chain: false },
+  });
+  D.entities['rail-chain-signal'] = baseEntity({
+    id: 'rail-chain-signal', size: [1, 1], rotatable: true, health: 100, behaviour: 'rail-signal',
+    minable: 'rail-chain-signal', category: 'logistics', mineTime: 0.1, signal: { chain: true },
+  });
   // locomotive/cargo-wagon are NOT grid entities (placed via F.api.registerVirtual per
   // §6.4); they have items (with `vehicle`) but intentionally no F.data.entities def.
 
@@ -306,6 +320,7 @@
     ['chemical-science-pack', ['advanced-electronics', 'sulfur-processing', 'engine'], 'RG', 75, 10, ['chemical-science-pack']],
     ['railway', ['logistics-2', 'engine'], 'RG', 75, 30, ['rail', 'locomotive', 'cargo-wagon']],
     ['automated-rail-transportation', ['railway'], 'RG', 75, 30, ['train-stop']],
+    ['rail-signals', ['automated-rail-transportation'], 'RG', 100, 30, ['rail-signal', 'rail-chain-signal']],
     ['advanced-oil-processing', ['chemical-science-pack'], 'RGB', 75, 30, ['advanced-oil-processing', 'heavy-oil-cracking', 'light-oil-cracking', 'solid-fuel-from-light-oil']],
     ['lubricant', ['advanced-oil-processing'], 'RGB', 50, 30, ['lubricant']],
     ['electric-engine', ['lubricant'], 'RGB', 50, 30, ['electric-engine-unit']],
