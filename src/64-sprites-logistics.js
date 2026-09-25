@@ -257,7 +257,7 @@
   }
 
   F.sprites.definePainter(['wooden-chest', 'iron-chest', 'steel-chest'], paintChest);
-  F.sprites.definePainter(['burner-inserter', 'inserter', 'long-handed-inserter', 'fast-inserter'], paintInserterBase);
+  F.sprites.definePainter(['burner-inserter', 'inserter', 'long-handed-inserter', 'fast-inserter', 'filter-inserter', 'stack-inserter'], paintInserterBase);
   F.sprites.definePainter(['small-electric-pole', 'medium-electric-pole'], paintPole);
   F.sprites.definePainter(['pipe', 'pipe-to-ground'], paintPipe);
   F.sprites.definePainter(['stone-wall'], paintWall);

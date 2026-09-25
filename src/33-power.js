@@ -421,9 +421,13 @@
         networks.set(netId, net);
       }
       const def = safeDef(p.type);
-      const supply = Math.floor((def && def.pole && def.pole.supply) || 2); // half-width 2.5 -> tiles within 2 of the pole tile (5x5)
-      for (let dx = -supply; dx <= supply; dx++) {
-        for (let dy = -supply; dy <= supply; dy++) {
+      // `supply` is the half-width of the supplied square around the pole's centre. For a 1x1
+      // pole, 2.5 -> tiles within 2 of the pole tile (5x5); a 2x2 substation's 9 -> 18x18.
+      const half = (def && def.pole && def.pole.supply) || 2.5;
+      const w = (def && def.size && def.size[0]) || 1, h = (def && def.size && def.size[1]) || 1;
+      const ex = Math.floor(half - w / 2), ey = Math.floor(half - h / 2);
+      for (let dx = -ex; dx <= w - 1 + ex; dx++) {
+        for (let dy = -ey; dy <= h - 1 + ey; dy++) {
           const key = F.util.key(p.x + dx, p.y + dy);
           if (!coverage.has(key)) coverage.set(key, netId);
         }

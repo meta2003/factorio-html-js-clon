@@ -20,6 +20,13 @@ Mid and late game (see `design/EXPANSION.md`):
   paste it rotated elsewhere (Ctrl+V); build ghosts by hand or let construction robots do it.
   A blueprint library (L) keeps named blueprints across games and shares them as text strings.
 - **Rocket silo**: build rocket parts, load a satellite and launch — the victory screen.
+- **Higher building tiers**: express belts / undergrounds / splitters (Logistics 3), filter and
+  stack inserters, the electric furnace (no fuel), assembling machine 3, the big electric pole
+  (30-tile wires) and the substation (18×18 supply area).
+- **Technology tree (T)**: a prerequisite graph you can pan (drag) and zoom (wheel). Hover a
+  technology to light up the chain it needs, search by technology or item name, and open the
+  detail panel for cost, unlocks and links. "Research with prerequisites" (or a double-click)
+  queues the whole missing chain in order.
 - Science: red, green, blue (chemical), purple (production), yellow (utility) and space packs.
 
 > Current build: English only, and combat (biters, turrets, weapons) is switched off. That code is
@@ -47,8 +54,8 @@ The headless runner loads the built game with DOM stubs and runs the scenarios i
 
 | Path | What |
 |---|---|
-| `src/NN-*.js` | game modules (expansion: `05/06` data+text, `37-oil`, `38-trains`, `39-robots`, `45-rocket`; `51-ghosts` planned buildings, `52-blueprints` copy/paste, `53-construction` construction robots, `54-deconstruction` deconstruction planner, `55-blueprint-library` library + strings), concatenated in filename order (see `design/ARCHITECTURE.md`) |
-| `src/60-sprites.js`, `src/62..68-sprites-*.js` | procedural art: sprite library + building painter packs |
+| `src/NN-*.js` | game modules (expansion: `05/06` data+text, `37-oil`, `38-trains`, `39-robots`, `45-rocket`; `51-ghosts` planned buildings, `52-blueprints` copy/paste, `53-construction` construction robots, `54-deconstruction` deconstruction planner, `55-blueprint-library` library + strings; `07-data-tiers` higher building tiers; `72-ui-techtree` technology tree window), concatenated in filename order (see `design/ARCHITECTURE.md`) |
+| `src/60-sprites.js`, `src/62..69-sprites-*.js` | procedural art: sprite library + building painter packs |
 | `src/disabled/` | code kept out of the build (combat, Slovenian translation) |
 | `src/template.html`, `src/style.css` | page shell and UI styles |
 | `design/` | game design doc, architecture/API contracts, engineering constraints, art brief |
@@ -74,7 +81,7 @@ The headless runner loads the built game with DOM stubs and runs the scenarios i
 | Ctrl+X, then drag | cut: copy an area and mark its buildings for deconstruction |
 | L | blueprint library: save, reuse, export/import blueprint strings (FB1…) |
 | E | inventory and crafting |
-| T | technologies |
+| T | technology tree (drag to pan, wheel to zoom, double-click to research) |
 | M | map |
 | H / F1 | instructions |
 | F | pick up items nearby |

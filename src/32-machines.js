@@ -172,9 +172,13 @@
   // FURNACE  (GDD §6.14, §7.4.1)
   // =======================================================================
 
+  // Electric furnaces (def.energy.type 'electric') share this behaviour but have no fuel slot:
+  // e.fuel stays null, so they refuse fuel items and list no 'fuel' inventory.
+  function isBurnerDef(def) { return !!(def && def.energy && def.energy.type === 'burner'); }
+
   const furnaceBehaviour = {
     create(e) {
-      e.fuel = F.inv.create(1);
+      e.fuel = isBurnerDef(safeEntityDef(e.type)) ? F.inv.create(1) : null;
       e.input = F.inv.create(1);
       e.output = F.inv.create(1);
       e.recipe = null;
@@ -187,7 +191,7 @@
       spillInventory(e, e.output);
     },
     accepts(e, item) {
-      if (isFuelItem(item)) return Math.max(0, 5 - F.inv.count(e.fuel, item));
+      if (isFuelItem(item) && e.fuel) return Math.max(0, 5 - F.inv.count(e.fuel, item));
       const recipeId = smeltRecipeFor(item);
       if (!recipeId) return 0;
       if (e.input[0] && e.input[0].id !== item) return 0;
@@ -200,7 +204,7 @@
       return Math.max(0, limit - F.inv.count(e.input, item));
     },
     insert(e, item, count) {
-      if (isFuelItem(item)) {
+      if (isFuelItem(item) && e.fuel) {
         const remaining = F.inv.add(e.fuel, item, count, { ignoreStack: true });
         return count - remaining;
       }
@@ -214,11 +218,10 @@
     },
     take(e, filter) { return F.inv.takeOne(e.output, filter); },
     inventories(e) {
-      return [
-        { name: 'fuel', inv: e.fuel },
-        { name: 'input', inv: e.input },
-        { name: 'output', inv: e.output },
-      ];
+      const out = [];
+      if (e.fuel) out.push({ name: 'fuel', inv: e.fuel });
+      out.push({ name: 'input', inv: e.input }, { name: 'output', inv: e.output });
+      return out;
     },
     status(e) { return e._status || 'idle'; },
     tick(e, def) { furnaceTick(e, def || safeEntityDef(e.type)); },

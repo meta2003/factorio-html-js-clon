@@ -638,6 +638,7 @@
     row.appendChild(mid);
     var output = invByName(e, 'output'); if (output) row.appendChild(labeled(F.t('ui.output'), slotGrid(output, 1, { target: e })));
     root.appendChild(row);
+    if (def.energy && def.energy.type === 'electric') addRow(root, F.t('ui.energyConsumption'), U.fmtPower(def.energy.usage));
   }
 
   // Recipe ids offered by an assembler's picker (design/EXPANSION.md §6.6):
@@ -1003,104 +1004,11 @@
   });
 
   // =========================================================================
-  // WINDOW: tech  (technology tree, 3 tiers/columns)
+  // WINDOW: tech — the technology tree lives in its own module, 72-ui-techtree.js
+  // (a pannable/zoomable prerequisite graph with a detail panel). It reuses
+  // recipeTooltipHtml via F.ui.recipeTooltipHtml, exported here.
   // =========================================================================
-  // Display name/icon id for a tech "unlocks" entry: unlocks are recipe ids
-  // (F.data.recipes), which may now be fluid-only (design/EXPANSION.md §4,
-  // e.g. 'basic-oil-processing' has no item result) or, rarely, a bare
-  // item/entity id — never assume `.results[0][0]` exists.
-  function unlockIconId(u) {
-    var rdef = F.data.recipes[u];
-    if (!rdef) return u;
-    var iconId = recipeIconId(rdef);
-    return iconId; // may be null (fluid-only recipe) — caller falls back to a fluid icon
-  }
-  function unlockDisplayName(u) {
-    var rdef = F.data.recipes[u];
-    if (rdef) {
-      var iconId = recipeIconId(rdef);
-      if (iconId) return F.t('item.' + iconId);
-      var fr = rdef.fluidResults && rdef.fluidResults[0];
-      if (fr) return F.t('fluid.' + fr[0]);
-      return u;
-    }
-    if (F.i18n.has('item.' + u)) return F.t('item.' + u);
-    if (F.i18n.has('ent.' + u)) return F.t('ent.' + u);
-    return u;
-  }
-  function techCard(id, root) {
-    var info = F.research && typeof F.research.techInfo === 'function' ? F.research.techInfo(id) : null;
-    if (!info) return el('div');
-    var state = info.done ? 'done' : info.isCurrent ? 'current' : info.queued ? 'queued' : info.available ? 'available' : 'locked';
-    var card = el('div', 'f-tech-card f-tech-' + state);
-    var firstUnlockIconId = info.unlocks[0] ? unlockIconId(info.unlocks[0]) : null;
-    card.appendChild(firstUnlockIconId ? buildIcon(firstUnlockIconId, 30) : el('div', 'f-icon'));
-    card.appendChild(el('div', 'f-tech-name', info.name));
-    var cost = info.cost || { packs: [], count: 1, time: 1 };
-    var costText = cost.packs.map(function (p) { return F.t('item.' + p[0]) + ' x' + p[1]; }).join(' + ') + ' × ' + cost.count;
-    card.appendChild(el('div', 'f-tech-cost', costText));
-    card.appendChild(bar(info.fraction || 0, 'f-bar-blue'));
-    attachTooltip(card, function () {
-      var html = '<b style="color:#ffa500">' + U.escapeHtml(info.name) + '</b><br>' + U.escapeHtml(costText);
-      if (info.prereq.length) html += '<br>' + U.escapeHtml(F.t('ui.research.prereqMissing')) + ': ' + info.prereq.map(function (p) { return U.escapeHtml(F.t('tech.' + p)); }).join(', ');
-      if (info.unlocks.length) html += '<br>' + U.escapeHtml(F.t('ui.research.unlocks')) + ': ' + info.unlocks.map(function (u) { return U.escapeHtml(unlockDisplayName(u)); }).join(', ');
-      return html;
-    });
-    card.addEventListener('click', function (ev) {
-      if (info.done) return;
-      if (ev.shiftKey) { if (F.research) F.research.queue(id); }
-      else { if (F.research) F.research.start(id); }
-      renderTech(root, lastPayload.tech);
-    });
-    return card;
-  }
-  // Tier column label (design/EXPANSION.md §5/§6.6): 1 "Red tier", 2 "Red +
-  // green tier" (both pre-existing), 3 "Blue tier", 4 "Endgame tier" (new).
-  var TIER_LABEL_KEYS = { 1: 'ui.tier1', 2: 'ui.tier2', 3: 'ui.research.tier3', 4: 'ui.research.tier4' };
-  function tierLabel(tierNum) { return F.t(TIER_LABEL_KEYS[tierNum] || 'ui.tier2'); }
-  function renderTech(root, payload) {
-    clear(root);
-    var head = el('div', 'f-tech-head');
-    var cur = F.state && F.state.research && F.state.research.current;
-    head.appendChild(el('div', null, F.t('ui.research.current') + ': ' + (cur ? F.t('tech.' + cur) : F.t('ui.research.none'))));
-    var frac = F.research && typeof F.research.progress === 'function' ? F.research.progress() : 0;
-    head.appendChild(bar(frac, 'f-bar-blue', (frac * 100).toFixed(0) + '%'));
-    root.appendChild(head);
-
-    // Tier count is data-driven, not hardcoded to 3: the expansion adds
-    // tiers 3 (blue) and 4 (purple/yellow, "endgame") on top of the base
-    // game's 1/2 — see design/EXPANSION.md §5. ~45 techs total once the
-    // expansion's tech table is in; the whole window scrolls via .f-body's
-    // max-height (70-ui.js), and each column additionally scrolls on its
-    // own past a sane height (style.css) so one long tier doesn't force the
-    // window to grow past the screen.
-    var maxTier = 1;
-    (F.data.order.techs || []).forEach(function (id) {
-      var t = (F.data.techs[id] && F.data.techs[id].tier) || 1;
-      if (t > maxTier) maxTier = t;
-    });
-    var cols = [];
-    for (var t2 = 0; t2 < maxTier; t2++) cols.push([]);
-    (F.data.order.techs || []).forEach(function (id) {
-      var def = F.data.techs[id];
-      var tier = U.clamp((def.tier || 1) - 1, 0, maxTier - 1);
-      cols[tier].push(id);
-    });
-    var tree = el('div', 'f-tech-tree');
-    cols.forEach(function (ids, ci) {
-      if (!ids.length) return; // no empty tier columns
-      var col = el('div', 'f-tech-col');
-      col.appendChild(el('div', 'f-tech-col-title', tierLabel(ci + 1)));
-      ids.forEach(function (id) { col.appendChild(techCard(id, root)); });
-      tree.appendChild(col);
-    });
-    root.appendChild(tree);
-  }
-  registerWindow('tech', {
-    title: function () { return F.t('ui.technologies'); },
-    render: renderTech,
-    refreshOn: ['research:done'],
-  });
+  F.ui.recipeTooltipHtml = recipeTooltipHtml;
 
   // =========================================================================
   // WINDOW: help  ("Navodila")

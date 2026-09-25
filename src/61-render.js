@@ -1452,7 +1452,7 @@
         cutHole(octx, ps2[0], ps2[1], 10 * F.C.TILE * camera.zoom);
       }
       // Working furnaces/boilers glow at night too (GDD §11.9 "furnace/boiler mouths radius 2").
-      var glowTypes = ['stone-furnace', 'steel-furnace', 'boiler'];
+      var glowTypes = ['stone-furnace', 'steel-furnace', 'electric-furnace', 'boiler'];
       for (var gt = 0; gt < glowTypes.length; gt++) {
         var list = F.entities.ofType(glowTypes[gt]) || [];
         for (var j = 0; j < list.length; j++) {

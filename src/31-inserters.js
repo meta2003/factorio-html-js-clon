@@ -34,6 +34,7 @@
   }
 
   function reachOf(ins) { return (ins && ins.reach) || 1; }
+  function stackSizeOf(ins) { return Math.max(1, (ins && ins.stack) || 1); }
 
   // Resolvers (design/EXPANSION.md §6.3): fn(tx,ty) -> obj|null, consulted when the
   // pickup/drop tile has no grid entity. `obj` is duck-typed like an entity but with
@@ -219,6 +220,13 @@
     const got = takeFromSource(srcTarget, filterFn);
     if (got) {
       e.hand = { id: got, count: 1 };
+      // Stack inserters (ins.stack > 1) keep grabbing the same item, up to their hand size,
+      // from whatever the source still offers this tick.
+      const handMax = stackSizeOf(ins);
+      if (handMax > 1) {
+        const same = (item) => item === got;
+        while (e.hand.count < handMax && takeFromSource(srcTarget, same)) e.hand.count++;
+      }
       e.phase = 'swing_out';
       e.t = halfSwingTicks(ins);
       e._status = 'working';
@@ -265,32 +273,37 @@
     const dropTgt = tileTarget(dx, dy);
     dropTgt._insDir = e.dir;
     const item = e.hand.id;
-    let ok = false;
+    let dropped = 0;
 
+    // One item per tick onto belts and the ground; entities take as many as they accept now.
+    // A stack inserter's hand therefore empties over several ticks on a belt (it stays in the
+    // 'drop' phase until the hand is empty), like Factorio's.
     if (dropTgt.kind === 'belt') {
       const li = F.belts.lanePositionForInserter(dropTgt.entity, e.dir);
       const lane = li ? li.lane : 0;
       const pos = (li && li.pos != null) ? li.pos : 128;
-      if (F.belts.canInsert(dropTgt.entity, lane, pos)) ok = F.belts.insert(dropTgt.entity, lane, pos, item);
+      if (F.belts.canInsert(dropTgt.entity, lane, pos) && F.belts.insert(dropTgt.entity, lane, pos, item)) dropped = 1;
     } else if (dropTgt.kind === 'entity') {
-      if (entityAcceptsNow(dropTgt.entity, item)) {
+      while (dropped < e.hand.count && entityAcceptsNow(dropTgt.entity, item)) {
         const n = F.entities.insertItem ? F.entities.insertItem(dropTgt.entity, item, 1) : 0;
-        ok = n > 0;
+        if (n <= 0) break;
+        dropped++;
       }
     } else { // ground
       if (groundAcceptsNow(dropTgt.tx, dropTgt.ty)) {
         const leftover = F.ground.drop(dropTgt.tx, dropTgt.ty, item, 1);
-        ok = leftover === 0;
+        if (leftover === 0) dropped = 1;
       }
     }
+    if (dropped > 0) e.hand.count -= dropped;
 
-    if (ok) {
+    if (e.hand.count <= 0) {
       e.hand = null;
       e.phase = 'swing_back';
       e.t = halfSwingTicks(ins);
       e._status = 'working';
     } else {
-      e._status = 'waiting_for_space';
+      e._status = dropped > 0 ? 'working' : 'waiting_for_space';
     }
   }
 

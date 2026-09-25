@@ -56,6 +56,7 @@
   var AM_PALETTE = {
     'assembling-machine-1': { body: '#6C7960', bodyLo: '#333B2C', accent: '#9FC27A', pillar: '#4E564A', trim: '#C9A227' },
     'assembling-machine-2': { body: '#54697E', bodyLo: '#212C37', accent: '#8FCBEF', pillar: '#3C4A58', trim: '#E7F3FA' },
+    'assembling-machine-3': { body: '#7F6E45', bodyLo: '#3A3220', accent: '#F2C14E', pillar: '#4F452C', trim: '#FFE7A3' },
   };
   function paintAssembler(ctx, W, H, frame, dir, def, type, opts) {
     var working = !!(opts && opts.working);
@@ -80,8 +81,18 @@
     L.rivets(ctx, [[hx + cut * 0.55, hy + cut * 0.55], [hx + hw - cut * 0.55, hy + cut * 0.55],
       [hx + cut * 0.55, hy + hh - cut * 0.55], [hx + hw - cut * 0.55, hy + hh - cut * 0.55]], W * 0.02);
 
-    // AM2: brighter trim band + extra piping stubs on the top edge.
-    if (type === 'assembling-machine-2') {
+    // AM3: gold trim bands top and bottom, hazard-striped base plates, four coolant pipes.
+    if (type === 'assembling-machine-3') {
+      ctx.fillStyle = L.rgba(pal.accent, 0.9);
+      ctx.fillRect(hx + cut * 0.4, hy + hh * 0.08, hw - cut * 0.8, hh * 0.045);
+      ctx.fillRect(hx + cut * 0.4, hy + hh * 0.88, hw - cut * 0.8, hh * 0.04);
+      L.hazardStripe(ctx, hx + hw * 0.22, hy + hh * 0.93, hw * 0.2, hh * 0.05, W * 0.02);
+      L.hazardStripe(ctx, hx + hw * 0.58, hy + hh * 0.93, hw * 0.2, hh * 0.05, W * 0.02);
+      [0.24, 0.42, 0.58, 0.76].forEach(function (t) {
+        pillar(ctx, hx + hw * t, hy + H * 0.02, W * 0.02, H * 0.05, '#6F7C86');
+      });
+    } else if (type === 'assembling-machine-2') {
+      // AM2: brighter trim band + extra piping stubs on the top edge.
       ctx.fillStyle = L.rgba(pal.accent, 0.85); ctx.fillRect(hx + cut * 0.4, hy + hh * 0.09, hw - cut * 0.8, hh * 0.045);
       pillar(ctx, hx + hw * 0.28, hy + H * 0.02, W * 0.022, H * 0.05, pal.pillar);
       pillar(ctx, hx + hw * 0.72, hy + H * 0.02, W * 0.022, H * 0.05, pal.pillar);
@@ -307,7 +318,7 @@
     if (lit) { ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.beginPath(); ctx.arc(W * 0.43, H * 0.32, W * 0.066, 0, Math.PI * 2); ctx.fill(); }
   }
 
-  F.sprites.definePainter(['assembling-machine-1', 'assembling-machine-2'], paintAssembler);
+  F.sprites.definePainter(['assembling-machine-1', 'assembling-machine-2', 'assembling-machine-3'], paintAssembler);
   F.sprites.definePainter('lab', paintLab);
   F.sprites.definePainter('radar', paintRadar);
   F.sprites.definePainter('solar-panel', paintSolarPanel);

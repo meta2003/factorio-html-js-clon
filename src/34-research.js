@@ -18,7 +18,7 @@
     'ui.research.none': 'No active research',
     'ui.research.queue': 'Queue',
     'ui.research.queueEmpty': 'The queue is empty',
-    'ui.research.queueFull': 'Queue is full (max 7)',
+    'ui.research.queueFull': 'Queue is full (max 60)',
     'ui.research.available': 'Available',
     'ui.research.locked': 'Locked',
     'ui.research.done': 'Researched',
@@ -45,7 +45,7 @@
     // src/disabled/README.md).
   });
 
-  const MAX_QUEUE = 7;
+  const MAX_QUEUE = 60; // room for a whole prerequisite chain (queueWithPrereqs)
 
   // ---------------------------------------------------------------------
   // internal helpers
@@ -134,9 +134,12 @@
     // marking `done[id] = true` above is sufficient — nothing further to
     // mutate for `effects`/`unlocks` here.
     F.events.emit('research:done', { id: id, tech: def });
-    if (r.queue.length > 0) {
-      const next = r.queue.shift();
-      start(next);
+    // Continue with the first queued tech whose prerequisites are now met (the queue is kept in
+    // prerequisite order by queueWithPrereqs, but a hand-queued tech may still be waiting).
+    for (let i = 0; i < r.queue.length; i++) {
+      const qdef = techDefSafe(r.queue[i]);
+      if (!qdef || r.done[r.queue[i]]) { r.queue.splice(i, 1); i--; continue; }
+      if (prereqsMet(qdef, r)) { start(r.queue[i]); break; }
     }
   }
 
@@ -210,6 +213,51 @@
     if (!r.current) return start(techId); // nothing active -> queueing just starts it
     if (r.queue.length >= MAX_QUEUE) { F.log.warn('[research] queue: full'); return false; }
     r.queue.push(techId);
+    return true;
+  }
+
+  // Not-yet-researched techs needed for `techId`, prerequisites first, ending with techId
+  // itself (empty when techId is already researched or unknown).
+  function missingChain(techId) {
+    const r = state();
+    const out = [];
+    if (!r) return out;
+    const seen = {};
+    (function visit(id) {
+      if (seen[id] || r.done[id]) return;
+      seen[id] = true;
+      const def = techDefSafe(id);
+      if (!def) return;
+      (def.prereq || []).forEach(visit);
+      out.push(id);
+    })(techId);
+    return out;
+  }
+
+  // Queue techId together with every missing prerequisite, in an order that researches them
+  // one after another. Returns false when nothing could be queued (already done, or no room).
+  function queueWithPrereqs(techId) {
+    const r = state();
+    if (!r) return false;
+    const chain = missingChain(techId).filter(function (id) { return id !== r.current && r.queue.indexOf(id) < 0; });
+    if (!chain.length) return r.current === techId || r.queue.indexOf(techId) >= 0;
+    if (r.queue.length + chain.length > MAX_QUEUE) { F.log.warn('[research] queueWithPrereqs: queue full'); return false; }
+    // Nothing active: start the first startable tech, queue the rest.
+    let i = 0;
+    if (!r.current) {
+      const first = techDefSafe(chain[0]);
+      if (first && prereqsMet(first, r)) { start(chain[0]); i = 1; }
+    }
+    for (; i < chain.length; i++) r.queue.push(chain[i]);
+    return true;
+  }
+
+  function dequeue(techId) {
+    const r = state();
+    if (!r) return false;
+    const i = r.queue.indexOf(techId);
+    if (i < 0) return false;
+    r.queue.splice(i, 1);
     return true;
   }
 
@@ -333,6 +381,10 @@
     start: start,
     cancel: cancel,
     queue: queue,
+    queueWithPrereqs: queueWithPrereqs,
+    dequeue: dequeue,
+    missingChain: missingChain,
+    maxQueue: MAX_QUEUE,
     isDone: isDone,
     isRecipeUnlocked: isRecipeUnlocked,
     unlockedRecipes: unlockedRecipes,

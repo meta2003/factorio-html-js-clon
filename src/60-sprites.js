@@ -260,11 +260,12 @@
   var BELT_TIER = {
     yellow: { rail: '#DDAA1C', hi: '#FFE17C', lo: '#7A5A08' },
     fast: { rail: '#C8392A', hi: '#FF8C76', lo: '#6A180E' },
+    express: { rail: '#2F9AD6', hi: '#9BE0FF', lo: '#0E3F5E' },
   };
   var BELT_RAIL = 0.10; // rail width as a fraction of the belt width
   function beltTierOf(def) {
     var b = def.belt || def.underground || def.splitter || {};
-    return BELT_TIER[b.tier === 'fast' ? 'fast' : 'yellow'];
+    return BELT_TIER[b.tier] || BELT_TIER.yellow;
   }
   function roundRectPath(ctx, x, y, w, h, r) {
     r = Math.min(r, w / 2, h / 2);
@@ -717,9 +718,9 @@
   // solar-panel/accumulator) plus the 2 non-placeable "natural" entities (spawner, corpse).
   var PAINTERS = {
     'wooden-chest': paintChest, 'iron-chest': paintChest, 'steel-chest': paintChest,
-    'transport-belt': paintBelt, 'fast-transport-belt': paintBelt,
-    'underground-belt': paintUnderground, 'fast-underground-belt': paintUnderground,
-    'splitter': paintSplitter, 'fast-splitter': paintSplitter,
+    'transport-belt': paintBelt, 'fast-transport-belt': paintBelt, 'express-transport-belt': paintBelt,
+    'underground-belt': paintUnderground, 'fast-underground-belt': paintUnderground, 'express-underground-belt': paintUnderground,
+    'splitter': paintSplitter, 'fast-splitter': paintSplitter, 'express-splitter': paintSplitter,
     'burner-inserter': paintInserterBase, 'inserter': paintInserterBase,
     'long-handed-inserter': paintInserterBase, 'fast-inserter': paintInserterBase,
     'pipe': paintPipe, 'pipe-to-ground': paintPipe,
