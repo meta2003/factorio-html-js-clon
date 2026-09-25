@@ -162,6 +162,35 @@
   F.sprites.definePainter(['train-stop'], paintTrainStop);
 
   // =========================================================================================
+  // Rail signal / chain signal (1x1, rotatable: painted facing north = the rail tile it
+  // guards). frame = aspect from 38-trains.js: 0 green, 1 red, 2 yellow. Concrete pad, a mast
+  // with a three-lamp head (only the current lamp lit) and a small pointer toward the rail.
+  // The chain signal gets a blue band on its head so the two read apart at a glance.
+  // =========================================================================================
+  var LAMP_ON = ['#4CF26A', '#FF4436', '#FFD23A'];
+  var LAMP_OFF = ['#1F4A28', '#4A1C18', '#4A4018'];
+  function paintRailSignal(ctx, W, H, frame, dir, def, type) {
+    var chain = type === 'rail-chain-signal';
+    var aspect = (frame | 0) % 3;
+    L.foundation(ctx, W, H, '#7A7C7E');
+    // pointer toward the guarded rail (top edge)
+    ctx.fillStyle = '#E8E2C8';
+    ctx.beginPath(); ctx.moveTo(W * 0.5, H * 0.03); ctx.lineTo(W * 0.62, H * 0.13); ctx.lineTo(W * 0.38, H * 0.13); ctx.closePath(); ctx.fill();
+    L.panel(ctx, W * 0.45, H * 0.6, W * 0.1, H * 0.3, '#4A4D50', { r: W * 0.03, hi: 18, lo: 24 });
+    var hx = W * 0.3, hy = H * 0.16, hw = W * 0.4, hh = H * 0.5;
+    L.panel(ctx, hx, hy, hw, hh, '#2B2E31', { r: hw * 0.28, hi: 14, lo: 22 });
+    if (chain) { ctx.fillStyle = '#3F86D0'; ctx.fillRect(hx + hw * 0.08, hy + hh * 0.9, hw * 0.84, hh * 0.08); }
+    // lamp order top->bottom: red, yellow, green (railway convention)
+    var order = [1, 2, 0];
+    for (var i = 0; i < 3; i++) {
+      var k = order[i], cy = hy + hh * (0.2 + i * 0.29), on = k === aspect;
+      L.disc(ctx, W * 0.5, cy, W * 0.085, on ? LAMP_ON[k] : LAMP_OFF[k], { hi: on ? 25 : 8, lo: 15 });
+      if (on) L.glow(ctx, W * 0.5, cy, W * 0.3, LAMP_ON[k], 0.45);
+    }
+  }
+  F.sprites.definePainter(['rail-signal', 'rail-chain-signal'], paintRailSignal);
+
+  // =========================================================================================
   // Vehicles: free-moving sprites (not F.sprites.entity — trains sit between tiles and rotate
   // to the rail tangent, so the feature module draws these directly). 128x192 px = 2x3 tiles at
   // 64 px/tile, facing NORTH, cached per (type,frame). NO shadow baked in (design/EXPANSION.md
@@ -366,6 +395,15 @@
       ctx.fillStyle = L.lighten(c1, 22); ctx.fill();
       L.inset(ctx, x + w * 0.18, y + h * 0.32, w * 0.64, h * 0.2, '#1E2A33', w * 0.08);
       ctx.fillStyle = c2; ctx.fillRect(x - w * 0.03, y + h * 0.84, w * 1.06, h * 0.12);
+    });
+    F.sprites.defineIcon('rail-signal', function (ctx, S, def) {
+      var band = (def.icon && def.icon.color2) || '#3FC35A';
+      L.panel(ctx, S * 0.46, S * 0.62, S * 0.08, S * 0.3, '#5A5D60', { r: S * 0.02, hi: 14, lo: 20 });
+      L.panel(ctx, S * 0.3, S * 0.08, S * 0.4, S * 0.58, '#2B2E31', { r: S * 0.12, hi: 14, lo: 22 });
+      L.disc(ctx, S * 0.5, S * 0.2, S * 0.07, '#FF4436', { hi: 20, lo: 15 });
+      L.disc(ctx, S * 0.5, S * 0.36, S * 0.07, '#4A4018', { hi: 8, lo: 15 });
+      L.disc(ctx, S * 0.5, S * 0.52, S * 0.07, '#4CF26A', { hi: 20, lo: 15 });
+      ctx.fillStyle = band; ctx.fillRect(S * 0.3, S * 0.62, S * 0.4, S * 0.05);
     });
     F.sprites.defineIcon('wagon', function (ctx, S, def) {
       var c1 = (def.icon && def.icon.color) || '#8A8F94', c2 = (def.icon && def.icon.color2) || '#5A4636';
