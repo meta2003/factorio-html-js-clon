@@ -437,14 +437,19 @@
   // Tick phase (EXPANSION.md §7.1: "Tick phase after 'fluids'") — registered via the §6.1 queue
   // pattern since 80-game.js (which owns F.game.addTickPhase) loads after this file.
   // =========================================================================================
+  var OIL_BEHAVIOURS = { crafter: 1, pumpjack: 1, 'storage-tank': 1 };
+  function isOilEntity(e) {
+    var def = e._def || (e._def = safeEntityDef(e.type));
+    return !!(def && OIL_BEHAVIOURS[def.behaviour]);
+  }
   function oilTick() {
-    var list = F.entities.all();
+    var list = F.entities.filtered ? F.entities.filtered('oil', isOilEntity) : F.entities.all();
     for (var i = 0; i < list.length; i++) {
       // F.entities.remove() defers the actual splice out of F.state.entities to flushRemovals()
       // (end of tick), so a just-removed entity can still be present here for the rest of this
       // same tick — skip it like every other tick phase implicitly does via behaviour dispatch.
       var e = list[i]; if (!e || e._removed) continue;
-      var def = safeEntityDef(e.type); if (!def) continue;
+      var def = e._def || (e._def = safeEntityDef(e.type)); if (!def) continue;
       if (def.behaviour === 'crafter') crafterTick(e, def);
       else if (def.behaviour === 'pumpjack') pumpjackTick(e, def);
       else if (def.behaviour === 'storage-tank') tankCheckDir(e);

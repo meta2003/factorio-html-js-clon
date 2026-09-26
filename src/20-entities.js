@@ -65,8 +65,13 @@
     return F.state.nextId;
   }
 
+  // Bumped whenever an entity is added or removed; F.entities.filtered() lists depend on it.
+  let version = 0;
+  const filteredCache = new Map(); // key -> { version, list }
+
   // Register an entity into the runtime caches + world tile map.
   function registerEntity(e) {
+    version++;
     byId.set(e.id, e);
     const arr = typeCache.get(e.type);
     if (arr) arr.push(e);
@@ -78,6 +83,7 @@
   // Unregister from caches + world tile map (tiles are freed immediately even
   // though the dense F.state.entities array splice is deferred to flushRemovals()).
   function unregisterEntity(e) {
+    version++;
     byId.delete(e.id);
     const arr = typeCache.get(e.type);
     if (arr) { const i = arr.indexOf(e); if (i >= 0) arr.splice(i, 1); }
@@ -163,6 +169,21 @@
   };
 
   entities.byId = function (id) { return byId.get(id); };
+
+  // The live entities (in F.state.entities order, i.e. by id) for which pred(e) holds, cached
+  // under `key` until an entity is added or removed. Tick phases that only care about a few
+  // behaviours use this instead of walking every pipe, pole and chest each tick.
+  entities.filtered = function (key, pred) {
+    let c = filteredCache.get(key);
+    if (!c || c.version !== version) {
+      const src = (F.state && F.state.entities) || [];
+      const list = [];
+      for (let i = 0; i < src.length; i++) if (!src[i]._removed && pred(src[i])) list.push(src[i]);
+      c = { version, list };
+      filteredCache.set(key, c);
+    }
+    return c.list;
+  };
   entities.all = function () { return F.state.entities || []; };
 
   entities.ofType = function (type) {
@@ -305,6 +326,7 @@
 
   // Rebuild every runtime cache after F.load(). Called by 80-game.js.
   entities.rebuild = function () {
+    version++;
     byId.clear();
     typeCache.clear();
     pendingRemovals.length = 0;

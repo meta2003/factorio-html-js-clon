@@ -242,6 +242,27 @@ module.exports = {
     assert(p2.wires.indexOf(p1.id) >= 0, 'big poles wire over 25 tiles');
   },
 
+  pipe_to_ground_passes_under_other_pipes(F, assert) {
+    fresh(F);
+    const a = findFlat(F, 9, 5);
+    const y = a.y + 2;
+    // a north-south pipe line in the middle, a pipe-to-ground pair crossing under it
+    for (let j = 0; j < 5; j++) place(F, assert, 'pipe', a.x + 4, a.y + j, 0);
+    const inE = place(F, assert, 'pipe-to-ground', a.x + 2, y, 1);   // east: front faces east
+    const outE = place(F, assert, 'pipe-to-ground', a.x + 6, y, 3);  // west: front faces west
+    assert(inE.pairId === outE.id && outE.pairId === inE.id, 'pair forms under the crossing pipe');
+    F.fluids.rebuild();
+    const mid = F.api.entityAt(a.x + 4, y);
+    assert(inE.fb._seg === outE.fb._seg && mid.fb._seg !== inE.fb._seg, 'the crossing pipe stays a separate segment');
+    // another pipe-to-ground on the same axis in between ends the search
+    fresh(F);
+    const b = findFlat(F, 9, 3);
+    const p1 = place(F, assert, 'pipe-to-ground', b.x, b.y + 1, 1);
+    place(F, assert, 'pipe-to-ground', b.x + 3, b.y + 1, 1);
+    const p3 = place(F, assert, 'pipe-to-ground', b.x + 6, b.y + 1, 3);
+    assert(!p1.pairId && p3.pairId && p3.pairId !== p1.id, 'pairs with the nearest pipe-to-ground only');
+  },
+
   research_queue_with_prerequisites(F, assert) {
     fresh(F);
     const target = 'automation-3';

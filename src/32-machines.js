@@ -780,12 +780,17 @@
     return out;
   };
 
+  function hasHandler(e) {
+    const def = e._def || (e._def = safeEntityDef(e.type));
+    return !!(def && HANDLERS[def.behaviour]);
+  }
   F.machines.tick = function () {
-    const list = F.entities.all();
+    const list = F.entities.filtered ? F.entities.filtered('machines', hasHandler) : F.entities.all();
     for (let i = 0; i < list.length; i++) {
       const e = list[i];
       if (!e) continue;
-      const def = safeEntityDef(e.type);
+      // e._def: the entity's definition, cached on the entity (runtime-only: '_' keys are not saved)
+      const def = e._def || (e._def = safeEntityDef(e.type));
       if (!def) continue;
       const fn = HANDLERS[def.behaviour];
       if (!fn) continue;

@@ -473,6 +473,11 @@
     return net.satisfaction != null ? net.satisfaction : 1;
   }
 
+  const GENERATOR_BEHAVIOURS = { solar: 1, engine: 1, accumulator: 1 };
+  function isGenerator(e) {
+    const def = e._def || (e._def = safeDef(e.type));
+    return !!(def && GENERATOR_BEHAVIOURS[def.behaviour]);
+  }
   function powerTick() {
     maybeRebuildPower();
     maybeRebuildFluids();
@@ -483,10 +488,10 @@
     const buckets = new Map(); // netId -> { solarJ, solarCount, engSegs: Map, accList: [] }
     function bucketOf(netId) { let b = buckets.get(netId); if (!b) { b = { solarJ: 0, solarCount: 0, engSegs: new Map(), accList: [] }; buckets.set(netId, b); } return b; }
 
-    const all = F.entities.all();
+    const all = F.entities.filtered ? F.entities.filtered('generators', isGenerator) : F.entities.all();
     for (let i = 0; i < all.length; i++) {
       const e = all[i];
-      const def = safeDef(e.type); if (!def) continue;
+      const def = e._def || (e._def = safeDef(e.type)); if (!def) continue;
       if (def.behaviour === 'solar') {
         const netId = resolveNetId(e); if (netId == null) continue;
         const b = bucketOf(netId);
@@ -689,16 +694,17 @@
       e.fb = { fluid: null, amount: 0, cap: 50 };
       e.pairId = 0;
       const [dx, dy] = F.util.dirVec(e.dir);
+      // The pair is the nearest pipe-to-ground on this line; anything else on the surface in
+      // between (pipes, belts, buildings) is passed underneath. Another pipe-to-ground on the
+      // same axis ends the search, paired or not, so parallel lines never cross-link.
       for (let g = 1; g <= 10; g++) {
         const tx = e.x + dx * g, ty = e.y + dy * g;
         const other = (F.world && F.world.entityAt) ? F.world.entityAt(tx, ty) : null;
-        if (other) {
-          const odef = safeDef(other.type);
-          if (odef && odef.behaviour === 'pipe-to-ground' && !other.pairId && other.dir === F.util.oppDir(e.dir)) {
-            e.pairId = other.id; other.pairId = e.id;
-          }
-          break; // stop at the nearest occupied tile either way (paired or blocked)
-        }
+        if (!other) continue;
+        const odef = safeDef(other.type);
+        if (!odef || odef.behaviour !== 'pipe-to-ground' || (other.dir & 1) !== (e.dir & 1)) continue;
+        if (!other.pairId && other.dir === F.util.oppDir(e.dir)) { e.pairId = other.id; other.pairId = e.id; }
+        break;
       }
       F.fluids.markDirty();
     },
