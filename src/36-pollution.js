@@ -166,6 +166,16 @@
   function emit(entity, amount) {
     if (!F.state) return;
     if (typeof amount !== 'number' || !isFinite(amount) || amount <= 0) return; // 0/negative/NaN: silent no-op
+    // hot path (every working machine, every tick): the entity's chunk is cached on it while it
+    // stays put and the chunk store is the same
+    const pc = entity && entity._polChunk;
+    if (pc && entity._polX === entity.x && entity._polY === entity.y && entity._polStore === F.state.world.chunks) {
+      pc.pollution = (pc.pollution || 0) + amount;
+      const p = F.state.pollution;
+      if (p && typeof p.emittedAccum === 'number') p.emittedAccum += amount;
+      else { const st = state(); if (st) st.emittedAccum += amount; }
+      return;
+    }
     const loc = chunkOfEntity(entity);
     if (!loc) { F.log.warn('[pollution] emit: invalid entity', entity); return; }
     const chunk = getChunk(loc.cx, loc.cy, true);
@@ -173,6 +183,9 @@
     chunk.pollution = (chunk.pollution || 0) + amount;
     const st = state();
     if (st) st.emittedAccum += amount;
+    if (typeof entity.x === 'number' && F.state.world) {
+      entity._polChunk = chunk; entity._polX = entity.x; entity._polY = entity.y; entity._polStore = F.state.world.chunks;
+    }
   }
 
   // ---------------------------------------------------------------------
@@ -255,11 +268,15 @@
       c.water = water; c.grass = grass; c.sand = sand;
       c.terrainDone = true;
     }
-    let trees = 0;
-    if (chunk.feature) {
-      for (let i = 0; i < chunk.feature.length; i++) if (chunk.feature[i] === 1) trees++;
+    // trees change only through F.world's feature edits, which bump chunk._fv
+    if (c.trees === undefined || c.treesVer !== (chunk._fv || 0)) {
+      let trees = 0;
+      if (chunk.feature) {
+        for (let i = 0; i < chunk.feature.length; i++) if (chunk.feature[i] === 1) trees++;
+      }
+      c.trees = trees;
+      c.treesVer = chunk._fv || 0;
     }
-    c.trees = trees;
     return c;
   }
 

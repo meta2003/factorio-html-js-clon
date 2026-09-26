@@ -50,6 +50,31 @@ node test/headless.js --ticks 3600 --summary
 The headless runner loads the built game with DOM stubs and runs the scenarios in
 `test/scenarios.js`, covering mining, smelting, belts, inserters, power, research and save/load.
 
+### Playthrough test: a bot wins the game
+
+```bash
+node build/build.js && node test/playthrough.js           # full game, ~4 min: PASS when the rocket launches
+node test/playthrough.js --quick                           # smoke test, ~20 s: up to chemical science
+node test/playthrough.js --until oil-processing --verbose  # stop at any milestone, with the bot's log
+```
+
+`test/bot/` is a bot that starts a new game (seed 42) with the normal starting kit and plays it to
+the first rocket launch, the game's victory condition — about 3 hours of game time, 34
+technologies and ~3300 buildings. It only does what a player can do: mine and craft by hand,
+place buildings from the inventory, put items into and take them out of buildings, set
+recipes and pick research. The one shortcut is that it teleports instead of walking; there
+are no belts or inserters either — the bot carries everything itself, with a warehouse of
+chests as its stock. Exit code 0 means it won; on failure the last lines of its log are printed.
+
+| File | What |
+|---|---|
+| `test/playthrough.js` | the runner: options `--seed`, `--max-minutes`, `--until`, `--quick`, `--verbose`, `--debug`, `--save` |
+| `test/bot/bot.js` | map scan, research order, production planner (demand → backlog per recipe → machines), expansion rules, power blocks, oil campus, rocket |
+| `test/bot/machines.js` | building orders and machine service (fuel, ingredients, outputs, recipes) |
+| `test/bot/pipes.js` | fluid router (A* with underground pipes, one fluid per network) |
+| `test/bot/space.js` | building spots, reserved areas, power poles |
+| `test/bot/hands.js` | player actions and the stock (inventory + warehouse chests) |
+
 ## Layout
 
 | Path | What |
@@ -60,7 +85,7 @@ The headless runner loads the built game with DOM stubs and runs the scenarios i
 | `src/template.html`, `src/style.css` | page shell and UI styles |
 | `design/` | game design doc, architecture/API contracts, engineering constraints, art brief |
 | `research/` | notes on Factorio mechanics used for the design |
-| `test/` | headless test runner and scenarios |
+| `test/` | headless test runner and scenarios; `test/bot/` + `test/playthrough.js` the playthrough bot |
 
 ## Controls
 

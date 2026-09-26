@@ -226,6 +226,9 @@
   function equalizeSegments() {
     for (const seg of segments) {
       if (!seg.boxes.length || seg.capacity <= 0) continue;
+      // boxes only change through their segment: skip segments unchanged since the last pass
+      if (seg._eqAmount === seg.amount && seg._eqFluid === seg.fluid) continue;
+      seg._eqAmount = seg.amount; seg._eqFluid = seg.fluid;
       const frac = F.util.clamp(seg.amount / seg.capacity, 0, 1);
       const fluid = seg.amount > 0 ? seg.fluid : null;
       for (const box of seg.boxes) { box.amount = box.cap * frac; box.fluid = fluid; box._seg = seg; }

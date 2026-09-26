@@ -180,6 +180,7 @@
   // Records a per-tile override into chunk.delta (lazily created), keyed by
   // tile index (as ARCHITECTURE's example: {amount:{"i":value}, feature:{"i":0}}).
   function markDelta(chunk, field, i, value) {
+    if (field === 'feature') chunk._fv = (chunk._fv || 0) + 1; // lets caches (tree counts) notice
     if (!chunk.delta) chunk.delta = {};
     const bucket = chunk.delta[field] || (chunk.delta[field] = {});
     bucket[i] = value;
@@ -486,6 +487,22 @@
 
   function chunkKey(cx, cy) { return cx + ',' + cy; }
 
+  // Hot-path chunk lookup for the per-tile queries below (drills ask for resources every
+  // tick): a numeric-key Map in front of ensureChunk, reset whenever the chunk store object
+  // is replaced (new game / load). Chunks are never removed from a live store.
+  let fastStore = null;
+  const fastChunks = new Map();
+  function tileChunk(tx, ty) {
+    const cx = Math.floor(tx / 32), cy = Math.floor(ty / 32);
+    const store = F.state.world.chunks;
+    if (store !== fastStore) { fastStore = store; fastChunks.clear(); }
+    const k = (cx + 0x8000) * 0x10000 + (cy + 0x8000);
+    let c = fastChunks.get(k);
+    if (c === undefined) { c = F.world.ensureChunk(cx, cy); fastChunks.set(k, c); }
+    return c;
+  }
+  function tileIndex(tx, ty) { return (ty - Math.floor(ty / 32) * 32) * 32 + (tx - Math.floor(tx / 32) * 32); }
+
   // `seedOverride`: used only by legacyChunkToDelta to regenerate a chunk
   // for a seed that isn't (yet) F.state.world.seed during save migration;
   // the normal ensureChunk() path omits it and reads F.state.world.seed.
@@ -704,20 +721,25 @@
     },
 
     terrain: function (tx, ty) {
-      const r = F.world.chunkOf(tx, ty);
-      const chunk = F.world.ensureChunk(r[0], r[1]);
-      return chunk.terrain[r[2]];
+      tx = Math.floor(tx); ty = Math.floor(ty);
+      return tileChunk(tx, ty).terrain[tileIndex(tx, ty)];
     },
 
     isWater: function (tx, ty) { return F.world.terrain(tx, ty) < 2; },
     isLand: function (tx, ty) { return inMapLimit(tx, ty) && F.world.terrain(tx, ty) >= 2; },
 
     resource: function (tx, ty) {
-      const r = F.world.chunkOf(tx, ty);
-      const chunk = F.world.ensureChunk(r[0], r[1]);
-      const idx = chunk.res[r[2]];
+      tx = Math.floor(tx); ty = Math.floor(ty);
+      const chunk = tileChunk(tx, ty), i = tileIndex(tx, ty);
+      const idx = chunk.res[i];
       if (!idx) return null;
-      return { item: RES_ITEM[idx], amount: chunk.amount[r[2]] };
+      return { item: RES_ITEM[idx], amount: chunk.amount[i] };
+    },
+    // Ore left on a tile (0 when none) — resource() without the allocation, for hot paths.
+    resourceAmount: function (tx, ty) {
+      tx = Math.floor(tx); ty = Math.floor(ty);
+      const chunk = tileChunk(tx, ty), i = tileIndex(tx, ty);
+      return chunk.res[i] ? chunk.amount[i] : 0;
     },
 
     mineResource: function (tx, ty, n) {
@@ -744,9 +766,8 @@
     },
 
     feature: function (tx, ty) {
-      const r = F.world.chunkOf(tx, ty);
-      const chunk = F.world.ensureChunk(r[0], r[1]);
-      return chunk.feature[r[2]];
+      tx = Math.floor(tx); ty = Math.floor(ty);
+      return tileChunk(tx, ty).feature[tileIndex(tx, ty)];
     },
 
     removeFeature: function (tx, ty) {

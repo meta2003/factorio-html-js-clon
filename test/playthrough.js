@@ -2,10 +2,12 @@
 //
 //   node build/build.js && node test/playthrough.js            # the test (exit code 0 = won)
 //   node test/playthrough.js --seed 7 --verbose                 # another map, with the bot's log
-//   node test/playthrough.js --until oil-processing             # stop at a milestone (quick check)
+//   node test/playthrough.js --quick                            # smoke test: stop at chemical science (~20 s)
+//   node test/playthrough.js --until oil-processing             # stop at any milestone
 //
 // Options: --seed N (42) · --max-minutes N game minutes before giving up (240) · --until TEXT
-// stop successfully at the first milestone containing TEXT · --verbose print the bot's log ·
+// stop successfully at the first milestone containing TEXT · --quick = --until chemical-science-pack ·
+// --verbose print the bot's log ·
 // --every N progress line every N game minutes (10) · --debug bot state with each progress line ·
 // --save FILE write the final save.
 'use strict';
@@ -17,7 +19,7 @@ const argv = process.argv.slice(2);
 const opt = (k, d) => { const i = argv.indexOf(k); return i !== -1 ? argv[i + 1] : d; };
 const SEED = parseInt(opt('--seed', '42'), 10);
 const MAX_MIN = parseFloat(opt('--max-minutes', '240'));
-const UNTIL = opt('--until', null);
+const UNTIL = opt('--until', argv.includes('--quick') ? 'chemical-science-pack' : null);
 const EVERY = parseFloat(opt('--every', '10'));
 const VERBOSE = argv.includes('--verbose');
 

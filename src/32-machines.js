@@ -409,8 +409,7 @@
     for (let k = 0; k < total; k++) {
       const idx = (e.rrIndex + k) % total;
       const tx = x0 + (idx % w), ty = y0 + Math.floor(idx / w);
-      const res = F.world.resource(tx, ty);
-      if (res && res.amount > 0) {
+      if (F.world.resourceAmount(tx, ty) > 0) {
         e.rrIndex = (idx + 1) % total;
         return { tx, ty };
       }
@@ -494,12 +493,12 @@
     if (!def) return;
     if (e.held) drillTryOutput(e, def);
 
-    const [x0, y0, x1, y1] = drillRegion(e, def);
     let working = false, statusReason = null;
     if (e.held) {
       statusReason = 'output_full';
     } else {
-      if (!e.target || !(F.world.resource(e.target.tx, e.target.ty) || {}).amount) {
+      if (!e.target || !F.world.resourceAmount(e.target.tx, e.target.ty)) {
+        const [x0, y0, x1, y1] = drillRegion(e, def);
         e.target = findNextOreTile(e, x0, y0, x1, y1);
       }
       if (!e.target) statusReason = 'no_minable_resources';
@@ -514,8 +513,7 @@
         e.progress -= 1;
         const item = F.world.mineResource(e.target.tx, e.target.ty, 1);
         if (item) e.held = { id: item, count: 1 };
-        const res = F.world.resource(e.target.tx, e.target.ty);
-        if (!res || res.amount <= 0) e.target = null;
+        if (F.world.resourceAmount(e.target.tx, e.target.ty) <= 0) e.target = null;
         emitPollution(e, def, sat);
         if (e.held) drillTryOutput(e, def);
       }
