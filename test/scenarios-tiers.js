@@ -263,6 +263,20 @@ module.exports = {
     assert(!p1.pairId && p3.pairId && p3.pairId !== p1.id, 'pairs with the nearest pipe-to-ground only');
   },
 
+  fluid_rebuild_ignores_entities_removed_this_tick(F, assert) {
+    fresh(F);
+    const a = findFlat(F, 5, 1);
+    const pipes = [];
+    for (let i = 0; i < 5; i++) pipes.push(place(F, assert, 'pipe', a.x + i, a.y, 0));
+    F.fluids.rebuild();
+    assert(pipes[0].fb._seg === pipes[4].fb._seg, 'one line');
+    // remove the middle pipe and rebuild within the same tick (before the removal is flushed)
+    F.api.remove(a.x + 2, a.y);
+    F.fluids.markDirty();
+    F.fluids.rebuild();
+    assert(pipes[0].fb._seg !== pipes[4].fb._seg, 'the two halves are separate segments at once');
+  },
+
   research_queue_with_prerequisites(F, assert) {
     fresh(F);
     const target = 'automation-3';

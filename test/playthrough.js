@@ -8,7 +8,8 @@
 // Options: --seed N (42) · --max-minutes N game minutes before giving up (240) · --until TEXT
 // stop successfully at the first milestone containing TEXT · --quick = --until chemical-science-pack ·
 // --verbose print the bot's log ·
-// --every N progress line every N game minutes (10) · --debug bot state with each progress line ·
+// --every N progress line every N game minutes (10, a multiple of 10) · --debug bot state with
+// each progress line (reads more of the game state, so it can change the run) ·
 // --save FILE write the final save.
 'use strict';
 const fs = require('fs');
@@ -29,7 +30,7 @@ F.newGame({ seed: SEED });
 const bot = createBot(F, { verbose: VERBOSE });
 
 const maxTicks = MAX_MIN * 3600;
-let nextReport = EVERY * 3600;
+let nextReport = 10 * 3600;
 let result = 'timeout';
 let tickMs = 0;
 while (F.state.tick < maxTicks) {
@@ -39,9 +40,12 @@ while (F.state.tick < maxTicks) {
   tickMs += Date.now() - t0;
   if (bot.victory()) { result = 'victory'; break; }
   if (UNTIL && bot.milestones.some(m => m.name.includes(UNTIL))) { result = 'milestone'; break; }
+  // The report is taken every 10 game minutes whatever --every says: reading the power
+  // network can make the game recompute it, so the cadence must not depend on the options.
   if (F.state.tick >= nextReport) {
-    nextReport += EVERY * 3600;
+    nextReport += 10 * 3600;
     const s = bot.summary();
+    if (Math.round(F.state.tick / 3600) % EVERY !== 0) continue;
     if (argv.includes('--debug')) console.log(bot.debug());
     console.log(`${s.time} research=${s.researched} now=${s.current || '-'} entities=${s.entities} power=${s.power ? s.power.demand + '/' + s.power.capacity + 'kW' : '-'} wall=${((Date.now() - wall0) / 1000).toFixed(1)}s`);
   }

@@ -295,7 +295,8 @@ module.exports = {
     const pipes = [];
     let px = port.x + dx, py = port.y + dy;
     for (let i = 0; i < 6; i++) {
-      clearArea(F, px, py, 1, 1);
+      // only this tile: clearArea's one-tile margin would take the pump itself
+      if (F.world.feature(px, py)) F.world.removeFeature(px, py);
       if (!F.api.canPlace('pipe', px, py, 0).ok) break;
       pipes.push(place(F, assert, 'pipe', px, py, 0));
       px += dx; py += dy;

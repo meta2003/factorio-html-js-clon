@@ -138,6 +138,9 @@
     const all = F.entities.all();
     for (let i = 0; i < all.length; i++) {
       const e = all[i];
+      // removed entities stay in the list until the end of the tick (flushRemovals); a rebuild
+      // in between must not connect through them
+      if (e._removed) continue;
       const def = safeDef(e.type); if (!def) continue;
       switch (def.behaviour) {
         case 'pipe': pipes.push(e); addBox(e, 'fb', e.fb); break;
@@ -395,6 +398,7 @@
     const all = F.entities.all();
     for (let i = 0; i < all.length; i++) {
       const e = all[i];
+      if (e._removed) continue; // see rebuildFluids
       const def = safeDef(e.type); if (!def) continue;
       if (def.behaviour === 'pole') poles.push(e);
     }

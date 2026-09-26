@@ -65,6 +65,8 @@ place buildings from the inventory, put items into and take them out of building
 recipes and pick research. The one shortcut is that it teleports instead of walking; there
 are no belts or inserters either — the bot carries everything itself, with a warehouse of
 chests as its stock. Exit code 0 means it won; on failure the last lines of its log are printed.
+Runs are deterministic (same seed, same game); seeds 42, 7 and 123 all end in a launch after
+3–3¼ hours of game time.
 
 | File | What |
 |---|---|

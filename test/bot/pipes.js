@@ -61,14 +61,19 @@ function createPipes(ctx) {
     const s = m.get(fluid); if (!s) return;
     s.delete(src); if (!s.size) m.delete(fluid); if (!m.size) conn.delete(key(x, y));
   }
+  // A pipe on a port's keepout tile takes the keepout's place; a rolled-back pipe gives it back
+  // (or the tile in front of that port would be free for any fluid).
+  const keptOut = new Map();
+  function clearKeepout(k) { if (keepout.has(k)) { keptOut.set(k, keepout.get(k)); keepout.delete(k); } }
   function registerPipe(x, y, fluid) {
     pipeFluid.set(key(x, y), fluid);
     for (const [dx, dy] of DIRV) addConn(x + dx, y + dy, fluid, 'pipe:' + x + ',' + y);
-    keepout.delete(key(x, y));
+    clearKeepout(key(x, y));
     (nets[fluid] = nets[fluid] || { pipes: 0 }).pipes++;
   }
   function unregister(s, fluid) {
     pipeFluid.delete(key(s.x, s.y));
+    if (keptOut.has(key(s.x, s.y))) { keepout.set(key(s.x, s.y), keptOut.get(key(s.x, s.y))); keptOut.delete(key(s.x, s.y)); }
     const src = 'pipe:' + s.x + ',' + s.y;
     if (s.type === 'pipe') for (const [dx, dy] of DIRV) dropConn(s.x + dx, s.y + dy, fluid, src);
     else { const b = DIRV[(s.dir + 2) % 4]; dropConn(s.x + b[0], s.y + b[1], fluid, src); }
@@ -77,7 +82,7 @@ function createPipes(ctx) {
     pipeFluid.set(key(x, y), fluid);
     const b = DIRV[(dir + 2) % 4];
     addConn(x + b[0], y + b[1], fluid, 'pipe:' + x + ',' + y);
-    keepout.delete(key(x, y));
+    clearKeepout(key(x, y));
     (nets[fluid] = nets[fluid] || { pipes: 0 }).pipes++;
   }
 
@@ -252,6 +257,7 @@ function createPipes(ctx) {
     };
     for (const s of steps) {
       const pe = ctx.hands.place(s.type, s.x, s.y, s.dir);
+      if (!pe && !stock.inHand(s.type)) { rollback('out of ' + s.type); ctx.need(s.type, 10); return 'wait'; }
       if (!pe) return rollback('placement failed at ' + s.x + ',' + s.y + ' (' + s.type + '): ' + F.api.canPlace(s.type, s.x, s.y, s.dir).reason);
       placed.push(s);
       if (s.type === 'pipe') registerPipe(s.x, s.y, fluid); else registerPtg(s.x, s.y, s.dir, fluid);

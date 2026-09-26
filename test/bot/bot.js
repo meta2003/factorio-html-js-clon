@@ -192,6 +192,8 @@ function createBot(F, options) {
       ctx.space.reserve({ x: rect.x - 1, y: rect.y - 1, w: rect.w + 2, h: rect.h + 2 }, 'power');
       // the lanes stay free for pipes and poles
       for (let k = 0; k <= UNITS; k++) { const lane = { x: b.x - 1 + 4 * k, y: rect.y, w: 1, h: 12 }; ctx.space.release(lane); ctx.space.markNoPipe(lane); }
+      // ...except the lane tile where the pipe from boiler to boiler goes (no pole there)
+      for (let k = 1; k < UNITS; k++) ctx.space.reserve({ x: b.x - 1 + 4 * k, y: b.y + 11, w: 1, h: 1 }, 'boiler-pipe');
       // the water pipe leaves the block through the ring west of the first boiler
       ctx.space.release({ x: b.x - 2, y: b.y + 11, w: 1, h: 1 });
       blocks.push(b);
@@ -210,12 +212,12 @@ function createBot(F, options) {
       const release = (x, y, w, h) => ctx.space.release({ x, y, w, h });
       M.order({ type: 'boiler', tag: 'power', prio: 0, find: () => { release(bx, b.y + 10, 3, 2); return { x: bx, y: b.y + 10, dir: 0 }; },
         after: e => {
-          M.add({ cls: 'boiler', e });
+          M.add({ cls: 'boiler', e, block: b });
           // the power plant has its own water network ('water:power'), apart from the campus
           // each power block has its own offshore pump and water network ('water:power<n>')
           ctx.pipes.registerEntity(e, box => box === 'water' ? b.water : 'steam:' + e.id);
           if (k === 0) M.wantPipe(e, 'water', b.water);
-          else M.order({ type: 'pipe', tag: 'power', prio: 0, find: () => ({ x: bx - 1, y: b.y + 11, dir: 0 }), after: () => ctx.pipes.registerPipe(bx - 1, b.y + 11, b.water) });
+          else M.order({ type: 'pipe', tag: 'power', prio: 0, find: () => { release(bx - 1, b.y + 11, 1, 1); return { x: bx - 1, y: b.y + 11, dir: 0 }; }, after: () => ctx.pipes.registerPipe(bx - 1, b.y + 11, b.water) });
         } });
       for (const dy of [5, 0]) {
         M.order({ type: 'steam-engine', tag: 'power', prio: 0, find: () => { release(bx, b.y + dy, 3, 5); return { x: bx, y: b.y + dy, dir: 0 }; },
@@ -674,7 +676,20 @@ function createBot(F, options) {
     // power: keep 25% headroom
     // power: add a steam unit when demand nears capacity — only while every boiler runs
     const ps = power.stats();
-    const boilersOk = M.of('boiler').every(r => { const st = statusOf(r.e); return st !== 'no_water' && st !== 'no_fuel'; });
+    // A boiler still without water or fuel after three minutes will not come right (its pipe
+    // could not be laid): its block takes no more units — the water runs through the boilers —
+    // and it no longer holds up the expansion.
+    for (const r of M.of('boiler')) {
+      const st = statusOf(r.e);
+      if (st !== 'no_water' && st !== 'no_fuel') { r.badSince = 0; continue; }
+      if (!r.badSince) r.badSince = F.state.tick;
+      if (F.state.tick - r.badSince > 3 * 3600 && !r.given) {
+        r.given = true;
+        if (r.block) r.block.units = Math.max(r.block.units, 8);
+        ctx.log('boiler at ' + r.e.x + ',' + r.e.y + ' has ' + st + ': giving up on it and closing its power block');
+      }
+    }
+    const boilersOk = M.of('boiler').every(r => !r.badSince || r.given);
     if (ps && boilersOk && power.units() < cfg.maxPowerUnits && orderCount('power') === 0) {
       if (ps.demand > 0.75 * ps.capacity || (ps.satisfaction < 0.9 && ps.demand > 0.5 * ps.capacity)) power.addUnit();
     }
