@@ -13,6 +13,13 @@ function createHands(ctx) {
   const P = () => F.state.player;
   const pinv = () => P().inv;
 
+  // Item flows for the debug report: flow(ctx.flow.made|used, item, where, n)
+  ctx.flow = { made: new Map(), used: new Map() };
+  function flow(m, item, where, n) {
+    let w = m.get(item); if (!w) { w = new Map(); m.set(item, w); }
+    w.set(where, (w.get(where) || 0) + n);
+  }
+
   // ---------------------------------------------------------------- movement / placement
   function standNear(x, y) {
     // A free, walkable tile a few tiles away, so the player never blocks a building spot.
@@ -38,11 +45,12 @@ function createHands(ctx) {
     const fp = F.entities.footprint(def, dir || 0);
     moveOutOf(x, y, fp[0], fp[1]);
     const e = F.api.place(type, x, y, dir || 0, { fromInventory: true });
-    if (e) ctx.stats.placed++;
+    if (e) { ctx.stats.placed++; flow(ctx.flow.used, item, 'placed', 1); }
     return e;
   }
   function remove(e) {
     standNear(e.x, e.y);
+    stock.stash(); // room for the building and whatever is inside it
     return F.api.remove(e.x, e.y);
   }
 
@@ -127,7 +135,7 @@ function createHands(ctx) {
         let left = F.inv.add(pinv(), s.id, s.count);
         if (left > 0) { stock.stash(); left = F.inv.add(pinv(), s.id, left); }
         const got = s.count - left;
-        if (got > 0) { moved += got; ctx.stats.itemsMoved += got; }
+        if (got > 0) { moved += got; ctx.stats.itemsMoved += got; flow(ctx.flow.made, s.id, e.type, got); }
         if (left > 0) s.count = left; else g.inv[i] = null;
       }
     }
@@ -140,7 +148,7 @@ function createHands(ctx) {
     const k = Math.min(n, have);
     if (k <= 0) return 0;
     const inserted = F.api.insertInto(e, item, k);
-    if (inserted > 0) { F.player.take(item, inserted); ctx.stats.itemsMoved += inserted; }
+    if (inserted > 0) { F.player.take(item, inserted); ctx.stats.itemsMoved += inserted; flow(ctx.flow.used, item, e.recipe || e.type, inserted); }
     return inserted;
   }
   function countIn(e, item, name) {

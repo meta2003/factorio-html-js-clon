@@ -8,6 +8,10 @@ function createSpace(ctx) {
   const reserved = new Map(); // "x,y" -> tag
 
   function isReserved(x, y) { return reserved.has(key(x, y)); }
+  // tiles where poles may stand but pipes must not pass (the power block's lanes)
+  const noPipe = new Set();
+  function markNoPipe(r) { for (let j = 0; j < r.h; j++) for (let i = 0; i < r.w; i++) noPipe.add(key(r.x + i, r.y + j)); }
+  function pipeForbidden(x, y) { return noPipe.has(key(x, y)); }
   function reserve(r, tag) {
     for (let j = 0; j < r.h; j++) for (let i = 0; i < r.w; i++) reserved.set(key(r.x + i, r.y + j), tag || true);
   }
@@ -163,7 +167,7 @@ function createSpace(ctx) {
     return p;
   }
 
-  return { isReserved, reserve, release, tileOk, featuresIn, clear, findSpot, ensurePowered, onMain, mainNetId, poleType };
+  return { markNoPipe, pipeForbidden, isReserved, reserve, release, tileOk, featuresIn, clear, findSpot, ensurePowered, onMain, mainNetId, poleType };
 }
 
 module.exports = { createSpace };

@@ -16,7 +16,7 @@ const DEFAULTS = {
   step: 30,             // ticks between factory walks
   planEvery: 4,         // walks between re-plans
   loadSeconds: 20,      // how much work a machine is loaded with per visit
-  maxAsm: 90, maxFurnaces: 230, maxLabs: 30, maxDrillsPerOre: 80, maxPowerUnits: 40,
+  maxAsm: 90, maxFurnaces: 230, maxLabs: 30, maxDrillsPerOre: 120, maxPowerUnits: 40,
   oilRadius: 120, maxPumpjacks: 20,
   oreStock: 4000,       // ore kept in the warehouse before drills are left to fill up
 };
@@ -32,6 +32,8 @@ const RESEARCH_ORDER = [
 ];
 
 // Chemical plant recipes the bot runs, and which fluid each needs water for.
+// Fluids made in chemical plants from items; the planner treats them as intermediates.
+const MADE_FLUIDS = ['sulfuric-acid', 'lubricant'];
 const CHEM_RECIPES = ['plastic-bar', 'sulfur', 'sulfuric-acid', 'lubricant', 'battery', 'electric-engine-unit', 'processing-unit',
   'rocket-fuel', 'solid-fuel-from-light-oil', 'solid-fuel-from-petroleum-gas', 'heavy-oil-cracking', 'light-oil-cracking'];
 
@@ -70,7 +72,7 @@ function createBot(F, options) {
     const sp = F.world.spawn;
     const patches = {};
     function scan() {
-      const R = 120, x0 = Math.round(sp.x) - R, y0 = Math.round(sp.y) - R, N = 2 * R + 1;
+      const R = 220, x0 = Math.round(sp.x) - R, y0 = Math.round(sp.y) - R, N = 2 * R + 1;
       const seen = new Uint8Array(N * N);
       for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
         if (seen[j * N + i]) continue;
@@ -93,10 +95,11 @@ function createBot(F, options) {
         if (n < 40) continue;
         const p = { item: r.item, n, amount, x0: x0 + mx, y0: y0 + my, x1: x0 + Mx, y1: y0 + My, cx: x0 + Math.round(sx / n), cy: y0 + Math.round(sy / n) };
         p.dist = Math.hypot(p.cx - sp.x, p.cy - sp.y);
-        if (!patches[r.item] || p.dist < patches[r.item].dist) patches[r.item] = p;
+        (patches[r.item] = patches[r.item] || []).push(p);
       }
     }
     scan();
+    for (const k of Object.keys(patches)) patches[k].sort((a, b) => a.dist - b.dist);
     let water = null;
     for (const [x, y] of spiral(Math.round(sp.x), Math.round(sp.y), 150)) if (F.world.isWater(x, y)) { water = [x, y]; break; }
     const wells = [];
@@ -105,7 +108,7 @@ function createBot(F, options) {
       if (r && r.item === 'crude-oil') wells.push({ x: Math.round(sp.x) + x, y: Math.round(sp.y) + y, amount: r.amount, d: Math.hypot(x, y) });
     }
     wells.sort((a, b) => a.d - b.d);
-    return { patch: ore => patches[ore], patches, water, wells, spawn: [Math.round(sp.x), Math.round(sp.y)] };
+    return { patch: ore => (patches[ore] || [])[0], patchesOf: ore => patches[ore] || [], patches, water, wells, spawn: [Math.round(sp.x), Math.round(sp.y)] };
   })();
 
   // Anchors: where each part of the base grows from.
@@ -144,17 +147,25 @@ function createBot(F, options) {
       return [...out];
     }
     // science packs still to be consumed by the queued research
-    function packDemand() {
+    // Packs for the running tech (current=true) or for the running tech and the next two
+    // (packs for techs far ahead would only tie up plates).
+    function packDemand(current) {
       const r = F.state.research;
       const need = new Map();
-      const ids = [r.current].concat(r.queue).filter(Boolean);
+      const ids = (current ? [r.current] : [r.current].concat(r.queue.slice(0, 2))).filter(Boolean);
       for (const id of ids) {
         const inf = F.research.techInfo(id);
         const left = inf.unitsTotal - inf.unitsDone;
         for (const [p, k] of inf.cost.packs) need.set(p, (need.get(p) || 0) + left * k);
       }
-      // what is already inside the labs counts as delivered
-      for (const rec of M.of('lab')) for (const p of need.keys()) need.set(p, Math.max(0, need.get(p) - H.countIn(rec.e, p)));
+      // Packs already inside labs count as delivered — but a lab only works with a full set,
+      // so packs still missing from individual labs are always wanted.
+      const labs = M.of('lab');
+      for (const p of need.keys()) {
+        let inside = 0, missing = 0;
+        for (const rec of labs) { const c = H.countIn(rec.e, p); inside += c; missing += Math.max(0, 10 - c); }
+        need.set(p, Math.min(need.get(p), Math.max(need.get(p) - inside, missing)));
+      }
       return need;
     }
     return { update, packsWanted, packDemand };
@@ -169,14 +180,20 @@ function createBot(F, options) {
     const blocks = [];
     const generators = [];
     const UNITS = 8;
+    let noRoomLogged = false;
     function newBlock() {
       const a = ctx.anchors.water;
-      const rect = ctx.space.findSpot(4 * UNITS + 1, 12, a[0], a[1], { margin: 2, maxFeatures: 10, radius: 70 });
-      if (!rect) { ctx.log('no room for a power block'); return null; }
-      const b = { x: rect.x + 1, y: rect.y, units: 0, rect };
-      ctx.space.reserve(rect, 'power');
+      const rect = ctx.space.findSpot(4 * UNITS + 1, 12, a[0], a[1], { margin: 2, maxFeatures: 10, radius: 130 });
+      if (!rect) { if (!noRoomLogged) ctx.log('no room for a power block'); noRoomLogged = true; return null; }
+      const b = { x: rect.x + 1, y: rect.y, units: 0, rect, water: 'water:power' + blocks.length };
+      ctx.anchors[b.water] = [rect.x, rect.y + 11];
+      // the block and a one-tile ring around it: engines' steam ports face that ring, and no
+      // other pipe may ever pass there
+      ctx.space.reserve({ x: rect.x - 1, y: rect.y - 1, w: rect.w + 2, h: rect.h + 2 }, 'power');
       // the lanes stay free for pipes and poles
-      for (let k = 0; k <= UNITS; k++) ctx.space.release({ x: b.x - 1 + 4 * k, y: rect.y, w: 1, h: 12 });
+      for (let k = 0; k <= UNITS; k++) { const lane = { x: b.x - 1 + 4 * k, y: rect.y, w: 1, h: 12 }; ctx.space.release(lane); ctx.space.markNoPipe(lane); }
+      // the water pipe leaves the block through the ring west of the first boiler
+      ctx.space.release({ x: b.x - 2, y: b.y + 11, w: 1, h: 1 });
       blocks.push(b);
       ctx.log('power block at ' + b.x + ',' + b.y);
       return b;
@@ -194,9 +211,11 @@ function createBot(F, options) {
       M.order({ type: 'boiler', tag: 'power', prio: 0, find: () => { release(bx, b.y + 10, 3, 2); return { x: bx, y: b.y + 10, dir: 0 }; },
         after: e => {
           M.add({ cls: 'boiler', e });
-          ctx.pipes.registerEntity(e, box => box === 'water' ? 'water' : 'steam:' + e.id);
-          if (k === 0) M.wantPipe(e, 'water', 'water');
-          else M.order({ type: 'pipe', tag: 'power', prio: 0, find: () => ({ x: bx - 1, y: b.y + 11, dir: 0 }), after: () => ctx.pipes.registerPipe(bx - 1, b.y + 11, 'water') });
+          // the power plant has its own water network ('water:power'), apart from the campus
+          // each power block has its own offshore pump and water network ('water:power<n>')
+          ctx.pipes.registerEntity(e, box => box === 'water' ? b.water : 'steam:' + e.id);
+          if (k === 0) M.wantPipe(e, 'water', b.water);
+          else M.order({ type: 'pipe', tag: 'power', prio: 0, find: () => ({ x: bx - 1, y: b.y + 11, dir: 0 }), after: () => ctx.pipes.registerPipe(bx - 1, b.y + 11, b.water) });
         } });
       for (const dy of [5, 0]) {
         M.order({ type: 'steam-engine', tag: 'power', prio: 0, find: () => { release(bx, b.y + dy, 3, 5); return { x: bx, y: b.y + dy, dir: 0 }; },
@@ -239,24 +258,25 @@ function createBot(F, options) {
     function seed(fluid) {
       if (seeds[fluid] || seeding[fluid]) return;
       seeding[fluid] = true;
-      if (fluid === 'water') {
-        M.order({ type: 'offshore-pump', tag: 'oil', prio: 0, find: () => pumpSpot(ctx.anchors.campus),
-          after: e => { seeds.water = e; ctx.pipes.registerEntity(e, () => 'water'); ctx.pipes.markNetworked(e, 'water'); } });
+      if (fluid.startsWith('water')) {
+        const anchor = fluid === 'water' ? ctx.anchors.campus : (ctx.anchors[fluid] || ctx.anchors.water);
+        M.order({ type: 'offshore-pump', tag: 'oil', prio: 0, find: () => pumpSpot(anchor, fluid),
+          after: e => { seeds[fluid] = e; ctx.pipes.registerEntity(e, () => fluid); ctx.pipes.markNetworked(e, fluid); } });
         return;
       }
       M.order({ type: 'storage-tank', tag: 'oil', prio: 0, find: () => campusSpot('storage-tank', null, () => fluid),
         after: e => { seeds[fluid] = e; ctx.pipes.registerEntity(e, () => fluid); ctx.pipes.markNetworked(e, fluid); M.add({ cls: 'tank', e, fluid }); } });
     }
-    function pumpSpot(anchor) {
-      for (const [x, y] of spiral(world.water[0], world.water[1], 60)) {
+    function pumpSpot(anchor, fluid) {
+      for (const [x, y] of spiral(anchor[0], anchor[1], 90)) {
         if (!F.world.isLand(x, y) || ctx.space.isReserved(x, y)) continue;
         for (let d = 0; d < 4; d++) {
           if (!F.api.canPlace('offshore-pump', x, y, d).ok) continue;
-          if (!ctx.pipes.spotPortsOk('offshore-pump', x, y, d, () => 'water')) continue;
+          if (!ctx.pipes.spotPortsOk('offshore-pump', x, y, d, () => fluid)) continue;
           const back = ctx.pipes.portTiles('offshore-pump', x, y, d)[0];
           if (!ctx.space.tileOk(back.ax, back.ay, false)) continue;
           void anchor;
-          ctx.pipes.reservePorts('offshore-pump', x, y, d, () => 'water');
+          ctx.pipes.reservePorts('offshore-pump', x, y, d, () => fluid);
           return { x, y, dir: d };
         }
       }
@@ -268,7 +288,7 @@ function createBot(F, options) {
       const sz = d.size[0];
       const a = ctx.anchors.campus;
       for (let dir = 0; dir < 1; dir++) {
-        const r = ctx.space.findSpot(sz, sz, a[0], a[1], { margin: 3, maxFeatures: 6, radius: 70, pitch: 1,
+        const r = ctx.space.findSpot(sz, sz, a[0], a[1], { margin: 3, maxFeatures: 6, radius: 120, pitch: 1,
           test: rr => ctx.pipes.spotPortsOk(type, rr.x, rr.y, dir, fluidOf) });
         if (r) { ctx.pipes.reservePorts(type, r.x, r.y, dir, fluidOf); return { x: r.x, y: r.y, dir }; }
       }
@@ -283,8 +303,9 @@ function createBot(F, options) {
           ctx.pipes.registerEntity(e, fm);
           M.wantPower(e); ctx.space.ensurePowered(e);
           const r = F.data.recipes[recipe];
-          (r.fluidIngredients || []).forEach(([f], i) => M.wantPipe(e, 'fin' + i, f));
-          (r.fluidResults || []).forEach(([f], i) => M.wantPipe(e, 'fout' + i, f));
+          const again = () => buildCrafter(type, recipe, tag);
+          (r.fluidIngredients || []).forEach(([f], i) => M.wantPipe(e, 'fin' + i, f, again));
+          (r.fluidResults || []).forEach(([f], i) => M.wantPipe(e, 'fout' + i, f, again));
         } });
     }
     const jacks = new Set();
@@ -305,12 +326,12 @@ function createBot(F, options) {
         M.add({ cls: 'pumpjack', e });
         ctx.pipes.registerEntity(e, () => 'crude-oil');
         M.wantPower(e); ctx.space.ensurePowered(e);
-        M.wantPipe(e, 'fb', 'crude-oil');
+        M.wantPipe(e, 'fb', 'crude-oil', () => { jacks.delete(key(w.x, w.y)); if ((w.moves = (w.moves || 0) + 1) < 3) buildPumpjack(w); });
       } });
     }
     function tankLevel(fluid) {
       const t = seeds[fluid];
-      if (!t || fluid === 'water') return null;
+      if (!t || fluid.startsWith('water')) return null;
       F.fluids.segmentInfo(t);
       const seg = t.fb && t.fb._seg;
       if (!seg) return null;
@@ -368,6 +389,11 @@ function createBot(F, options) {
     const producer = {};
     const recipesFor = {};
     for (const r of Object.values(F.data.recipes)) for (const [id] of r.results) (recipesFor[id] = recipesFor[id] || []).push(r.id);
+    // Fluids a chemical plant makes from items (sulfuric acid, lubricant) are planned like
+    // intermediates, so their plants get built and loaded; refinery fluids are not (raw).
+    for (const f of MADE_FLUIDS) recipesFor[f] = [f];
+    const ingr = r => MADE_FLUIDS.length ? r.ingredients.concat((r.fluidIngredients || []).filter(([f]) => MADE_FLUIDS.indexOf(f) >= 0)) : r.ingredients;
+    const outOf = (r, item) => (r.results.find(x => x[0] === item) || (r.fluidResults || []).find(x => x[0] === item) || [item, 1])[1];
     function recipeFor(item) {
       if (item === 'solid-fuel') return F.research.isRecipeUnlocked('solid-fuel-from-light-oil') ? 'solid-fuel-from-light-oil' : 'solid-fuel-from-petroleum-gas';
       if (producer[item] !== undefined) return producer[item];
@@ -391,10 +417,10 @@ function createBot(F, options) {
       function visit(item) {
         if (seen.has(item)) return; seen.add(item);
         const r = recipesFor[item];
-        if (r) for (const rid of r) for (const [ing] of F.data.recipes[rid].ingredients) visit(ing);
+        if (r) for (const rid of r) for (const [ing] of ingr(F.data.recipes[rid])) visit(ing);
         topo.push(item);
       }
-      for (const id of Object.keys(F.data.items)) visit(id);
+      for (const id of Object.keys(F.data.items).concat(MADE_FLUIDS)) visit(id);
       topo.reverse();
     })();
 
@@ -418,11 +444,11 @@ function createBot(F, options) {
           const rid = recipeFor(item);
           if (!rid || !F.research.isRecipeUnlocked(rid)) { raw.set(item, (raw.get(item) || 0) + net); continue; }
           const r = F.data.recipes[rid];
-          const out = (r.results.find(x => x[0] === item) || [item, 1])[1];
+          const out = outOf(r, item);
           const crafts = Math.ceil(net / out);
           let b = backlog.get(rid); if (!b) { b = [0, 0, 0]; backlog.set(rid, b); }
           b[p] += crafts;
-          for (const [ing, k] of r.ingredients) gross.set(ing, (gross.get(ing) || 0) + k * crafts);
+          for (const [ing, k] of ingr(r)) gross.set(ing, (gross.get(ing) || 0) + k * crafts);
         }
       }
       last = { backlog, raw, spare: spare || new Map(left) };
@@ -480,11 +506,16 @@ function createBot(F, options) {
       // keep machines already on a wanted recipe, free the rest
       const have = new Map();
       const free = [];
+      // A machine that is loaded (or was switched less than a minute ago) keeps its recipe
+      // while that still has work, even over the target: switching drops the craft in progress
+      // and hands the ingredients back, and the targets move with the stock every plan.
+      const settled = rec => cls !== 'furnace' && crafts(rec.recipe) > 0 && (rec.starved || 0) < 3 &&
+        (rec.e.progress > 0 || M.craftsIn(rec.e, rec.recipe) > 0 || F.state.tick - (rec.since || 0) < 3600);
       for (const rec of recs) {
         const cur = rec.next || rec.recipe;
         const t = target.get(cur) || 0;
         const h = have.get(cur) || 0;
-        if (cur && h < t && (rec.starved || 0) < 3) have.set(cur, h + 1);
+        if (cur && ((h < t && (rec.starved || 0) < 3) || settled(rec))) have.set(cur, h + 1);
         else free.push(rec);
       }
       if (cls === 'furnace') free.sort((a, b) => (a.e.input[0] ? 1 : 0) - (b.e.input[0] ? 1 : 0)).reverse();
@@ -598,6 +629,7 @@ function createBot(F, options) {
     const chestless = M.of('drill').filter(r => !r.chest).length + orderCount('drill-chest');
     const drillsIdle = M.of('drill').filter(r => F.data.entities[r.e.type].energy.type === 'electric' && !ctx.space.onMain(r.e)).length;
     const raw = planner.last().raw;
+    ctx.drillBlock = { chestless, drillsIdle };
     for (const ore of ores) {
       if (chestless > 1 || drillsIdle > 0) break;
       const have = drillCount(ore);
@@ -609,7 +641,10 @@ function createBot(F, options) {
       if (ore === 'copper-ore') deficit += (raw.get('copper-plate') || 0);
       // furnaces smelting this ore want ~1 ore per 3.2 s each (per unit of furnace speed)
       const smelters = M.of('furnace').filter(r => r.recipe && F.data.recipes[r.recipe].ingredients[0][0] === ore).reduce((t, r) => t + M.speedOf(r.e) / 3.2, 0);
-      if (have < minDrills[ore] || deficit / Math.max(0.1, rate) > 60 || (smelters > rate * 1.1 && deficit > 0)) M.buildDrill(drillType, ore);
+      // iron is the one resource that limits the whole game (a single patch): once there is
+      // power, keep adding iron drills until the patch is full; copper follows iron
+      const always = electric && (ore === 'iron-ore' || (ore === 'copper-ore' && have < 0.6 * drillCount('iron-ore')));
+      if (have < minDrills[ore] || always || deficit / Math.max(0.1, rate) > 60 || (smelters > rate * 1.1 && deficit > 0)) M.buildDrill(drillType, ore);
     }
 
     // furnaces: more only while ore piles up and the furnaces have a backlog
@@ -662,7 +697,7 @@ function createBot(F, options) {
       // petroleum runs dry
       const basic = M.of('refinery').filter(r => r.recipe === 'basic-oil-processing').length + M.orders.filter(o => o.recipe === 'basic-oil-processing').length;
       const crudeL = oil.tankLevel('crude-oil'), petL = oil.tankLevel('petroleum-gas');
-      if (basic === 0 || (!F.research.isDone('advanced-oil-processing') && basic < 5 && !M.orders.some(o => o.recipe === 'basic-oil-processing') &&
+      if (!F.research.isDone('advanced-oil-processing') && (basic === 0 || basic < 5 && !M.orders.some(o => o.recipe === 'basic-oil-processing') &&
           crudeL && crudeL.frac > 0.5 && (!petL || petL.frac < 0.1))) oil.buildCrafter('oil-refinery', 'basic-oil-processing', 'refinery');
     }
     // advanced refineries make about twice the petroleum per crude: once two of them are
@@ -694,8 +729,21 @@ function createBot(F, options) {
       const r = F.data.recipes[want];
       if (r.ingredients.length || !r.results.length) continue;
       const out = r.results[0][0];
-      if (rec.recipe && S.count(out) > 400 && planner.crafts(want) === 0) { rec.wanted = want; M.setRecipe(rec, null); rec.recipe = null; }
-      else if (!rec.recipe && (S.count(out) < 150 || planner.crafts(want) > 0)) M.setRecipe(rec, want);
+      const wanted = planner.crafts(want) > 0 || planner.crafts(planner.recipeFor(out) || want) > 0;
+      // solid fuel is also the petroleum sink: a full petroleum network would stop the refineries
+      const lv = out === 'solid-fuel' && oil.tankLevel(r.fluidIngredients[0][0]);
+      const sink = !!(lv && lv.frac > 0.6);
+      if (rec.recipe && S.count(out) > 400 && !wanted && !sink) { rec.wanted = want; M.setRecipe(rec, null); rec.recipe = null; }
+      else if (!rec.recipe && (S.count(out) < 150 || wanted || sink)) M.setRecipe(rec, want);
+    }
+    // light oil goes to solid fuel (rocket fuel) while that is wanted: cracking only takes the
+    // surplus
+    const lightWanted = planner.crafts('solid-fuel-from-light-oil') > 0 || planner.crafts('rocket-fuel') > 0;
+    const light = oil.tankLevel('light-oil');
+    for (const rec of M.of('chem').filter(r => (r.recipe || r.wanted) === 'light-oil-cracking')) {
+      const frac = light ? light.frac : 0;
+      if (rec.recipe && lightWanted && frac < 0.4) { rec.wanted = rec.recipe; M.setRecipe(rec, null); rec.recipe = null; }
+      else if (!rec.recipe && (!lightWanted || frac > 0.7)) M.setRecipe(rec, 'light-oil-cracking');
     }
     // a petroleum sink so refineries never stall: solid fuel for the boilers
     const pet = oil.tankLevel('petroleum-gas');
@@ -723,7 +771,13 @@ function createBot(F, options) {
     if (F.research.isDone('oil-processing')) { d.push({ item: 'pipe', qty: 100, prio: 1 }); d.push({ item: 'pipe-to-ground', qty: 10, prio: 1 }); }
     for (const [id, n] of rocket.demand()) d.push({ item: id, qty: n, prio: 1 });
     // research: a few minutes of packs ahead, not the whole tree (that would tie up the plates)
-    for (const [p, n] of research.packDemand()) if (n > 0) d.push({ item: p, qty: Math.min(n, 300), prio: 2 });
+    // (the running tech first: the next ones' packs only get what it leaves over)
+    const now = research.packDemand(true);
+    for (const [p, n] of now) if (n > 0) d.push({ item: p, qty: Math.min(n, 200), prio: 1 });
+    for (const [p, n] of research.packDemand()) {
+      const rest = Math.min(n, 200) - Math.min(now.get(p) || 0, 200);
+      if (rest > 0) d.push({ item: p, qty: rest, prio: 2 });
+    }
     // keep fuel for the boilers and burner buildings
     return d;
   }
@@ -754,6 +808,7 @@ function createBot(F, options) {
       expand();
       M.powerPass();
       M.pipePass();
+      checkFluids();
       planner.plan(demands());
       for (const cls of ['asm', 'furnace']) planner.assign(cls, cls === 'furnace' ? 60 : 30);
       planner.handCraft();
@@ -770,11 +825,54 @@ function createBot(F, options) {
     const top = [...S.totals].sort((a, b) => b[1] - a[1]).slice(0, 18).map(([k, v]) => k + ':' + v).join(' ');
     const bl = [...planner.last().backlog].map(([r, b]) => [r, b]).sort((a, b) => planner.weight(b[0]) - planner.weight(a[0])).slice(0, 10).map(([r, b]) => r + '=' + b.join('/')).join(' ');
     const asm = M.of('asm').map(r => (r.recipe || '-') + (r.starved ? '!' : '')).join(',');
-    return '  machines ' + JSON.stringify(cls) + '\n  orders ' + JSON.stringify(ord) + '\n  stock ' + top +
+    const util = {};
+    for (const r of M.list) {
+      if (r.e._removed) continue;
+      const st = statusOf(r.e);
+      const u = util[r.cls] = util[r.cls] || {};
+      u[st] = (u[st] || 0) + 1;
+    }
+    const utilStr = Object.entries(util).map(([c, u]) => c + '{' + Object.entries(u).map(([k, v]) => k + ':' + v).join(',') + '}').join(' ');
+    const perOre = {};
+    for (const r of M.of('drill')) perOre[r.ore] = (perOre[r.ore] || 0) + 1;
+    // fluid crafters: recipe -> status counts, with the fluid levels of one of them
+    const fc = {};
+    for (const r of M.of('chem').concat(M.of('refinery'))) {
+      const k = r.recipe || r.wanted || '-';
+      const g = fc[k] = fc[k] || { n: {}, box: '' };
+      const st = statusOf(r.e); g.n[st] = (g.n[st] || 0) + 1;
+      if (!g.box && st !== 'working') g.box = [...(r.e.fin || []), ...(r.e.fout || [])].map(b => { const x = b._seg || b; return (x.fluid || '?') + ':' + Math.round(x.amount); }).join('/');
+    }
+    const fcStr = Object.entries(fc).map(([k, g]) => k + JSON.stringify(g.n).replace(/"/g, '') + (g.box ? '[' + g.box + ']' : '')).join(' ');
+    return '  machines ' + JSON.stringify(cls) + ' drills ' + JSON.stringify(perOre) + ' block ' + JSON.stringify(ctx.drillBlock) + '\n  status ' + utilStr + '\n  fluid-crafters ' + fcStr + '\n  orders ' + JSON.stringify(ord) + '\n  stock ' + top +
       '\n  backlog ' + bl + '\n  asm ' + asm + '\n  craftQ ' + F.state.player.craftQueue.map(q => q.recipe + 'x' + q.count).join(',') +
       '\n  power ' + M.of('boiler').map(r => 'B' + statusOf(r.e) + '(w' + Math.round((r.e.water._seg || r.e.water).amount) + ')').join(' ') + ' ' + M.of('engine').map(r => 'E' + statusOf(r.e)).join(' ') +
       ' pumps ' + F.entities.all().filter(e => e.type === 'offshore-pump').map(e => e.x + ',' + e.y + ':' + statusOf(e) + ':' + Math.round((e.fb._seg || e.fb).amount)).join(' ') +
-      '\n  unpowered ' + M.unpowered.size + ' mining ' + JSON.stringify(F.input.state.mine);
+      '\n  unpowered ' + M.unpowered.size + ' mining ' + JSON.stringify(F.input.state.mine) + flows();
+  }
+  // What was taken out of / put into buildings since the last report (hand crafting not included).
+  function flows() {
+    const f = ctx.flow; let out = '';
+    for (const item of ['iron-ore', 'iron-plate', 'steel-plate', 'copper-plate', 'electronic-circuit']) {
+      const sum = m => [...(m.get(item) || new Map()).values()].reduce((a, b) => a + b, 0);
+      const top = [...(f.used.get(item) || new Map())].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => k + ':' + v).join(' ');
+      out += '\n  flow ' + item + ' made ' + sum(f.made) + ' used ' + sum(f.used) + ' <- ' + top;
+    }
+    const made = [...f.made].map(([k, m]) => [k, [...m.values()].reduce((a, b) => a + b, 0)]).sort((a, b) => b[1] - a[1]).slice(0, 30);
+    out += '\n  made ' + made.map(([k, v]) => k + ':' + v).join(' ');
+    const placed = [...f.used].filter(([, m]) => m.get('placed')).map(([k, m]) => k + ':' + m.get('placed')).join(' ');
+    out += '\n  placed ' + placed;
+    f.made.clear(); f.used.clear();
+    return out;
+  }
+  // Every fluid network must carry only its own fluid; a mix would stall its machines for good.
+  const mixed = new Set();
+  function checkFluids() {
+    for (const f of Object.keys(oil.seeds)) {
+      if (f.startsWith('water')) continue;
+      const lv = oil.tankLevel(f);
+      if (lv && lv.fluid && lv.fluid !== f && !mixed.has(f)) { mixed.add(f); ctx.log('FLUID MIX: the ' + f + ' network holds ' + lv.fluid); }
+    }
   }
   function victory() { return !!(F.state.rocket && F.state.rocket.launches > 0); }
   function summary() {

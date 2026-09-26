@@ -17,7 +17,12 @@ function createMachines(ctx) {
   function count(cls) { return of(cls).length; }
 
   // ------------------------------------------------------------------ feeding
-  function fuelItem() { for (const f of FUEL) if (S.count(f) > 0) return f; return null; }
+  // Solid fuel burns first (it is the petroleum sink) — until rocket fuel needs it.
+  const FUEL_LATE = ['coal', 'wood', 'solid-fuel'];
+  function fuelItem() {
+    for (const f of F.research.isRecipeUnlocked('rocket-fuel') ? FUEL_LATE : FUEL) if (S.count(f) > 0) return f;
+    return null;
+  }
   function refuel(e, want) {
     const g = (F.entities.inventories(e) || []).find(x => x.name === 'fuel');
     if (!g) return;
@@ -192,15 +197,28 @@ function createMachines(ctx) {
 
   // Fluid connections still to be made: { e, box, fluid }.
   const unpiped = [];
-  function wantPipe(e, box, fluid) { unpiped.push({ e, box, fluid, tries: 0 }); }
+  // rebuild(): called when the port cannot be piped after several tries — the building is
+  // taken down and ordered again elsewhere
+  function wantPipe(e, box, fluid, rebuild) { unpiped.push({ e, box, fluid, tries: 0, rebuild }); }
   function pipePass() {
     for (let i = 0; i < unpiped.length; i++) {
       const u = unpiped[i];
       if (u.e._removed) { unpiped.splice(i--, 1); continue; }
+      if (u.wait > 0) { u.wait--; continue; } // back off after failed routes (A* is costly)
       if (!ctx.oil.hasNetwork(u.fluid, u.e)) { ctx.oil.seed(u.fluid, u.e); continue; }
       const r = ctx.pipes.connect(u.e, u.box, u.fluid);
       if (r === 'done') unpiped.splice(i--, 1);
-      else if (r === 'fail') { u.tries++; if (u.tries === 3 || u.tries % 50 === 0) ctx.log('cannot route ' + u.fluid + ' to ' + u.e.type + '#' + u.e.id + ' at ' + u.e.x + ',' + u.e.y + ' ' + u.box + ' (try ' + u.tries + ') ' + JSON.stringify(ctx.lastRouteFail)); }
+      else if (r === 'fail' && u.rebuild && u.tries >= 5) {
+        ctx.log('cannot pipe ' + u.fluid + ' to ' + u.e.type + ' at ' + u.e.x + ',' + u.e.y + ': moving it');
+        const e = u.e;
+        for (let j = unpiped.length - 1; j >= 0; j--) if (unpiped[j].e === e) unpiped.splice(j, 1);
+        i = -1;
+        const rb = u.rebuild;
+        H.remove(e);
+        rb();
+        continue;
+      }
+      else if (r === 'fail') { u.tries++; u.wait = Math.min(40, u.tries * 3); if (u.tries === 3 || u.tries % 50 === 0) ctx.log('cannot route ' + u.fluid + ' to ' + u.e.type + '#' + u.e.id + ' at ' + u.e.x + ',' + u.e.y + ' ' + u.box + ' (try ' + u.tries + ') ' + JSON.stringify(ctx.lastRouteFail)); }
     }
   }
 
@@ -208,7 +226,7 @@ function createMachines(ctx) {
   function gridSpot(w, h, anchor) {
     const a = anchor || ctx.anchors.factory;
     // machines on a 4-tile lattice leave one-tile lanes for poles
-    return ctx.space.findSpot(w, h, a[0], a[1], { pitch: 4, originX: a[0] % 4, originY: a[1] % 4, margin: 0, maxFeatures: 4, radius: 40, test: r => laneFree(r) });
+    return ctx.space.findSpot(w, h, a[0], a[1], { pitch: 4, originX: a[0] % 4, originY: a[1] % 4, margin: 0, maxFeatures: 4, radius: 60, test: r => laneFree(r) });
   }
   // keep the lane tiles around a lattice slot free of other buildings
   function laneFree(r) {
@@ -241,10 +259,16 @@ function createMachines(ctx) {
   }
 
   // Mining drill on an ore patch with an iron chest at its output tile.
+  // the nearest ore patch with room, then the next one
   function drillSpot(type, ore) {
+    for (const patch of ctx.world.patchesOf(ore)) {
+      const s = drillSpotIn(type, ore, patch);
+      if (s) return s;
+    }
+    return null;
+  }
+  function drillSpotIn(type, ore, patch) {
     const def = F.data.entities[type];
-    const patch = ctx.world.patch(ore);
-    if (!patch) return null;
     const sz = def.size[0];
     const pitchX = sz, pitchY = sz + 1;
     const out = def.drill.output;
@@ -257,7 +281,7 @@ function createMachines(ctx) {
         if (!ctx.space.tileOk(x + i, y + j, true)) { okRect = false; break; }
         const r = F.world.resource(x + i, y + j); if (r && r.item === ore) ore0 += r.amount;
       }
-      if (!okRect || ore0 < 2000) continue;
+      if (!okRect || ore0 < 500) continue;
       if (!F.api.canPlace(type, x, y, 0).ok) continue;
       const d = Math.hypot(x - patch.cx, y - patch.cy);
       if (!best || d < best.d) best = { x, y, dir: 0, d, cx, cy };

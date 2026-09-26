@@ -88,6 +88,7 @@ function createPipes(ctx) {
     if (!F.world.isLand(x, y) || F.world.entityAt(x, y)) return false;
     if (ctx.space.isReserved(x, y) && key(x, y) !== startKey) return false;
     if (banned.size && banned.has(key(x, y))) return false;
+    if (ctx.space.pipeForbidden(x, y) && key(x, y) !== startKey) return false;
     const k = key(x, y);
     const ko = keepout.get(k);
     if (ko !== undefined && ko !== fluid) return false;
@@ -160,7 +161,7 @@ function createPipes(ctx) {
     open.push(start); best.set(key(sx, sy), 0);
     let expanded = 0;
     lastRouteInfo = null;
-    while (open.size && expanded++ < 150000) {
+    while (open.size && expanded++ < 40000) {
       const n = open.pop();
       if (best.get(key(n.x, n.y)) < n.g) continue;
       if (isGoal(n.x, n.y, fluid) && n.prev) return unwind(n);
