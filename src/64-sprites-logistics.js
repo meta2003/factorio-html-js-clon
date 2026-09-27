@@ -1,5 +1,5 @@
 // 64-sprites-logistics.js — painter pack overriding the flat-box placeholders for logistics
-// entities (chests, poles, pipes, stone-wall; inserters live in 64-sprites-inserters.js) with layered, top-lit industrial
+// entities (chests, poles, stone-wall; inserters and pipes live in 64-sprites-inserters/-pipes.js) with layered, top-lit industrial
 // art. See design/BUILDING-ART.md for the painter contract/style and src/60-sprites.js "Building
 // art library" for the shared helpers (F.sprites.lib). Registers via F.sprites.definePainter;
 // never edits 60-sprites.js. Deterministic only (no Math.random — none of these entities need
@@ -104,75 +104,6 @@
   }
 
   // -----------------------------------------------------------------------
-  // Pipes — neighbour-mask-driven segments (L.cylinder) from the centre to each connected
-  // edge, joined by a central hub (bends/T/cross) or a single mid collar (straight runs),
-  // with L.pipeNub flanges where the pipe meets the tile edge. Isolated = short capped stub.
-  // pipe-to-ground: fixed geometry per spec — visible stub on the local-south (BACK) edge,
-  // concrete/metal ground hatch with a dark mouth on the local-north side.
-  // -----------------------------------------------------------------------
-  function pipeCollar(ctx, cx, cy, angle, thick) {
-    ctx.save(); ctx.translate(cx, cy); ctx.rotate(angle);
-    L.panel(ctx, -thick * 0.66, -thick * 0.15, thick * 1.32, thick * 0.3, '#6E787E', { r: thick * 0.07, rim: false, outlineWidth: 1 });
-    L.rivets(ctx, [[0, -thick * 0.1], [0, thick * 0.1]], thick * 0.06);
-    ctx.restore();
-  }
-  function pipeRun(ctx, cx, cy, d, len, thick, col) {
-    var v = F.util.dirVec(d);
-    if (v[0] === 0) L.cylinder(ctx, cx - thick / 2, v[1] < 0 ? cy - len : cy, thick, len, col, false, { r: thick * 0.1 });
-    else L.cylinder(ctx, v[0] < 0 ? cx - len : cx, cy - thick / 2, len, thick, col, true, { r: thick * 0.1 });
-  }
-  function paintPipeToGround(ctx, W, H, cx, cy, thick, col) {
-    var stubLen = Math.min(W, H) * 0.36;
-    L.cylinder(ctx, cx - thick / 2, cy, thick, stubLen, col, false, { r: thick * 0.1 });
-    L.pipeNub(ctx, cx, Math.min(H * 0.96, cy + stubLen), 2, thick * 1.05);
-    L.disc(ctx, cx, cy, thick * 0.5, L.darken(col, 6), { outlineWidth: 1.2 });
-    var hw = W * 0.64, hh = H * 0.42, hx = cx - hw / 2, hy = H * 0.06;
-    L.panel(ctx, hx, hy, hw, hh, '#6E7478', { r: hh * 0.16, hi: 18, lo: 22 });
-    L.inset(ctx, hx + hw * 0.18, hy + hh * 0.22, hw * 0.64, hh * 0.56, '#0A0B0C', hh * 0.14);
-    L.rivets(ctx, [[hx + hw * 0.1, hy + hh * 0.16], [hx + hw * 0.9, hy + hh * 0.16],
-      [hx + hw * 0.1, hy + hh * 0.84], [hx + hw * 0.9, hy + hh * 0.84]], thick * 0.06);
-  }
-  function paintPipe(ctx, W, H, frame, dir, def, type, opts) {
-    var col = '#8FA3B0';
-    var thick = Math.min(W, H) * 0.32;
-    var cx = W / 2, cy = H / 2;
-    if (type === 'pipe-to-ground') { paintPipeToGround(ctx, W, H, cx, cy, thick, col); return; }
-
-    var mask = (opts && opts.mask != null) ? opts.mask : 0;
-    var edge = Math.min(W, H) * 0.5 - thick * 0.16;
-
-    if (mask === 0) {
-      var stubLen = Math.min(W, H) * 0.46;
-      L.cylinder(ctx, cx - thick / 2, cy - stubLen / 2, thick, stubLen, col, false, { r: thick * 0.12 });
-      L.disc(ctx, cx, cy - stubLen / 2, thick * 0.5, L.darken(col, 10), { outlineWidth: 1.4 });
-      L.disc(ctx, cx, cy + stubLen / 2, thick * 0.5, L.darken(col, 10), { outlineWidth: 1.4 });
-      return;
-    }
-
-    var straightNS = mask === 5, straightEW = mask === 10; // N|S=1|4, E|W=2|8
-    if (straightNS || straightEW) {
-      if (straightNS) L.cylinder(ctx, cx - thick / 2, 0, thick, H, col, false, { r: thick * 0.1 });
-      else L.cylinder(ctx, 0, cy - thick / 2, W, thick, col, true, { r: thick * 0.1 });
-      pipeCollar(ctx, cx, cy, straightNS ? 0 : Math.PI / 2, thick);
-      var ends = straightNS ? [0, 2] : [1, 3];
-      for (var k = 0; k < 2; k++) {
-        var v0 = F.util.dirVec(ends[k]);
-        L.pipeNub(ctx, cx + v0[0] * edge, cy + v0[1] * edge, ends[k], thick * 1.05);
-      }
-      return;
-    }
-
-    var stubLen2 = Math.min(W, H) * 0.5;
-    for (var d = 0; d < 4; d++) {
-      if (!(mask & (1 << d))) continue;
-      pipeRun(ctx, cx, cy, d, stubLen2, thick, col);
-      var v = F.util.dirVec(d);
-      L.pipeNub(ctx, cx + v[0] * edge, cy + v[1] * edge, d, thick * 1.05);
-    }
-    L.disc(ctx, cx, cy, thick * 0.58, L.darken(col, 6), { hi: 35, lo: 32 });
-  }
-
-  // -----------------------------------------------------------------------
   // Stone wall — central stone-block body (top-lit, brick mortar lines) with unbordered
   // extension slabs toward each connected neighbour so adjoining wall tiles read as one
   // continuous run; open sides keep the body's outline.
@@ -216,6 +147,5 @@
 
   F.sprites.definePainter(['wooden-chest', 'iron-chest', 'steel-chest'], paintChest);
   F.sprites.definePainter(['small-electric-pole', 'medium-electric-pole'], paintPole);
-  F.sprites.definePainter(['pipe', 'pipe-to-ground'], paintPipe);
   F.sprites.definePainter(['stone-wall'], paintWall);
 })();

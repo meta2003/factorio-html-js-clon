@@ -849,7 +849,11 @@
     for (var d = 0; d < 4; d++) {
       var v = F.C.DIRS[d], nx = e.x + v[0], ny = e.y + v[1];
       var ent = (F.world && F.world.entityAt) ? F.world.entityAt(nx, ny) : null;
-      if (ent && (isFluidCapable(ent.type) || portFacing(ent, nx, ny, (d + 2) % 4))) mask |= (1 << d);
+      if (!ent) continue;
+      // a pipe-to-ground only connects on its back side (33-power.js ports)
+      var edef = F.data.entities[ent.type];
+      if (edef && edef.groundPipe) { if (F.util.oppDir(ent.dir) === (d + 2) % 4) mask |= (1 << d); continue; }
+      if (isFluidCapable(ent.type) || portFacing(ent, nx, ny, (d + 2) % 4)) mask |= (1 << d);
     }
     return mask;
   }
@@ -870,7 +874,7 @@
       var def = F.data.entities[e.type];
       var frame = 0, opts = null;
       if (def.behaviour === 'pipe' || def.behaviour === 'pipe-to-ground') {
-        opts = { mask: pipeConnMask(e) };
+        opts = { mask: pipeConnMask(e), variant: (e.x + e.y) & 1 };
         addFluidOpt(e, opts);
       } else if (def.behaviour === 'storage-tank') {
         opts = {};

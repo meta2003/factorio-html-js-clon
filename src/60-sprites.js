@@ -687,6 +687,7 @@
     if (opts.lit) s += 'l';
     if (opts.shape) s += 's' + opts.shape;
     if (opts.cap) s += 'c' + opts.cap;
+    if (opts.variant) s += 'v' + opts.variant; // e.g. pipe window on every other straight piece
     // Fluid tint (pipe/pipe-to-ground/storage-tank, design/EXPANSION.md §6.5): fluid is one of
     // ~8 ids, so this keeps the cache bounded while still giving each fluid its own canvas.
     if (opts.fluid) s += 'f' + opts.fluid;
