@@ -1,6 +1,6 @@
-// 63-sprites-machines.js — better procedural building art for the "machine" family: the two
-// assembling machines, lab, radar, solar panel, accumulator and small lamp. Registered on top of
-// src/60-sprites.js's PAINTERS table via F.sprites.definePainter (design/BUILDING-ART.md's
+// 63-sprites-machines.js — better procedural building art for the "machine" family: the lab,
+// radar, solar panel, accumulator and small lamp (assemblers: 63-sprites-assemblers.js).
+// Registered on top of src/60-sprites.js's PAINTERS table via F.sprites.definePainter (design/BUILDING-ART.md's
 // contract) — that file is never edited here. Pure drawing module, ES5 style, deterministic
 // (F.rng.local only, no Math.random).
 (function () {
@@ -46,84 +46,6 @@
   // Small standing cylindrical support post (corner pillar / lamp post / battery terminal).
   function pillar(ctx, cx, cy, r, h, color) {
     L.cylinder(ctx, cx - r, cy - h, r * 2, h, color, false, { r: r * 0.6 });
-  }
-
-  // ---------------------------------------------------------------------
-  // Assembling machines 1 & 2 — chamfered steel housing on a foundation, corner support
-  // pillars, side panels (seam + vents + rivets), a big central rotating work-chamber lid,
-  // small status lamps. AM2 = blue-steel tier with brighter trim + extra piping.
-  // ---------------------------------------------------------------------
-  var AM_PALETTE = {
-    'assembling-machine-1': { body: '#6C7960', bodyLo: '#333B2C', accent: '#9FC27A', pillar: '#4E564A', trim: '#C9A227' },
-    'assembling-machine-2': { body: '#54697E', bodyLo: '#212C37', accent: '#8FCBEF', pillar: '#3C4A58', trim: '#E7F3FA' },
-    'assembling-machine-3': { body: '#7E7250', bodyLo: '#352F20', accent: '#8FD98A', pillar: '#4F4838', trim: '#F2E3A6' },
-  };
-  function paintAssembler(ctx, W, H, frame, dir, def, type, opts) {
-    var working = !!(opts && opts.working);
-    var pal = AM_PALETTE[type] || AM_PALETTE['assembling-machine-1'];
-    L.foundation(ctx, W, H, '#55585A');
-
-    // corner support pillars, drawn before the housing so its chamfered corners overlap them.
-    var pr = W * 0.045, po = W * 0.145;
-    var corners = [[po, po], [W - po, po], [po, H - po], [W - po, H - po]];
-    for (var ci = 0; ci < 4; ci++) pillar(ctx, corners[ci][0], corners[ci][1] + pr * 1.1, pr, pr * 2.4, pal.pillar);
-
-    // chamfered housing body.
-    var hx = W * 0.09, hy = H * 0.08, hw = W * 0.82, hh = H * 0.84, cut = Math.min(hw, hh) * 0.17;
-    chamferPanel(ctx, hx, hy, hw, hh, cut, pal.body, { lo: 32 });
-
-    // side seam + vent + rivets (reads as panelling, not a flat box).
-    ctx.strokeStyle = 'rgba(0,0,0,0.28)'; ctx.lineWidth = Math.max(1, W * 0.012);
-    ctx.beginPath(); ctx.moveTo(hx + hw * 0.18, hy + cut * 0.6); ctx.lineTo(hx + hw * 0.18, hy + hh - cut * 0.6); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(hx + hw * 0.82, hy + cut * 0.6); ctx.lineTo(hx + hw * 0.82, hy + hh - cut * 0.6); ctx.stroke();
-    L.vent(ctx, hx + hw * 0.03, hy + hh * 0.66, hw * 0.13, hh * 0.24, 4, true);
-    L.vent(ctx, hx + hw * 0.84, hy + hh * 0.66, hw * 0.13, hh * 0.24, 4, true);
-    L.rivets(ctx, [[hx + cut * 0.55, hy + cut * 0.55], [hx + hw - cut * 0.55, hy + cut * 0.55],
-      [hx + cut * 0.55, hy + hh - cut * 0.55], [hx + hw - cut * 0.55, hy + hh - cut * 0.55]], W * 0.02);
-
-    // AM2/AM3: brighter trim band + extra piping stubs on the top edge (AM3 adds a second band).
-    if (type === 'assembling-machine-3') {
-      ctx.fillStyle = L.rgba(pal.accent, 0.85); ctx.fillRect(hx + cut * 0.4, hy + hh * 0.9, hw - cut * 0.8, hh * 0.035);
-    }
-    if (type === 'assembling-machine-2' || type === 'assembling-machine-3') {
-      ctx.fillStyle = L.rgba(pal.accent, 0.85); ctx.fillRect(hx + cut * 0.4, hy + hh * 0.09, hw - cut * 0.8, hh * 0.045);
-      pillar(ctx, hx + hw * 0.28, hy + H * 0.02, W * 0.022, H * 0.05, pal.pillar);
-      pillar(ctx, hx + hw * 0.72, hy + H * 0.02, W * 0.022, H * 0.05, pal.pillar);
-    } else {
-      ctx.strokeStyle = L.rgba(pal.accent, 0.55); ctx.lineWidth = Math.max(1, W * 0.012);
-      ctx.beginPath(); ctx.moveTo(hx + cut * 0.4, hy + hh * 0.12); ctx.lineTo(hx + hw - cut * 0.4, hy + hh * 0.12); ctx.stroke();
-    }
-
-    // central circular work chamber: outer flange, rotating lid/gear (frame 0..15 loop), radial
-    // slats, warm glow bleeding through when working.
-    var cx = W / 2, cy = hy + hh * 0.56, R = Math.min(W, H) * 0.25;
-    L.disc(ctx, cx, cy, R * 1.14, L.darken(pal.body, 14), { outlineWidth: Math.max(1.5, W * 0.02) });
-    var ang = working ? (frame / 16) * Math.PI * 2 : 0;
-    if (working) {
-      var pulse = 0.5 + 0.5 * Math.sin(frame / 16 * Math.PI * 2);
-      L.glow(ctx, cx, cy, R * 1.5, '#FF8A2A', 0.18 + 0.16 * pulse);
-    }
-    L.gearShape(ctx, cx, cy, R * 0.88, R * 0.3, 10, ang, L.lighten(pal.body, 22), '#201F1C');
-    ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
-    for (var si = 0; si < 6; si++) {
-      ctx.save(); ctx.rotate(si / 6 * Math.PI * 2);
-      ctx.fillStyle = 'rgba(8,8,8,0.32)'; ctx.fillRect(-R * 0.05, -R * 0.26, R * 0.1, R * 0.52);
-      ctx.restore();
-    }
-    ctx.restore();
-    if (working) {
-      ctx.fillStyle = 'rgba(255,180,100,' + (0.35 + 0.25 * (0.5 + 0.5 * Math.sin(frame / 16 * Math.PI * 2))).toFixed(2) + ')';
-      ctx.beginPath(); ctx.arc(cx, cy, R * 0.28, 0, Math.PI * 2); ctx.fill();
-    }
-
-    // status lamps near the top edge.
-    var lampY = hy + cut * 0.85;
-    [[hx + cut * 0.55, lampY], [hx + hw - cut * 0.55, lampY]].forEach(function (p) {
-      if (working) L.glow(ctx, p[0], p[1], W * 0.05, '#6FE68A', 0.55);
-      ctx.fillStyle = working ? '#6FE68A' : '#3A4038';
-      ctx.beginPath(); ctx.arc(p[0], p[1], W * 0.018, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = 'rgba(12,12,12,0.85)'; ctx.lineWidth = 1; ctx.stroke();
-    });
   }
 
   // ---------------------------------------------------------------------
@@ -311,7 +233,6 @@
     if (lit) { ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.beginPath(); ctx.arc(W * 0.43, H * 0.32, W * 0.066, 0, Math.PI * 2); ctx.fill(); }
   }
 
-  F.sprites.definePainter(['assembling-machine-1', 'assembling-machine-2', 'assembling-machine-3'], paintAssembler);
   F.sprites.definePainter('lab', paintLab);
   F.sprites.definePainter('radar', paintRadar);
   F.sprites.definePainter('solar-panel', paintSolarPanel);

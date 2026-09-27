@@ -52,7 +52,7 @@ The headless runner loads the built game with DOM stubs and runs the scenarios i
 | Path | What |
 |---|---|
 | `src/NN-*.js` | game modules (expansion: `05/06` data+text, `37-oil`, `38-trains`, `39-robots`, `45-rocket`; `51-ghosts` planned buildings, `52-blueprints` copy/paste, `53-construction` construction robots, `54-deconstruction` deconstruction planner, `55-blueprint-library` library + strings; modules: `07/08` data+text, `35-modules` slots and effects), concatenated in filename order (see `design/ARCHITECTURE.md`) |
-| `src/60-sprites.js`, `src/62..69-sprites-*.js` | procedural art: sprite library + building painter packs (`64-sprites-belts`, `-inserters` and `-pipes` redraw belts, undergrounds, splitters, inserters and pipes after the real Factorio sprites) |
+| `src/60-sprites.js`, `src/62..69-sprites-*.js` | procedural art: sprite library + building painter packs (`64-sprites-belts`, `-inserters`, `-pipes` and `63-sprites-assemblers` redraw belts, undergrounds, splitters, inserters, pipes and assembling machines after the real Factorio sprites) |
 | `src/disabled/` | code kept out of the build (combat, Slovenian translation) |
 | `src/template.html`, `src/style.css` | page shell and UI styles |
 | `design/` | game design doc, architecture/API contracts, engineering constraints, art brief |
