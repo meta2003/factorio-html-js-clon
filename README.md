@@ -12,7 +12,8 @@ Mid and late game (see `design/EXPANSION.md`):
 - **Oil processing**: pumpjacks on crude-oil wells, oil refineries, chemical plants, storage tanks,
   eight fluids (plastic, sulfur, sulfuric acid, lubricant, solid fuel, batteries…).
 - **Trains**: rails (drag to place), train stops, locomotives and cargo wagons, automatic
-  schedules, inserters loading wagons at stations, riding and manual driving.
+  schedules, inserters loading wagons at stations, riding and manual driving; rail signals and
+  chain signals split the network into blocks so several trains can share it.
 - **Robots**: roboports, logistic robots, passive provider / storage / requester chests;
   construction robots that build ghosts and pasted blueprints from logistic chests, and take
   down whatever the deconstruction planner (X) marks — buildings, trees and rocks.
