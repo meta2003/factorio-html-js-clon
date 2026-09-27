@@ -745,10 +745,11 @@
       e = list[i]; if (e._removed) continue;
       def = F.data.entities[e.type]; if (!def || def.layer !== 'belt') continue;
       if (!inRectEntity(e, rect)) continue;
-      // 16 frames = one rib period (1/4 tile); items advance 1/4 tile per step, so the ribs
-      // move exactly with the items.
+      // beltFramesPerRib frames = one slat (1/4 tile); items advance 1/4 tile per step, so the
+      // slats move exactly with the items. The loop spans the tier's arrow spacing (64-sprites-belts.js).
       var step = (F.belts && F.belts.stepTicks) ? F.belts.stepTicks(e) : Math.round(64 / beltSpeed(def));
-      var frame = Math.floor((F.state.tick || 0) * 16 / step) % 16;
+      var fpr = (F.sprites && F.sprites.beltFramesPerRib) || 16, nfr = (F.sprites && F.sprites.beltFrames) ? F.sprites.beltFrames(def) : 16;
+      var frame = Math.floor((F.state.tick || 0) * fpr / step) % nfr;
       var opts = def.underground ? { io: e.io === 'out' ? 'out' : 'in' } : null;
       if (def.belt) {
         if (e.curve) opts = { shape: e.curve > 0 ? 1 : -1 };
@@ -854,8 +855,8 @@
   }
   function wallConnMask(e) { return neighbourMask(e, function (ent) { return ent.type === 'stone-wall'; }); }
 
-  // Working-animation frame: a 16-step bucket (matches the belt chevron strip's cache
-  // convention, GDD §11.6) so cached-canvas identity (type|dir|frame|opts) stays bounded —
+  // Working-animation frame: a 16-step bucket (GDD §11.6) so cached-canvas identity
+  // (type|dir|frame|opts) stays bounded —
   // every gear/flywheel/drill-bob/flame-flicker/dish rotation loops over ≤16 canvases per
   // (type,dir,opts) instead of one new canvas per tick (which would defeat the sprite cache).
   var ANIM_FRAMES = 16;
