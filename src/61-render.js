@@ -910,81 +910,36 @@
   }
 
   // =====================================================================
-  // Inserter arms (GDD §11.6: 2-segment arm, held item icon at the hand).
+  // Inserter arms, Factorio-style (art in 64-sprites-inserters.js): the hand swings around the
+  // pivot on a half circle from the pickup tile to the drop tile (e.angle 0..1), raised off the
+  // ground — pivot, elbow and gripper each have a height that lifts them on screen, and the
+  // same points on the ground give the arm's shadow.
   // =====================================================================
+  var ARM_H_PIVOT = 0.1, ARM_H_HAND = 0.25;
   function drawInserterArms(list) {
-    if (!F.inserters || !F.inserters.armPos) return;
+    if (!F.inserters || !F.inserters.pickupTile || !F.sprites || !F.sprites.drawInserterArm) return;
+    var u = F.C.TILE * camera.zoom;
     for (var i = 0; i < list.length; i++) {
       var e = list[i], def = F.data.entities[e.type];
       if (!def || def.behaviour !== 'inserter') continue;
-      var hand;
-      try { hand = F.inserters.armPos(e); } catch (err) { continue; }
-      if (!hand) continue;
+      var pick;
+      try { pick = F.inserters.pickupTile(e); } catch (err) { continue; }
+      if (!pick) continue;
       var c = entityCenter(e);
-      var base = toScreen(c[0], c[1]);
-      var tip = toScreen(hand[0], hand[1]);
-      var dx = tip[0] - base[0], dy = tip[1] - base[1];
-      var len = Math.hypot(dx, dy) || 1;
-      var perp = [-dy / len, dx / len];
-      var bend = 6 * camera.zoom;
-      var mx = (base[0] + tip[0]) / 2 + perp[0] * bend;
-      var my = (base[1] + tip[1]) / 2 + perp[1] * bend;
-
-      // Arm colour = the inserter's own item icon colour (burner grey, inserter yellow,
-      // long-handed red, fast blue) so each tier reads distinctly even mid-swing.
-      var armColor = '#caa15a';
-      try {
-        var idef = F.data.itemDef(def.minable);
-        if (idef && idef.icon && idef.icon.color) armColor = idef.icon.color;
-      } catch (errIcon) { /* keep default */ }
-
-      // Two shaded segments (dark outline pass, then a slightly thinner coloured fill pass)
-      // plus joint discs at the base pivot, elbow and wrist so the arm reads as a mechanical
-      // two-bar linkage rather than a bare line.
-      var armW = Math.max(1.5, 4 * camera.zoom);
-      ctx.save();
-      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      ctx.strokeStyle = '#161208';
-      ctx.lineWidth = armW + Math.max(1, 1.6 * camera.zoom);
-      ctx.beginPath(); ctx.moveTo(base[0], base[1]); ctx.lineTo(mx, my); ctx.lineTo(tip[0], tip[1]); ctx.stroke();
-      ctx.strokeStyle = armColor;
-      ctx.lineWidth = armW;
-      ctx.beginPath(); ctx.moveTo(base[0], base[1]); ctx.lineTo(mx, my); ctx.lineTo(tip[0], tip[1]); ctx.stroke();
-      ctx.restore();
-
-      var jr = Math.max(1.2, 2.8 * camera.zoom);
-      ctx.save();
-      ctx.fillStyle = '#3A3A3A'; ctx.strokeStyle = '#141414'; ctx.lineWidth = Math.max(1, camera.zoom);
-      ctx.beginPath(); ctx.arc(base[0], base[1], jr * 1.15, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.arc(mx, my, jr, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.arc(tip[0], tip[1], jr * 0.85, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.restore();
-
+      var px = pick[0] + 0.5 - c[0], py = pick[1] + 0.5 - c[1];
+      var R = Math.hypot(px, py) || 1;
+      var a = F.util.clamp(e.angle || 0, 0, 1);
+      var th = Math.atan2(py, px) + a * Math.PI; // clockwise from pickup to drop
+      var hx = c[0] + Math.cos(th) * R, hy = c[1] + Math.sin(th) * R;
+      var ex = c[0] + (hx - c[0]) * 0.45, ey = c[1] + (hy - c[1]) * 0.45, hE = 0.55 + 0.2 * (R - 1);
+      var sc = toScreen(c[0], c[1] - 0.05), se = toScreen(ex, ey), sh = toScreen(hx, hy);
+      var lift = function (p, h) { return [p[0], p[1] - h * u]; };
+      var shade = function (p, h) { return [p[0] + h * 0.6 * u, p[1] + h * 0.15 * u]; };
       var held = F.inserters.holding ? F.inserters.holding(e) : null;
-      var handDir = [(tip[0] - mx) / len, (tip[1] - my) / len];
-      var handPerp = [-handDir[1], handDir[0]];
-      var hs = 3.2 * camera.zoom;
-      ctx.save();
-      ctx.strokeStyle = '#8a6a3a'; ctx.lineWidth = Math.max(1, 2 * camera.zoom); ctx.lineCap = 'round';
-      if (held) {
-        // closed grip: a short bracket clamped around the carried item icon.
-        ctx.beginPath();
-        ctx.moveTo(tip[0] - handPerp[0] * hs + handDir[0] * hs, tip[1] - handPerp[1] * hs + handDir[1] * hs);
-        ctx.lineTo(tip[0] - handPerp[0] * hs, tip[1] - handPerp[1] * hs);
-        ctx.lineTo(tip[0] + handPerp[0] * hs, tip[1] + handPerp[1] * hs);
-        ctx.lineTo(tip[0] + handPerp[0] * hs + handDir[0] * hs, tip[1] + handPerp[1] * hs + handDir[1] * hs);
-        ctx.stroke();
-        drawItemIcon(held, tip[0], tip[1], F.C.TILE * camera.zoom * 0.4, true);
-      } else {
-        // open hand: two short prongs (GDD §11.6 "open: two short prongs when empty").
-        ctx.beginPath();
-        ctx.moveTo(tip[0] - handPerp[0] * hs, tip[1] - handPerp[1] * hs);
-        ctx.lineTo(tip[0] - handPerp[0] * hs + handDir[0] * hs * 1.4, tip[1] - handPerp[1] * hs + handDir[1] * hs * 1.4);
-        ctx.moveTo(tip[0] + handPerp[0] * hs, tip[1] + handPerp[1] * hs);
-        ctx.lineTo(tip[0] + handPerp[0] * hs + handDir[0] * hs * 1.4, tip[1] + handPerp[1] * hs + handDir[1] * hs * 1.4);
-        ctx.stroke();
-      }
-      ctx.restore();
+      F.sprites.drawInserterArm(ctx, e.type,
+        lift(sc, ARM_H_PIVOT), lift(se, hE), lift(sh, ARM_H_HAND),
+        shade(sc, ARM_H_PIVOT), shade(se, hE), shade(sh, ARM_H_HAND), u,
+        held ? function (x, y) { drawItemIcon(held, x, y, u * 0.4, true); } : null);
     }
   }
 

@@ -1,5 +1,5 @@
 // 64-sprites-logistics.js — painter pack overriding the flat-box placeholders for logistics
-// entities (chests, inserter bases, poles, pipes, stone-wall) with layered, top-lit industrial
+// entities (chests, poles, pipes, stone-wall; inserters live in 64-sprites-inserters.js) with layered, top-lit industrial
 // art. See design/BUILDING-ART.md for the painter contract/style and src/60-sprites.js "Building
 // art library" for the shared helpers (F.sprites.lib). Registers via F.sprites.definePainter;
 // never edits 60-sprites.js. Deterministic only (no Math.random — none of these entities need
@@ -70,48 +70,6 @@
       ctx.fillStyle = L.lighten(c1, 55);
       ctx.beginPath(); ctx.arc(x + w / 2, y + lidH, lw * 0.13, 0, Math.PI * 2); ctx.fill();
     }
-  }
-
-  // -----------------------------------------------------------------------
-  // Inserter bases — octagonal bolted plate + coloured motor housing + pivot hub. Compact
-  // (~70% tile) so the arm/belts/chests around it stay readable. The arm itself is drawn
-  // separately every frame by 61-render.js's drawInserterArms.
-  // -----------------------------------------------------------------------
-  function octagonPath(ctx, cx, cy, r) {
-    ctx.beginPath();
-    for (var i = 0; i < 8; i++) {
-      var a = Math.PI / 8 + i * Math.PI / 4;
-      var px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r;
-      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-  }
-  function paintInserterBase(ctx, W, H, frame, dir, def, type) {
-    var col = L.entColors(def), c1 = col[0], c2 = col[1];
-    var cx = W / 2, cy = H / 2, r = Math.min(W, H) * 0.35;
-    var plate = '#585D61';
-    octagonPath(ctx, cx, cy, r);
-    var g = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.35, r * 0.05, cx, cy, r);
-    g.addColorStop(0, L.lighten(plate, 22)); g.addColorStop(1, L.darken(plate, 26));
-    ctx.fillStyle = g; ctx.fill();
-    ctx.strokeStyle = 'rgba(12,12,12,0.9)'; ctx.lineWidth = Math.max(1, r * 0.08); ctx.stroke();
-    var boltPts = [];
-    for (var i = 0; i < 8; i++) {
-      var a = Math.PI / 8 + i * Math.PI / 4;
-      boltPts.push([cx + Math.cos(a) * r * 0.82, cy + Math.sin(a) * r * 0.82]);
-    }
-    L.rivets(ctx, boltPts, r * 0.09);
-    // coloured motor housing (colour = the item's own icon colour: burner grey, inserter
-    // yellow, long-handed red, fast blue — see F.data.itemDef colours)
-    L.disc(ctx, cx, cy, r * 0.6, c1, { hi: 45, lo: 32 });
-    if (type === 'burner-inserter') {
-      L.glow(ctx, cx, cy + r * 0.06, r * 0.3, '#FF8A2A', 0.5);
-      ctx.fillStyle = 'rgba(255,138,42,0.85)';
-      ctx.beginPath(); ctx.arc(cx, cy + r * 0.06, r * 0.12, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#1A1410'; ctx.lineWidth = 1; ctx.stroke();
-    }
-    // pivot hub (arm attaches here)
-    L.disc(ctx, cx, cy, r * 0.22, c2, { hi: 30, lo: 38, outlineWidth: Math.max(1, r * 0.05) });
   }
 
   // -----------------------------------------------------------------------
@@ -257,7 +215,6 @@
   }
 
   F.sprites.definePainter(['wooden-chest', 'iron-chest', 'steel-chest'], paintChest);
-  F.sprites.definePainter(['burner-inserter', 'inserter', 'long-handed-inserter', 'fast-inserter'], paintInserterBase);
   F.sprites.definePainter(['small-electric-pole', 'medium-electric-pole'], paintPole);
   F.sprites.definePainter(['pipe', 'pipe-to-ground'], paintPipe);
   F.sprites.definePainter(['stone-wall'], paintWall);
