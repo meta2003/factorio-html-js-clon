@@ -56,6 +56,7 @@
   var AM_PALETTE = {
     'assembling-machine-1': { body: '#6C7960', bodyLo: '#333B2C', accent: '#9FC27A', pillar: '#4E564A', trim: '#C9A227' },
     'assembling-machine-2': { body: '#54697E', bodyLo: '#212C37', accent: '#8FCBEF', pillar: '#3C4A58', trim: '#E7F3FA' },
+    'assembling-machine-3': { body: '#7E7250', bodyLo: '#352F20', accent: '#8FD98A', pillar: '#4F4838', trim: '#F2E3A6' },
   };
   function paintAssembler(ctx, W, H, frame, dir, def, type, opts) {
     var working = !!(opts && opts.working);
@@ -80,8 +81,11 @@
     L.rivets(ctx, [[hx + cut * 0.55, hy + cut * 0.55], [hx + hw - cut * 0.55, hy + cut * 0.55],
       [hx + cut * 0.55, hy + hh - cut * 0.55], [hx + hw - cut * 0.55, hy + hh - cut * 0.55]], W * 0.02);
 
-    // AM2: brighter trim band + extra piping stubs on the top edge.
-    if (type === 'assembling-machine-2') {
+    // AM2/AM3: brighter trim band + extra piping stubs on the top edge (AM3 adds a second band).
+    if (type === 'assembling-machine-3') {
+      ctx.fillStyle = L.rgba(pal.accent, 0.85); ctx.fillRect(hx + cut * 0.4, hy + hh * 0.9, hw - cut * 0.8, hh * 0.035);
+    }
+    if (type === 'assembling-machine-2' || type === 'assembling-machine-3') {
       ctx.fillStyle = L.rgba(pal.accent, 0.85); ctx.fillRect(hx + cut * 0.4, hy + hh * 0.09, hw - cut * 0.8, hh * 0.045);
       pillar(ctx, hx + hw * 0.28, hy + H * 0.02, W * 0.022, H * 0.05, pal.pillar);
       pillar(ctx, hx + hw * 0.72, hy + H * 0.02, W * 0.022, H * 0.05, pal.pillar);
@@ -307,7 +311,7 @@
     if (lit) { ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.beginPath(); ctx.arc(W * 0.43, H * 0.32, W * 0.066, 0, Math.PI * 2); ctx.fill(); }
   }
 
-  F.sprites.definePainter(['assembling-machine-1', 'assembling-machine-2'], paintAssembler);
+  F.sprites.definePainter(['assembling-machine-1', 'assembling-machine-2', 'assembling-machine-3'], paintAssembler);
   F.sprites.definePainter('lab', paintLab);
   F.sprites.definePainter('radar', paintRadar);
   F.sprites.definePainter('solar-panel', paintSolarPanel);
