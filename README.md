@@ -6,7 +6,9 @@ on a canvas.
 
 > **Disclaimer:** Factio is an unofficial, non-commercial fan project. It is not affiliated with,
 > endorsed by or connected to Wube Software. Factorio is a trademark of Wube Software Ltd. Factio
-> contains no Factorio code, graphics or sounds: all code and art are original.
+> contains no Factorio code, graphics or sounds: all code and art are original.I am making this as a test
+> of what can be achived with vibe coding and don't want to harm wube or anybody. If i done harm in any way
+> please contact me and i will remove my "work" from github.
 
 Mine ore, smelt it, craft, run belts and inserters, build power (boiler, steam engine, solar),
 put up assembling machines and research the tech tree. The in-game help is under **Instructions** (H / F1).
