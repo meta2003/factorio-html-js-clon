@@ -1,6 +1,6 @@
 // 69-sprites-modules.js — art for the module expansion (src/07-data-modules.js): the module item
-// icon (shape 'module': a circuit card whose colour gives the kind and pips the tier) and the
-// electric furnace (3x3). assembling-machine-3 shares the assembler painter in 63-sprites-machines.js.
+// icon (shape 'module': a circuit card whose colour gives the kind and pips the tier). The electric
+// furnace is drawn in 62-sprites-furnaces.js, assembling-machine-3 in 63-sprites-assemblers.js.
 // Pure drawing module, ES5 style, deterministic.
 (function () {
   'use strict';
@@ -34,41 +34,4 @@
     });
   }
 
-  // ---------------------------------------------------------------------
-  // Electric furnace (3x3): brick-red refractory housing on a steel frame, a square heating
-  // chamber with glowing coils while working, cooling vents on both sides, no smoke stack.
-  // ---------------------------------------------------------------------
-  function paintElectricFurnace(ctx, W, H, frame, dir, def, type, opts) {
-    var working = !!(opts && opts.working);
-    L.foundation(ctx, W, H, '#55585A');
-    L.panel(ctx, W * 0.08, H * 0.08, W * 0.84, H * 0.84, '#7A4A3C', { r: W * 0.06 });
-    // steel frame bands
-    ctx.fillStyle = 'rgba(40,44,48,0.85)';
-    ctx.fillRect(W * 0.08, H * 0.2, W * 0.84, H * 0.05);
-    ctx.fillRect(W * 0.08, H * 0.76, W * 0.84, H * 0.05);
-    L.vent(ctx, W * 0.12, H * 0.32, W * 0.12, H * 0.36, 5, true);
-    L.vent(ctx, W * 0.76, H * 0.32, W * 0.12, H * 0.36, 5, true);
-    L.rivets(ctx, [[W * 0.14, H * 0.14], [W * 0.86, H * 0.14], [W * 0.14, H * 0.86], [W * 0.86, H * 0.86]], W * 0.018);
-    // heating chamber
-    var cx = W * 0.3, cy = H * 0.3, cw = W * 0.4, ch = H * 0.4;
-    L.inset(ctx, cx, cy, cw, ch, '#1A1210', W * 0.03);
-    var pulse = working ? 0.6 + 0.4 * Math.sin(frame / 16 * Math.PI * 2) : 0;
-    ctx.lineWidth = Math.max(1.5, W * 0.022);
-    for (var i = 0; i < 4; i++) {
-      var yy = cy + ch * (0.2 + i * 0.2);
-      ctx.strokeStyle = working ? 'rgba(255,' + (120 + Math.round(80 * pulse)) + ',40,0.95)' : '#4A3530';
-      ctx.beginPath();
-      for (var k = 0; k <= 8; k++) {
-        var xx = cx + cw * (0.1 + k * 0.1), dy = (k % 2 ? 1 : -1) * ch * 0.05;
-        if (k === 0) ctx.moveTo(xx, yy + dy); else ctx.lineTo(xx, yy + dy);
-      }
-      ctx.stroke();
-    }
-    if (working) L.glow(ctx, W / 2, H / 2, W * 0.34, '#FF7A2A', 0.25 + 0.15 * pulse);
-    // status lamp
-    ctx.fillStyle = working ? '#6FE68A' : '#3A4038';
-    ctx.beginPath(); ctx.arc(W * 0.5, H * 0.15, W * 0.022, 0, Math.PI * 2); ctx.fill();
-  }
-
-  F.sprites.definePainter('electric-furnace', paintElectricFurnace);
 })();

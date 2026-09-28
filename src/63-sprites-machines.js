@@ -1,8 +1,8 @@
-// 63-sprites-machines.js — better procedural building art for the "machine" family: the lab,
-// radar, solar panel, accumulator and small lamp (assemblers: 63-sprites-assemblers.js).
-// Registered on top of src/60-sprites.js's PAINTERS table via F.sprites.definePainter (design/BUILDING-ART.md's
-// contract) — that file is never edited here. Pure drawing module, ES5 style, deterministic
-// (F.rng.local only, no Math.random).
+// 63-sprites-machines.js — better procedural building art for the "machine" family: radar,
+// solar panel, accumulator and small lamp (assemblers and lab: 63-sprites-assemblers.js,
+// 63-sprites-lab.js). Registered on top of src/60-sprites.js's PAINTERS table via
+// F.sprites.definePainter (design/BUILDING-ART.md's contract) — that file is never edited here.
+// Pure drawing module, ES5 style, deterministic (F.rng.local only, no Math.random).
 (function () {
   'use strict';
   if (!F.sprites || !F.sprites.definePainter) return;
@@ -46,46 +46,6 @@
   // Small standing cylindrical support post (corner pillar / lamp post / battery terminal).
   function pillar(ctx, cx, cy, r, h, color) {
     L.cylinder(ctx, cx - r, cy - h, r * 2, h, color, false, { r: r * 0.6 });
-  }
-
-  // ---------------------------------------------------------------------
-  // Lab — octagonal base, glass dome over a pulsing core, orbiting red/green science-pack dots
-  // while working; dark dome when idle.
-  // ---------------------------------------------------------------------
-  function paintLab(ctx, W, H, frame, dir, def, type, opts) {
-    var working = !!(opts && opts.working);
-    L.foundation(ctx, W, H, '#54585B');
-    var bx = W * 0.08, by = H * 0.14, bw = W * 0.84, bh = H * 0.78, cut = Math.min(bw, bh) * 0.2;
-    chamferPanel(ctx, bx, by, bw, bh, cut, '#5B6670', { lo: 32 });
-    L.rivets(ctx, [[bx + cut * 0.55, by + cut * 0.55], [bx + bw - cut * 0.55, by + cut * 0.55],
-      [bx + cut * 0.55, by + bh - cut * 0.55], [bx + bw - cut * 0.55, by + bh - cut * 0.55]], W * 0.018);
-
-    var cx = W / 2, cy = by + bh * 0.34, R = Math.min(W, H) * 0.32;
-    var seamT = (Math.sin(frame / 16 * Math.PI * 2) + 1) / 2; // 0..1, seamless over the 16-frame loop
-    var coreA = working ? (0.45 + 0.45 * seamT) : 0.1;
-    L.glow(ctx, cx, cy, R * 1.3, '#4FE0F2', coreA);
-    ctx.fillStyle = working ? L.lighten('#1C6E82', 8 + 14 * seamT) : '#173238';
-    ctx.beginPath(); ctx.arc(cx, cy, R * 0.32, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = 'rgba(12,12,12,0.6)'; ctx.lineWidth = 1; ctx.stroke();
-
-    // glass dome: low-alpha radial gradient over the core, with a rim highlight arc.
-    ctx.save();
-    var dg = ctx.createRadialGradient(cx - R * 0.32, cy - R * 0.36, R * 0.06, cx, cy, R);
-    dg.addColorStop(0, 'rgba(255,255,255,0.40)');
-    dg.addColorStop(0.55, working ? 'rgba(160,225,240,0.22)' : 'rgba(120,150,160,0.16)');
-    dg.addColorStop(1, 'rgba(90,120,130,0.10)');
-    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fillStyle = dg; ctx.fill();
-    ctx.strokeStyle = 'rgba(12,12,12,0.55)'; ctx.lineWidth = Math.max(1.5, W * 0.022); ctx.stroke();
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = Math.max(1, W * 0.011);
-    ctx.beginPath(); ctx.arc(cx, cy, R * 0.94, Math.PI * 1.08, Math.PI * 1.55); ctx.stroke();
-    ctx.restore();
-
-    // orbiting science-pack dots — only while working, one full orbit per 16-frame loop.
-    if (working) {
-      var orbitR = R * 1.3, a1 = frame / 16 * Math.PI * 2, a2 = a1 + Math.PI;
-      L.disc(ctx, cx + Math.cos(a1) * orbitR, cy + Math.sin(a1) * orbitR * 0.5, W * 0.05, '#D9422B', { outlineWidth: 1.2 });
-      L.disc(ctx, cx + Math.cos(a2) * orbitR, cy + Math.sin(a2) * orbitR * 0.5, W * 0.05, '#3EB44A', { outlineWidth: 1.2 });
-    }
   }
 
   // ---------------------------------------------------------------------
@@ -233,7 +193,6 @@
     if (lit) { ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.beginPath(); ctx.arc(W * 0.43, H * 0.32, W * 0.066, 0, Math.PI * 2); ctx.fill(); }
   }
 
-  F.sprites.definePainter('lab', paintLab);
   F.sprites.definePainter('radar', paintRadar);
   F.sprites.definePainter('solar-panel', paintSolarPanel);
   F.sprites.definePainter('accumulator', paintAccumulator);

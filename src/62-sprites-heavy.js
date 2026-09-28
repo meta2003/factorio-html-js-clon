@@ -1,6 +1,6 @@
 // 62-sprites-heavy.js — higher-detail procedural building art for a subset of production
-// entities (stone-furnace, steel-furnace, burner mining drill, boiler, steam-engine,
-// offshore-pump). Registers replacement painters via F.sprites.definePainter (design/
+// entities (burner mining drill, boiler, steam-engine, offshore-pump; furnaces and the electric
+// drill live in 62-sprites-furnaces.js / 62-sprites-drill.js). Registers replacement painters via F.sprites.definePainter (design/
 // BUILDING-ART.md's contract); does not edit src/60-sprites.js. Every painter draws in local
 // "facing north" coordinates over a w0×h0 px box (px = tiles × 64) — the caller rotates the
 // canvas for dir 1..3 and adds the cast shadow, so nothing here special-cases dir or draws its
@@ -195,131 +195,6 @@
       ctx.fillStyle = cols[i % cols.length];
       ctx.beginPath(); ctx.arc(ox, oy, w * (0.07 + rng() * 0.05), 0, Math.PI * 2); ctx.fill();
     }
-  }
-
-  // ---------------------------------------------------------------------
-  // stone-furnace (2x2, not rotatable): cut-stone block furnace held together by riveted
-  // iron straps and corner angle-irons, a cast-iron fire door with grate on the front and a
-  // square iron flue collar on top; soot above the door.
-  // ---------------------------------------------------------------------
-  function stoneCourses(ctx, x, y, w, h, rows, rng, shadeTop, shadeBottom) {
-    var palette = ['#8F8676', '#857C6D', '#9B9280', '#7A7264', '#A39A86', '#8A8272'];
-    var rowH = h / rows;
-    for (var ry = 0; ry < rows; ry++) {
-      var yy = y + ry * rowH, xx = x - (ry % 2) * w * 0.12 - rng() * w * 0.05;
-      var shade = shadeTop + (shadeBottom - shadeTop) * (ry / Math.max(1, rows - 1));
-      while (xx < x + w) {
-        var sw = w * (0.2 + rng() * 0.12);
-        var col = L.adjust(palette[(rng() * palette.length) | 0], Math.round(shade));
-        L.rectBevel(ctx, xx + 1, yy + 1, sw - 2, rowH - 2, col, { light: L.lighten(col, 20), dark: L.darken(col, 28), outlineColor: 'rgba(30,26,20,0.75)', outlineWidth: 1 });
-        // chisel marks
-        ctx.fillStyle = 'rgba(0,0,0,0.12)';
-        ctx.fillRect(xx + sw * (0.2 + rng() * 0.5), yy + rowH * (0.3 + rng() * 0.3), sw * 0.12, 1);
-        xx += sw;
-      }
-    }
-  }
-  function paintStoneFurnaceHeavy(ctx, W, H, frame, dir, def, type, opts) {
-    var working = !!(opts && opts.working);
-    var rng = seed(type, 1, 9);
-    var x = W * 0.06, w = W * 0.88, top = H * 0.08, faceY = H * 0.56, bot = H * 0.95;
-    // mortar bed / silhouette
-    L.roundRectPath(ctx, x, top, w, bot - top, W * 0.07); ctx.fillStyle = '#3A342D'; ctx.fill();
-    ctx.save(); L.roundRectPath(ctx, x, top, w, bot - top, W * 0.07); ctx.clip();
-    stoneCourses(ctx, x, top, w, faceY - top, 4, rng, 8, 0);        // top face (lit)
-    stoneCourses(ctx, x, faceY, w, bot - faceY, 3, rng, -22, -38);  // front face (shade)
-    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(x, faceY, w, H * 0.02); // eave shadow
-    streaks(ctx, W * 0.3, faceY, W * 0.4, H * 0.12, rng, 5, 'rgba(15,12,10,0.35)'); // soot
-    ctx.restore();
-    L.roundRectPath(ctx, x, top, w, bot - top, W * 0.07); ctx.strokeStyle = '#0E0C0A'; ctx.lineWidth = 2; ctx.stroke();
-    // iron straps: around the top edge and across the front face, with rivets
-    var iron = '#3B3A38';
-    L.rectBevel(ctx, x, faceY - H * 0.035, w, H * 0.05, iron, { light: '#5A5754', dark: '#232120', outlineColor: '#0E0D0C', outlineWidth: 1 });
-    L.rivets(ctx, [[x + w * 0.08, faceY - H * 0.01], [x + w * 0.36, faceY - H * 0.01], [x + w * 0.64, faceY - H * 0.01], [x + w * 0.92, faceY - H * 0.01]], W * 0.016);
-    L.rectBevel(ctx, x, bot - H * 0.1, w, H * 0.045, iron, { light: '#5A5754', dark: '#232120', outlineColor: '#0E0D0C', outlineWidth: 1 });
-    L.rivets(ctx, [[x + w * 0.08, bot - H * 0.078], [x + w * 0.92, bot - H * 0.078]], W * 0.016);
-    // corner angle irons
-    for (var s = 0; s < 2; s++) {
-      var cx0 = s ? x + w - W * 0.07 : x;
-      L.rectBevel(ctx, cx0, top + H * 0.05, W * 0.07, bot - top - H * 0.08, s ? '#2E2D2B' : '#46443F', { light: '#5E5B56', dark: '#1D1C1A', outlineColor: '#0E0D0C', outlineWidth: 1 });
-      L.rivets(ctx, [[cx0 + W * 0.035, top + H * 0.14], [cx0 + W * 0.035, top + H * 0.33]], W * 0.014);
-    }
-    // square cast-iron flue collar on the top face
-    var fx = W * 0.36, fy = H * 0.14, fw = W * 0.28, fh = H * 0.24;
-    L.rectBevel(ctx, fx, fy, fw, fh, '#403D3A', { light: '#66625C', dark: '#221F1D', outlineColor: '#0B0A09', outlineWidth: 1.5 });
-    L.inset(ctx, fx + fw * 0.2, fy + fh * 0.2, fw * 0.6, fh * 0.6, '#0C0A08', fw * 0.05);
-    if (working) {
-      L.glow(ctx, fx + fw / 2, fy + fh * 0.55, fw * 0.55, '#FF8A2A', flicker(frame, 1.1, 0.55, 0.3));
-      stackSmoke(ctx, fx + fw / 2, fy + fh * 0.4, frame, W);
-    }
-    L.rivets(ctx, [[fx + fw * 0.1, fy + fh * 0.1], [fx + fw * 0.9, fy + fh * 0.1], [fx + fw * 0.1, fy + fh * 0.9], [fx + fw * 0.9, fy + fh * 0.9]], W * 0.013);
-    // cast-iron fire door on the front face
-    fireGrate(ctx, W * 0.34, H * 0.66, W * 0.32, H * 0.2, working, frame, 4);
-  }
-
-  // ---------------------------------------------------------------------
-  // steel-furnace (2x2): dark riveted steel housing with cooling ribs, a bolted crucible
-  // flange (refractory brick, molten glow while working) on top, a wide grated fire window
-  // with a hazard-striped kick plate on the front, twin exhaust stacks and rust/soot runs.
-  // ---------------------------------------------------------------------
-  function paintSteelFurnaceHeavy(ctx, W, H, frame, dir, def, type, opts) {
-    var working = !!(opts && opts.working);
-    var f = frame | 0, rng = seed(type, 4, 2);
-    var steel = '#4C535B';
-    // housing: top face + front face
-    housing(ctx, W * 0.05, H * 0.07, W * 0.9, H * 0.55, H * 0.32, steel, W * 0.05);
-    ctx.save(); L.roundRectPath(ctx, W * 0.05, H * 0.07, W * 0.9, H * 0.87, W * 0.05); ctx.clip();
-    grime(ctx, W * 0.05, H * 0.07, W * 0.9, H * 0.55, rng, 26);
-    streaks(ctx, W * 0.08, H * 0.62, W * 0.84, H * 0.3, rng, 7, 'rgba(110,55,25,0.35)'); // rust runs on the front
-    ctx.restore();
-    // cooling ribs down both sides of the top face
-    for (var side = 0; side < 2; side++) {
-      var rx = side ? W * 0.8 : W * 0.09;
-      for (var k = 0; k < 5; k++) {
-        var ry = H * (0.14 + k * 0.09);
-        L.rectBevel(ctx, rx, ry, W * 0.11, H * 0.05, '#5A626B', { light: '#7C858F', dark: '#2E3338', outlineColor: '#111', outlineWidth: 1 });
-      }
-    }
-    // crucible flange: bolted steel ring, brick lining, melt
-    var cx = W * 0.5, cy = H * 0.35, R = W * 0.25, rb = W * 0.19, rp = W * 0.13;
-    L.disc(ctx, cx, cy, R, '#6A737C', { hi: 34, lo: 44 });
-    var bolts = [];
-    for (var bI = 0; bI < 12; bI++) { var a = bI / 12 * Math.PI * 2; bolts.push([cx + Math.cos(a) * R * 0.87, cy + Math.sin(a) * R * 0.87]); }
-    L.rivets(ctx, bolts, W * 0.014);
-    var n = 12;
-    for (var b = 0; b < n; b++) {
-      var a0 = b / n * Math.PI * 2 + 0.035, a1 = (b + 1) / n * Math.PI * 2 - 0.035;
-      ctx.beginPath(); ctx.arc(cx, cy, rb, a0, a1); ctx.arc(cx, cy, rp, a1, a0, true); ctx.closePath();
-      ctx.fillStyle = L.adjust(b % 2 ? '#7E4430' : '#6C3A28', Math.round(Math.cos((a0 + a1) / 2 - 0.8) * 14));
-      ctx.fill();
-    }
-    ctx.strokeStyle = '#0A0806'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, rb, 0, Math.PI * 2); ctx.stroke();
-    ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, rp, 0, Math.PI * 2); ctx.clip();
-    if (working) {
-      var g = ctx.createRadialGradient(cx - rp * 0.15, cy - rp * 0.1, rp * 0.05, cx, cy, rp);
-      g.addColorStop(0, 'rgba(255,246,200,' + flicker(f, 1.2, 0.75, 0.25).toFixed(2) + ')');
-      g.addColorStop(0.45, '#FFAA2E'); g.addColorStop(0.85, '#C8481A'); g.addColorStop(1, '#5A1A0A');
-      ctx.fillStyle = g; ctx.fillRect(cx - rp, cy - rp, rp * 2, rp * 2);
-      for (var c = 0; c < 4; c++) {
-        var ang = c * 1.7 + f * 0.25, dd = rp * (0.35 + 0.15 * (c % 2));
-        ctx.fillStyle = 'rgba(130,36,10,0.35)';
-        ctx.beginPath(); ctx.ellipse(cx + Math.cos(ang) * dd, cy + Math.sin(ang) * dd, rp * 0.22, rp * 0.12, ang, 0, Math.PI * 2); ctx.fill();
-      }
-    } else {
-      ctx.fillStyle = '#0E0B09'; ctx.fillRect(cx - rp, cy - rp, rp * 2, rp * 2);
-      ctx.fillStyle = 'rgba(120,40,16,0.35)'; ctx.beginPath(); ctx.arc(cx + rp * 0.15, cy + rp * 0.2, rp * 0.3, 0, Math.PI * 2); ctx.fill();
-    }
-    ctx.restore();
-    ctx.strokeStyle = '#0A0806'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, rp, 0, Math.PI * 2); ctx.stroke();
-    if (working) L.glow(ctx, cx, cy, R * 1.2, '#FF8A2A', flicker(f, 1.2, 0.16, 0.1));
-    // twin exhaust stacks in the back corners
-    stack(ctx, W * 0.16, H * 0.1, W * 0.075, '#3E444A', working, frame);
-    stack(ctx, W * 0.84, H * 0.1, W * 0.075, '#3E444A', working, frame);
-    if (working) { stackSmoke(ctx, W * 0.16, H * 0.1, frame, W); stackSmoke(ctx, W * 0.84, H * 0.1, frame + 7, W); }
-    // front face: seam, wide grated fire window, hazard kick plate
-    rivetSeam(ctx, W * 0.08, W * 0.92, H * 0.66, 6, W * 0.013);
-    fireGrate(ctx, W * 0.26, H * 0.7, W * 0.48, H * 0.12, working, frame, 6);
-    L.hazardStripe(ctx, W * 0.1, H * 0.86, W * 0.8, H * 0.05, W * 0.04);
   }
 
   // ---------------------------------------------------------------------
@@ -554,8 +429,6 @@
     L.pipeNub(ctx, W * 0.5, H, 2, W * 0.36);
   }
 
-  F.sprites.definePainter(['stone-furnace'], paintStoneFurnaceHeavy);
-  F.sprites.definePainter(['steel-furnace'], paintSteelFurnaceHeavy);
   F.sprites.definePainter(['burner-mining-drill'], paintBurnerDrillHeavy);
   F.sprites.definePainter(['boiler'], paintBoilerHeavy);
   F.sprites.definePainter(['steam-engine'], paintSteamEngineHeavy);
