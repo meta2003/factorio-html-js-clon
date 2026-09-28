@@ -1,6 +1,6 @@
 // 62-sprites-heavy.js — higher-detail procedural building art for a subset of production
-// entities (burner mining drill, boiler, steam-engine, offshore-pump; furnaces and the electric
-// drill live in 62-sprites-furnaces.js / 62-sprites-drill.js). Registers replacement painters via F.sprites.definePainter (design/
+// entities (burner mining drill, offshore-pump; furnaces, the electric drill, the boiler and the
+// steam engine live in 62-sprites-furnaces.js / 62-sprites-drill.js / 62-sprites-steam.js). Registers replacement painters via F.sprites.definePainter (design/
 // BUILDING-ART.md's contract); does not edit src/60-sprites.js. Every painter draws in local
 // "facing north" coordinates over a w0×h0 px box (px = tiles × 64) — the caller rotates the
 // canvas for dir 1..3 and adds the cast shadow, so nothing here special-cases dir or draws its
@@ -247,170 +247,6 @@
   }
 
   // ---------------------------------------------------------------------
-  // Shared steam-plant parts.
-  // ---------------------------------------------------------------------
-  // Round pressure gauge: bezel, dial face, needle (twitches with `frame` when live).
-  function gauge(ctx, cx, cy, r, live, frame) {
-    L.disc(ctx, cx, cy, r, '#8A7A52', { hi: 45, lo: 40 });
-    ctx.fillStyle = '#E8E2CF'; ctx.beginPath(); ctx.arc(cx, cy, r * 0.72, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#B03A2A'; ctx.lineWidth = r * 0.14;
-    ctx.beginPath(); ctx.arc(cx, cy, r * 0.55, -0.4, 0.5); ctx.stroke(); // red zone
-    var a = live ? -0.6 + 0.12 * Math.sin((frame | 0) * 1.9) : -2.4;
-    ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = Math.max(1, r * 0.12);
-    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * r * 0.6, cy + Math.sin(a) * r * 0.6); ctx.stroke();
-  }
-  // Bolted pipe flange ring across a pipe of width w at (cx, y) (vertical pipe) or (x, cy).
-  function flange(ctx, cx, cy, w, h, color) {
-    L.rectBevel(ctx, cx - w / 2, cy - h / 2, w, h, color || '#5A6168', { outlineColor: '#101010', outlineWidth: 1 });
-    L.rivets(ctx, w > h ? [[cx - w * 0.36, cy], [cx + w * 0.36, cy]] : [[cx, cy - h * 0.36], [cx, cy + h * 0.36]], Math.min(w, h) * 0.18);
-  }
-  // Riveted horizontal drum (boiler shell) with seam bands and dished end caps.
-  function drum(ctx, x, y, w, h, color, rng) {
-    L.cylinder(ctx, x, y, w, h, color, true, { r: h * 0.5 });
-    ctx.save(); L.roundRectPath(ctx, x, y, w, h, h * 0.5); ctx.clip();
-    streaks(ctx, x, y + h * 0.5, w, h * 0.5, rng, 8, 'rgba(110,52,20,0.4)');
-    for (var i = 1; i < 4; i++) {
-      var sx = x + w * i / 4;
-      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(sx - 1.5, y, 3, h);
-      ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(sx + 1.5, y, 1.2, h);
-      var pts = []; for (var k = 1; k < 6; k++) pts.push([sx - 4, y + h * k / 6]);
-      L.rivets(ctx, pts, h * 0.035);
-    }
-    ctx.restore();
-  }
-
-  // ---------------------------------------------------------------------
-  // boiler (3x2, rotatable; steam out north centre, water in on the south row's west/east
-  // ends): riveted boiler drum with steam dome, gauge and safety valve on a brick-lined
-  // firebox, stoked fire door on the front, water manifold to both sides, smoking stack.
-  // ---------------------------------------------------------------------
-  function paintBoilerHeavy(ctx, W, H, frame, dir, def, type, opts) {
-    var working = !!(opts && opts.working);
-    var rng = seed(type, 2, 6), nub = Math.min(W, H) * 0.2;
-    // water manifold through the firebox to both side connections
-    L.cylinder(ctx, 0, H * 0.68, W, H * 0.14, '#7C868E', true, { r: H * 0.03 });
-    flange(ctx, W * 0.07, H * 0.75, W * 0.04, H * 0.2);
-    flange(ctx, W * 0.93, H * 0.75, W * 0.04, H * 0.2);
-    // firebox
-    housing(ctx, W * 0.1, H * 0.34, W * 0.84, H * 0.3, H * 0.3, '#5A4A3C', W * 0.03);
-    ctx.save(); L.roundRectPath(ctx, W * 0.1, H * 0.34, W * 0.84, H * 0.6, W * 0.03); ctx.clip();
-    grime(ctx, W * 0.1, H * 0.34, W * 0.84, H * 0.3, rng, 24, 'rgba(20,12,6,0.2)');
-    streaks(ctx, W * 0.14, H * 0.64, W * 0.72, H * 0.28, rng, 6, 'rgba(15,12,10,0.4)');
-    ctx.restore();
-    rivetSeam(ctx, W * 0.14, W * 0.86, H * 0.66, 8, W * 0.01);
-    fireGrate(ctx, W * 0.36, H * 0.72, W * 0.28, H * 0.15, working, frame, 5);
-    // steam line up to the north connection
-    L.cylinder(ctx, W * 0.46, 0, W * 0.08, H * 0.2, '#7C868E', false, { r: W * 0.01 });
-    flange(ctx, W * 0.5, H * 0.1, W * 0.12, H * 0.05);
-    // drum
-    drum(ctx, W * 0.08, H * 0.14, W * 0.74, H * 0.36, '#6E5B48', rng);
-    L.disc(ctx, W * 0.5, H * 0.24, W * 0.07, '#7A6652', { hi: 40, lo: 40 }); // steam dome
-    L.disc(ctx, W * 0.5, H * 0.24, W * 0.035, '#5E4E3E', { hi: 30, lo: 30 });
-    gauge(ctx, W * 0.26, H * 0.3, W * 0.045, working, frame);
-    // safety valve (pops a little steam while working)
-    L.cylinder(ctx, W * 0.64, H * 0.18, W * 0.04, H * 0.12, '#B08A40', false, { r: W * 0.01 });
-    if (working && (frame | 0) % 8 < 4) {
-      ctx.fillStyle = 'rgba(235,235,235,0.35)';
-      ctx.beginPath(); ctx.arc(W * 0.66, H * 0.14 - ((frame | 0) % 4) * H * 0.02, W * 0.025 + ((frame | 0) % 4) * W * 0.008, 0, Math.PI * 2); ctx.fill();
-    }
-    // exhaust stack, back right
-    stack(ctx, W * 0.88, H * 0.44, W * 0.05, '#3A342E', working, frame);
-    if (working) stackSmoke(ctx, W * 0.88, H * 0.44, frame, W * 0.7);
-    L.pipeNub(ctx, W * 0.5, 0, 0, nub);
-    L.pipeNub(ctx, 0, H * 0.75, 3, nub);
-    L.pipeNub(ctx, W, H * 0.75, 1, nub);
-  }
-
-  // ---------------------------------------------------------------------
-  // steam-engine (3x5, dirs 0/1; steam in/out at the north and south ends): heavy cast bed,
-  // lagged steam cylinder with valve chest, flyball governor and gauge, crosshead on guide
-  // bars, connecting rod to a spoked flywheel turning in its pit, and a generator with
-  // copper windings. Everything turns off one crank phase, seamless over 16 frames.
-  // ---------------------------------------------------------------------
-  function paintSteamEngineHeavy(ctx, W, H, frame, dir, def, type, opts) {
-    var working = !!(opts && opts.working);
-    var f = frame | 0, rng = seed(type, 6, 3), nub = Math.min(W, H) * 0.15;
-    var pang = working ? (f / 16) * Math.PI * 2 : 0;
-    // steam pipes to both end connections
-    L.cylinder(ctx, W * 0.45, 0, W * 0.1, H * 0.1, '#7C868E', false, { r: W * 0.01 });
-    L.cylinder(ctx, W * 0.45, H * 0.9, W * 0.1, H * 0.1, '#7C868E', false, { r: W * 0.01 });
-    // cast bed
-    housing(ctx, W * 0.08, H * 0.05, W * 0.84, H * 0.84, H * 0.05, '#4C5156', W * 0.05);
-    ctx.save(); L.roundRectPath(ctx, W * 0.08, H * 0.05, W * 0.84, H * 0.89, W * 0.05); ctx.clip();
-    grime(ctx, W * 0.08, H * 0.05, W * 0.84, H * 0.84, rng, 40);
-    ctx.restore();
-    var edgeBolts = [];
-    for (var b = 0; b < 7; b++) { edgeBolts.push([W * 0.13, H * (0.1 + b * 0.125)]); edgeBolts.push([W * 0.87, H * (0.1 + b * 0.125)]); }
-    L.rivets(ctx, edgeBolts, W * 0.014);
-    // steam cylinder (axis north-south) with lagging bands and end flanges
-    var cx = W * 0.5, cw = W * 0.4, cy0 = H * 0.08, ch = H * 0.26;
-    L.cylinder(ctx, cx - cw / 2, cy0, cw, ch, '#6E7780', false, { r: W * 0.03 });
-    for (var lb = 1; lb < 4; lb++) { ctx.fillStyle = 'rgba(176,138,64,0.85)'; ctx.fillRect(cx - cw / 2 + 2, cy0 + ch * lb / 4 - 2, cw - 4, 4); }
-    flange(ctx, cx, cy0 + 3, cw * 1.08, H * 0.022, '#5A6168');
-    flange(ctx, cx, cy0 + ch - 3, cw * 1.08, H * 0.022, '#5A6168');
-    // valve chest on the left of the cylinder, gauge on it
-    L.panel(ctx, W * 0.15, H * 0.12, W * 0.13, H * 0.16, '#5E676F', { r: W * 0.02 });
-    gauge(ctx, W * 0.215, H * 0.17, W * 0.045, working, frame);
-    // flyball governor on the right of the cylinder
-    var gx = W * 0.79, gy = H * 0.17, ga = working ? pang * 2 : 0, gs = working ? W * 0.055 : W * 0.035;
-    L.disc(ctx, gx, gy, W * 0.03, '#8C979E', { hi: 40, lo: 30 });
-    for (var bI = 0; bI < 2; bI++) {
-      var bx = gx + Math.cos(ga + bI * Math.PI) * gs, by = gy + Math.sin(ga + bI * Math.PI) * gs * 0.45;
-      ctx.strokeStyle = '#2A2E32'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(bx, by); ctx.stroke();
-      L.disc(ctx, bx, by, W * 0.022, '#C9A24A', { hi: 50, lo: 40 });
-    }
-    // guide bars + crosshead
-    var gTop = cy0 + ch, gBot = H * 0.5, stroke = Math.sin(pang) * H * 0.045, chY = (gTop + gBot) / 2 + stroke;
-    post(ctx, cx - W * 0.1, gTop, gBot, W * 0.03, '#6A737B');
-    post(ctx, cx + W * 0.1, gTop, gBot, W * 0.03, '#6A737B');
-    ctx.strokeStyle = '#D5D9DC'; ctx.lineWidth = W * 0.035;
-    ctx.beginPath(); ctx.moveTo(cx, gTop); ctx.lineTo(cx, chY); ctx.stroke();
-    L.rectBevel(ctx, cx - W * 0.12, chY - H * 0.018, W * 0.24, H * 0.036, '#5A6168', { outlineColor: '#101010', outlineWidth: 1.2 });
-    // flywheel pit + spoked flywheel
-    var fcx = W * 0.42, fcy = H * 0.7, fr = W * 0.3;
-    ctx.fillStyle = '#121212'; L.roundRectPath(ctx, fcx - fr * 1.06, fcy - fr * 1.06, fr * 2.12, fr * 2.12, fr * 0.3); ctx.fill();
-    ctx.save(); ctx.translate(fcx, fcy); ctx.rotate(pang);
-    var rimG = ctx.createRadialGradient(-fr * 0.3, -fr * 0.3, fr * 0.1, 0, 0, fr);
-    rimG.addColorStop(0, '#9AA3AB'); rimG.addColorStop(0.75, '#5E666D'); rimG.addColorStop(1, '#30353A');
-    ctx.fillStyle = rimG; ctx.beginPath(); ctx.arc(0, 0, fr, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#26292C'; ctx.beginPath(); ctx.arc(0, 0, fr * 0.8, 0, Math.PI * 2); ctx.fill();
-    for (var si = 0; si < 6; si++) {
-      ctx.save(); ctx.rotate(si / 6 * Math.PI * 2);
-      var sg = ctx.createLinearGradient(-fr * 0.06, 0, fr * 0.06, 0);
-      sg.addColorStop(0, '#454C53'); sg.addColorStop(0.5, '#7E878F'); sg.addColorStop(1, '#3A4046');
-      ctx.fillStyle = sg; ctx.beginPath();
-      ctx.moveTo(-fr * 0.09, 0); ctx.lineTo(-fr * 0.05, -fr * 0.8); ctx.lineTo(fr * 0.05, -fr * 0.8); ctx.lineTo(fr * 0.09, 0); ctx.closePath(); ctx.fill();
-      ctx.restore();
-    }
-    var rimBolts = []; for (var rb = 0; rb < 12; rb++) { var ra = rb / 12 * Math.PI * 2; rimBolts.push([Math.cos(ra) * fr * 0.9, Math.sin(ra) * fr * 0.9]); }
-    L.rivets(ctx, rimBolts, W * 0.011);
-    L.disc(ctx, 0, 0, fr * 0.22, '#8C979E', { hi: 50, lo: 35 });
-    ctx.strokeStyle = '#101010'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, 0, fr, 0, Math.PI * 2); ctx.stroke();
-    ctx.restore();
-    // connecting rod from crosshead to the crank pin
-    var pinA = pang - Math.PI / 2, pinX = fcx + Math.cos(pinA) * fr * 0.55, pinY = fcy + Math.sin(pinA) * fr * 0.55;
-    ctx.strokeStyle = '#1A1C1E'; ctx.lineWidth = W * 0.045; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(cx, chY); ctx.lineTo(pinX, pinY); ctx.stroke();
-    ctx.strokeStyle = '#A7AFB5'; ctx.lineWidth = W * 0.028;
-    ctx.beginPath(); ctx.moveTo(cx, chY); ctx.lineTo(pinX, pinY); ctx.stroke();
-    ctx.lineCap = 'butt';
-    L.disc(ctx, pinX, pinY, W * 0.025, '#C9CDD0', { hi: 40, lo: 40 });
-    // generator on the shaft: housing with copper windings and a status lamp
-    var gX = W * 0.74, gY = H * 0.56, gW = W * 0.16, gH = H * 0.28;
-    L.panel(ctx, gX, gY, gW, gH, '#4E565E', { r: W * 0.025 });
-    for (var wI = 0; wI < 7; wI++) {
-      var wy = gY + gH * (0.12 + wI * 0.11);
-      ctx.fillStyle = wI % 2 ? '#A8612E' : '#C87A3A'; ctx.fillRect(gX + gW * 0.15, wy, gW * 0.7, gH * 0.07);
-    }
-    ctx.fillStyle = working ? '#FFD34A' : '#4A4330';
-    ctx.beginPath(); ctx.arc(gX + gW / 2, gY + gH * 0.93, W * 0.02, 0, Math.PI * 2); ctx.fill();
-    if (working) L.glow(ctx, gX + gW / 2, gY + gH * 0.93, W * 0.07, '#FFD34A', 0.6);
-    L.hazardStripe(ctx, W * 0.14, H * 0.87, W * 0.72, H * 0.02, W * 0.03);
-    L.pipeNub(ctx, W * 0.5, 0, 0, nub);
-    L.pipeNub(ctx, W * 0.5, H, 2, nub);
-  }
-
-  // ---------------------------------------------------------------------
   // offshore-pump (1x1, rotatable): intake grate facing north (the water side), pump housing +
   // motor, pipe outlet on the south edge.
   // ---------------------------------------------------------------------
@@ -430,7 +266,5 @@
   }
 
   F.sprites.definePainter(['burner-mining-drill'], paintBurnerDrillHeavy);
-  F.sprites.definePainter(['boiler'], paintBoilerHeavy);
-  F.sprites.definePainter(['steam-engine'], paintSteamEngineHeavy);
   F.sprites.definePainter(['offshore-pump'], paintOffshorePumpHeavy);
 })();
