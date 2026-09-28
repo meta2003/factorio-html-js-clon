@@ -918,6 +918,7 @@
   function toggleRide() {
     var p = F.state && F.state.player;
     if (!p) return true;
+    if (p.ridingSpider) return false; // aboard a spidertron: its own handler steps out
     if (p.ridingTrain) {
       var train = findTrainById(p.ridingTrain);
       p.ridingTrain = null;
@@ -939,7 +940,8 @@
       var d = F.util.dist(p.x, p.y, tr.x, tr.y);
       if (d <= 3 && d < bestD) { bestD = d; best = train; }
     }
-    if (best) p.ridingTrain = best.id;
+    if (!best) return false; // nothing to board: let other vehicles (spidertron) take the key
+    p.ridingTrain = best.id;
     return true;
   }
   F._inputKeys = F._inputKeys || {};
