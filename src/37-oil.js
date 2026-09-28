@@ -525,10 +525,12 @@
     altOverlayFns: [],
   };
 
-  // crafter: opts.working drives the flare/mixer animation in 65-sprites-oil.js's painters; frame
-  // is a free-running clock (used for the refinery's flare flicker), not gated on "working".
+  // crafter: opts.working drives the refinery flame / chemical-plant window animation in
+  // 65-sprites-refinery.js. frame loops over 16 steps (sprites are cached per frame, so an
+  // unbounded clock here would allocate a new canvas every tick).
   F._renderHooks.entityOpts['crafter'] = function (e) {
-    return { frame: e.workingTicks || 0, opts: { working: e._status === 'working' } };
+    var working = e._status === 'working';
+    return { frame: working ? ((e.workingTicks | 0) >> 2) & 15 : 0, opts: { working: working } };
   };
   // pumpjack: frame only advances while actively pumping (EXPANSION.md §7.1).
   F._renderHooks.entityOpts['pumpjack'] = function (e) {

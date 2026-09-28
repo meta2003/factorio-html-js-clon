@@ -1,5 +1,6 @@
-// 65-sprites-oil.js — procedural art for the oil-processing chain: pumpjack, oil-refinery,
-// chemical-plant, storage-tank, the crude-oil well resource tile, and item icons for the new
+// 65-sprites-oil.js — procedural art for the oil-processing chain: pumpjack (the oil refinery,
+// chemical plant and storage tank live in 65-sprites-refinery.js), the crude-oil well resource
+// tile, and item icons for the new
 // intermediates (plastic, sulfur powder, solid-fuel block, rocket-fuel cell). Registers via
 // F.sprites.definePainter (design/BUILDING-ART.md contract) same as 62/63/64-sprites-*.js; never
 // edits src/60-sprites.js. Also exposes F.sprites.fluidTint(ctx,W,H,fluid) (design/EXPANSION.md
@@ -15,32 +16,6 @@
   // ---------------------------------------------------------------------
   // Local helpers
   // ---------------------------------------------------------------------
-  // Chamfered (cut-corner) steel plate — same top-lit gradient/rim/outline treatment as
-  // L.panel, following an octagon silhouette. Duplicated locally per the pattern already used
-  // by 62-/63-sprites-*.js (the shared lib only has rounded rects).
-  function chamferPath(ctx, x, y, w, h, c) {
-    ctx.beginPath();
-    ctx.moveTo(x + c, y); ctx.lineTo(x + w - c, y); ctx.lineTo(x + w, y + c);
-    ctx.lineTo(x + w, y + h - c); ctx.lineTo(x + w - c, y + h); ctx.lineTo(x + c, y + h);
-    ctx.lineTo(x, y + h - c); ctx.lineTo(x, y + c); ctx.closePath();
-  }
-  function chamferPanel(ctx, x, y, w, h, c, color, opts) {
-    opts = opts || {};
-    var g = ctx.createLinearGradient(x, y, x + w * 0.35, y + h);
-    g.addColorStop(0, L.lighten(color, opts.hi != null ? opts.hi : 26));
-    g.addColorStop(0.45, color);
-    g.addColorStop(1, L.darken(color, opts.lo != null ? opts.lo : 30));
-    chamferPath(ctx, x, y, w, h, c); ctx.fillStyle = g; ctx.fill();
-    ctx.save(); chamferPath(ctx, x, y, w, h, c); ctx.clip();
-    var lw = Math.max(1, Math.min(w, h) * 0.035);
-    ctx.strokeStyle = 'rgba(255,255,255,0.28)'; ctx.lineWidth = lw * 2;
-    ctx.beginPath(); ctx.moveTo(x, y + h - c); ctx.lineTo(x, y + c); ctx.lineTo(x + c, y); ctx.lineTo(x + w - c, y); ctx.stroke();
-    ctx.strokeStyle = 'rgba(0,0,0,0.30)';
-    ctx.beginPath(); ctx.moveTo(x + c, y + h); ctx.lineTo(x + w - c, y + h); ctx.lineTo(x + w, y + h - c); ctx.lineTo(x + w, y + c); ctx.stroke();
-    ctx.restore();
-    chamferPath(ctx, x, y, w, h, c);
-    ctx.strokeStyle = 'rgba(12,12,12,0.9)'; ctx.lineWidth = Math.max(1.5, L.PX * 0.03); ctx.stroke();
-  }
   // Nodding-donkey horsehead silhouette: (x,y) is the NOSE tip (frontmost point, where the
   // bridle cable attaches) — the northmost point of the whole mechanism, sitting right over the
   // well. The head mass hooks DOWN and to one side from there, back toward the beam/pivot (never
@@ -182,202 +157,6 @@
   }
 
   // ---------------------------------------------------------------------
-  // Oil refinery (5x5). Inputs south edge x=1,3 (fin[0],fin[1]); outputs north edge x=0,2,4
-  // (fout[0..2]). Three tall distillation towers + two horizontal tanks on a raised deck, an
-  // overhead pipe rack feeding the output header, walkway grating, a gas-flare stack that
-  // ignites (animated flame + warm tower lights) while opts.working, dark/unlit when idle.
-  // ---------------------------------------------------------------------
-  function paintOilRefinery(ctx, W, H, frame, dir, def, type, opts) {
-    var working = !!(opts && opts.working);
-    var i;
-    L.foundation(ctx, W, H, '#54585A');
-    L.panel(ctx, W * 0.05, H * 0.08, W * 0.9, H * 0.84, '#61666A', { r: W * 0.015, hi: 10, lo: 18 });
-
-    // ---- fluid ports ----
-    var inXs = [1.5 / 5 * W, 3.5 / 5 * W];
-    var outXs = [0.5 / 5 * W, 2.5 / 5 * W, 4.5 / 5 * W];
-    var nub = W * 0.045, headerY = H * 0.1;
-    ctx.strokeStyle = '#6E7A82';
-    for (i = 0; i < inXs.length; i++) {
-      ctx.lineWidth = nub * 0.7;
-      ctx.beginPath(); ctx.moveTo(inXs[i], H); ctx.lineTo(inXs[i], H * 0.82); ctx.stroke();
-      L.pipeNub(ctx, inXs[i], H, 2, nub);
-    }
-    ctx.lineWidth = nub * 0.55;
-    ctx.beginPath(); ctx.moveTo(outXs[0], headerY); ctx.lineTo(outXs[2], headerY); ctx.stroke();
-    for (i = 0; i < outXs.length; i++) {
-      ctx.beginPath(); ctx.moveTo(outXs[i], 0); ctx.lineTo(outXs[i], headerY); ctx.stroke();
-      L.pipeNub(ctx, outXs[i], 0, 0, nub);
-    }
-
-    // ---- distillation towers (west side) ----
-    var towers = [
-      { x: 0.18 * W, w: 0.1 * W, top: 0.18 * H, base: 0.84 * H },
-      { x: 0.32 * W, w: 0.11 * W, top: 0.12 * H, base: 0.84 * H },
-      { x: 0.46 * W, w: 0.095 * W, top: 0.24 * H, base: 0.84 * H },
-    ];
-    for (i = 0; i < towers.length; i++) {
-      var t = towers[i], th = t.base - t.top;
-      L.cylinder(ctx, t.x - t.w / 2, t.top, t.w, th, '#8C979E', false, { r: t.w * 0.14 });
-      L.disc(ctx, t.x, t.top, t.w * 0.5, '#7C8790', { hi: 40, lo: 30 });
-      L.hazardStripe(ctx, t.x - t.w / 2, t.base - th * 0.08, t.w, th * 0.05, t.w * 0.14);
-      L.rivets(ctx, [[t.x - t.w * 0.3, t.top + th * 0.3], [t.x + t.w * 0.3, t.top + th * 0.3],
-        [t.x - t.w * 0.3, t.top + th * 0.62], [t.x + t.w * 0.3, t.top + th * 0.62]], t.w * 0.05);
-      ctx.strokeStyle = '#6E7A82'; ctx.lineWidth = t.w * 0.16;
-      ctx.beginPath(); ctx.moveTo(t.x, t.top); ctx.lineTo(t.x, headerY); ctx.stroke();
-      ctx.fillStyle = working ? '#FFCB7A' : '#3A3E42';
-      ctx.beginPath(); ctx.arc(t.x, t.top + th * 0.14, t.w * 0.09, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#141414'; ctx.lineWidth = 1; ctx.stroke();
-      if (working) L.glow(ctx, t.x, t.top + th * 0.14, t.w * 0.5, '#FFCB7A', 0.5);
-    }
-
-    // ---- horizontal storage tanks (east side) ----
-    var tanks = [
-      { x: 0.64 * W, y: 0.42 * H, w: 0.28 * W, h: 0.13 * H },
-      { x: 0.62 * W, y: 0.62 * H, w: 0.3 * W, h: 0.14 * H },
-    ];
-    for (i = 0; i < tanks.length; i++) {
-      var tk = tanks[i];
-      L.cylinder(ctx, tk.x, tk.y, tk.w, tk.h, '#6C7268', true, { r: tk.h * 0.5 });
-      L.disc(ctx, tk.x, tk.y + tk.h / 2, tk.h / 2, '#5C6258', { hi: 40, lo: 30 });
-      L.disc(ctx, tk.x + tk.w, tk.y + tk.h / 2, tk.h / 2, '#5C6258', { hi: 40, lo: 30 });
-    }
-
-    // walkway grating between the towers and tanks.
-    ctx.strokeStyle = 'rgba(0,0,0,0.14)'; ctx.lineWidth = 1;
-    for (var gy = H * 0.3; gy < H * 0.84; gy += H * 0.05) { ctx.beginPath(); ctx.moveTo(W * 0.07, gy); ctx.lineTo(W * 0.56, gy); ctx.stroke(); }
-
-    // ---- gas flare (south-east corner) ----
-    var flx = W * 0.87, flBase = H * 0.86, flTop = H * 0.28;
-    L.cylinder(ctx, flx - W * 0.018, flTop, W * 0.036, flBase - flTop, '#3A3E42', false, { r: W * 0.01 });
-    L.panel(ctx, flx - W * 0.05, flBase, W * 0.1, H * 0.05, '#454C54', { r: W * 0.01 });
-    if (working) {
-      var flick = 0.6 + 0.4 * Math.sin(frame * 1.7);
-      L.glow(ctx, flx, flTop, W * 0.14, '#FF8A2A', 0.35 * flick);
-      ctx.save(); ctx.translate(flx, flTop);
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.quadraticCurveTo(-W * 0.03 * flick, -H * 0.05, -W * 0.012, -H * (0.09 + 0.02 * flick));
-      ctx.quadraticCurveTo(0, -H * 0.12, W * 0.012, -H * (0.09 + 0.02 * flick));
-      ctx.quadraticCurveTo(W * 0.03 * flick, -H * 0.05, 0, 0);
-      ctx.closePath();
-      var fg = ctx.createLinearGradient(0, 0, 0, -H * 0.12);
-      fg.addColorStop(0, '#FFD27A'); fg.addColorStop(0.5, '#FF8A2A'); fg.addColorStop(1, 'rgba(255,138,42,0)');
-      ctx.fillStyle = fg; ctx.fill();
-      ctx.restore();
-    }
-  }
-
-  // ---------------------------------------------------------------------
-  // Chemical plant (3x3). Inputs south edge x=0,2; outputs north edge x=0,2. Chamfered housing,
-  // a glass dome over a two-blade mixer that spins over a 16-frame loop + rising bubbles while
-  // opts.working; idle -> mixer frozen, liquid dim, dome flat, lights off.
-  // ---------------------------------------------------------------------
-  function paintChemicalPlant(ctx, W, H, frame, dir, def, type, opts) {
-    var working = !!(opts && opts.working);
-    L.foundation(ctx, W, H, '#54585A');
-    var bx = W * 0.1, by = H * 0.14, bw = W * 0.8, bh = H * 0.72, cut = Math.min(bw, bh) * 0.18;
-    chamferPanel(ctx, bx, by, bw, bh, cut, '#5E6A56', { lo: 32 });
-    L.rivets(ctx, [[bx + cut * 0.5, by + cut * 0.5], [bx + bw - cut * 0.5, by + cut * 0.5],
-      [bx + cut * 0.5, by + bh - cut * 0.5], [bx + bw - cut * 0.5, by + bh - cut * 0.5]], W * 0.018);
-
-    // ports: south x=0,2 (inputs), north x=0,2 (outputs), with short risers into the housing.
-    var px0 = 0.5 / 3 * W, px2 = 2.5 / 3 * W, nub = W * 0.07;
-    L.pipeNub(ctx, px0, H, 2, nub); L.pipeNub(ctx, px2, H, 2, nub);
-    L.pipeNub(ctx, px0, 0, 0, nub); L.pipeNub(ctx, px2, 0, 0, nub);
-    ctx.strokeStyle = '#6E7A82'; ctx.lineWidth = nub * 0.6;
-    [px0, px2].forEach(function (x) {
-      ctx.beginPath(); ctx.moveTo(x, H); ctx.lineTo(x, by + bh); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, by); ctx.stroke();
-    });
-
-    // glass dome over the mixer, centred in the upper housing.
-    var cx = W / 2, cy = by + bh * 0.38, R = Math.min(W, H) * 0.26;
-    ctx.save();
-    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.clip();
-    var liqColor = working ? '#6FCB6A' : '#3A4A3A';
-    ctx.fillStyle = L.rgba(liqColor, working ? 0.55 : 0.3);
-    ctx.fillRect(cx - R, cy + R * 0.08, R * 2, R * 1.2);
-    if (working) {
-      for (var bI = 0; bI < 5; bI++) {
-        var bt = (((frame | 0) + bI * 3) % 16) / 16;
-        var bx2 = cx + Math.sin(bI * 2.1) * R * 0.5, by2 = cy + R * 0.5 - bt * R * 0.9;
-        ctx.fillStyle = 'rgba(255,255,255,' + (0.5 * (1 - bt)).toFixed(2) + ')';
-        ctx.beginPath(); ctx.arc(bx2, by2, R * 0.05 * (1 + bt), 0, Math.PI * 2); ctx.fill();
-      }
-    }
-    ctx.restore();
-    var dg = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.35, R * 0.05, cx, cy, R);
-    dg.addColorStop(0, 'rgba(255,255,255,0.35)');
-    dg.addColorStop(0.6, working ? 'rgba(160,225,240,0.15)' : 'rgba(120,150,160,0.12)');
-    dg.addColorStop(1, 'rgba(90,120,130,0.08)');
-    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fillStyle = dg; ctx.fill();
-    ctx.strokeStyle = 'rgba(12,12,12,0.6)'; ctx.lineWidth = Math.max(1.5, W * 0.02); ctx.stroke();
-
-    // mixer shaft + blades, visible through the glass; spins only while working.
-    var mAngle = working ? (frame / 16) * Math.PI * 2 : 0;
-    ctx.save(); ctx.translate(cx, cy); ctx.rotate(mAngle);
-    ctx.strokeStyle = '#8C979E'; ctx.lineWidth = Math.max(1.6, W * 0.02); ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(-R * 0.55, 0); ctx.lineTo(R * 0.55, 0); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, -R * 0.4); ctx.lineTo(0, R * 0.4); ctx.stroke();
-    ctx.restore();
-    L.disc(ctx, cx, cy, R * 0.1, '#454C54', { outlineWidth: 1.2 });
-
-    // status lights.
-    var lampY = by + cut * 0.7;
-    [[bx + cut * 0.5, lampY], [bx + bw - cut * 0.5, lampY]].forEach(function (p) {
-      if (working) L.glow(ctx, p[0], p[1], W * 0.05, '#6FE68A', 0.5);
-      ctx.fillStyle = working ? '#6FE68A' : '#3A4038';
-      ctx.beginPath(); ctx.arc(p[0], p[1], W * 0.016, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = 'rgba(12,12,12,0.85)'; ctx.lineWidth = 1; ctx.stroke();
-    });
-  }
-
-  // ---------------------------------------------------------------------
-  // Storage tank (3x3). Big round tank on a square base, pipe stubs at the centre of all four
-  // edges, a small level window tinted by opts.fluid's colour (grey fallback).
-  // ---------------------------------------------------------------------
-  function paintStorageTank(ctx, W, H, frame, dir, def, type, opts) {
-    var color = fluidColor(opts && opts.fluid);
-    L.foundation(ctx, W, H, '#57595A');
-    var bx = W * 0.12, by = H * 0.12, bw = W * 0.76, bh = H * 0.76;
-    L.panel(ctx, bx, by, bw, bh, '#5E6268', { r: W * 0.03, hi: 14, lo: 22 });
-    L.rivets(ctx, [[bx + bw * 0.06, by + bh * 0.06], [bx + bw * 0.94, by + bh * 0.06],
-      [bx + bw * 0.06, by + bh * 0.94], [bx + bw * 0.94, by + bh * 0.94]], W * 0.02);
-
-    var cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.36;
-    L.disc(ctx, cx, cy, R, '#8C979E', { hi: 40, lo: 34, outlineWidth: Math.max(1.6, W * 0.02) });
-    ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.clip();
-    ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = Math.max(1, W * 0.012);
-    ctx.beginPath(); ctx.arc(cx, cy, R * 0.62, 0, Math.PI * 2); ctx.stroke();
-    ctx.restore();
-    L.disc(ctx, cx, cy, R * 0.28, '#9AA3A8', { hi: 55, lo: 20, outlineWidth: 1.4 });
-
-    // level window, tinted by the carried fluid.
-    var ww = R * 0.5, wh = R * 0.32, wx = cx - ww / 2, wy = cy + R * 0.32;
-    L.inset(ctx, wx, wy, ww, wh, '#141618', wh * 0.2);
-    ctx.save();
-    L.roundRectPath(ctx, wx + ww * 0.08, wy + wh * 0.12, ww * 0.84, wh * 0.76, wh * 0.14); ctx.clip();
-    ctx.fillStyle = L.rgba(color, 0.75); ctx.fillRect(wx, wy + wh * 0.4, ww, wh);
-    ctx.fillStyle = L.rgba(color, 0.35); ctx.fillRect(wx, wy, ww, wh * 0.4);
-    ctx.restore();
-    ctx.strokeStyle = 'rgba(12,12,12,0.7)'; ctx.lineWidth = 1.2;
-    L.roundRectPath(ctx, wx + ww * 0.08, wy + wh * 0.12, ww * 0.84, wh * 0.76, wh * 0.14); ctx.stroke();
-
-    // pipe connections at the centre of all four edges, with short risers to the tank body.
-    var nub = Math.min(W, H) * 0.11;
-    L.pipeNub(ctx, W * 0.5, 0, 0, nub);
-    L.pipeNub(ctx, W, H * 0.5, 1, nub);
-    L.pipeNub(ctx, W * 0.5, H, 2, nub);
-    L.pipeNub(ctx, 0, H * 0.5, 3, nub);
-    ctx.strokeStyle = '#6E7A82'; ctx.lineWidth = nub * 0.5;
-    ctx.beginPath(); ctx.moveTo(W * 0.5, 0); ctx.lineTo(W * 0.5, cy - R); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(W, H * 0.5); ctx.lineTo(cx + R, H * 0.5); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(W * 0.5, H); ctx.lineTo(W * 0.5, cy + R); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, H * 0.5); ctx.lineTo(cx - R, H * 0.5); ctx.stroke();
-  }
-
-  // ---------------------------------------------------------------------
   // F.sprites.fluidTint — small tinted "level window" helper (design/EXPANSION.md §8) other
   // modules (e.g. the renderer, for pipes) can call to show a fluid's colour without this pack
   // touching 64-sprites-logistics.js's pipe painter.
@@ -515,7 +294,4 @@
   }
 
   F.sprites.definePainter('pumpjack', paintPumpjack);
-  F.sprites.definePainter('oil-refinery', paintOilRefinery);
-  F.sprites.definePainter('chemical-plant', paintChemicalPlant);
-  F.sprites.definePainter('storage-tank', paintStorageTank);
 })();
