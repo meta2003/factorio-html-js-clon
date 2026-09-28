@@ -11,8 +11,10 @@
 // so all 8 facings and the walk cycle stay consistent: every body part is a shaded capsule or
 // ellipsoid, drawn back to front. F.sprites.player(dir, frame, facing8): dir 0..3 is the
 // simulation's facing, facing8 (0 = north, clockwise) the finer facing the renderer derives from
-// the player's movement; frame 0 = standing, 1..8 = walk cycle. The canvas is 0.6:1
-// (width:height) with the feet at 93% of its height, as the renderer expects.
+// the player's movement; frame 0 = standing, 1..8 = walk cycle, 9..16 = pickaxe swing (the
+// pick comes off the backpack, goes back over the shoulder and strikes the ground ahead). The canvas is 0.6:1
+// (width:height) in its standard box, with extra headroom on top for the raised pickaxe;
+// canvas.feet (fraction of the height) and canvas.rel (height / standard height) place it.
 (function () {
   'use strict';
   if (!F.sprites) return;
@@ -74,20 +76,27 @@
   }
 
   var cache = new Map();
-  var FRAMES = 9;
+  var FRAMES = 17; // 0 standing, 1..8 walk cycle, 9..16 pickaxe swing
   F.sprites.player = function (dir, frame, facing8) {
     if (!F.sprites.enabled) return { width: 0, height: 0 };
     var f8 = facing8 == null ? (((dir | 0) % 4 + 4) % 4) * 2 : ((facing8 | 0) % 8 + 8) % 8;
     frame = ((frame | 0) % FRAMES + FRAMES) % FRAMES;
     var key = f8 + '|' + frame, c = cache.get(key);
     if (c) return c;
-    var H = Math.round(PX * 2.1), W = Math.round(H * 0.6);
+    // the standard figure box is H0 tall (0.6:1, feet at 93%); the canvas adds headroom above
+    // it for the raised pickaxe. c.feet / c.rel tell the renderer where the feet are and how
+    // tall the canvas is relative to the standard box.
+    var H0 = Math.round(PX * 2.1), W = Math.round(H0 * 0.6), TOP = Math.round(H0 * 0.4), H = H0 + TOP;
     c = L.newCanvas(W, H);
     var ctx = L.ctxOf(c);
-    var S = H * 0.56, th = f8 / 8 * Math.PI * 2;
-    var walking = frame > 0, ph = (frame - 1) / 8 * Math.PI * 2;
+    var S = H0 * 0.56, th = f8 / 8 * Math.PI * 2;
+    var walking = frame > 0 && frame < 9, ph = (frame - 1) / 8 * Math.PI * 2;
+    var mining = frame >= 9, mt = (frame - 9) / 8;
+    // swing: raise the pick back over the shoulder, then strike it into the ground ahead
+    var swing = !mining ? 0 : (mt < 0.5 ? -0.9 + (mt / 0.5) * 3.1 : (mt < 0.75 ? 2.2 - ((mt - 0.5) / 0.25) * 3.1 : -0.9));
+    var lean = !mining ? 0 : (swing < 0.3 ? 0.07 : 0.02);
     var bob = walking ? Math.abs(Math.cos(ph)) * 0.025 : 0;
-    var P = projector(th, S, W / 2, H * 0.93);
+    var FY = TOP + H0 * 0.93, P = projector(th, S, W / 2, FY);
     var parts = [];
     function cap(a, b, r, col) { var pa = P(a[0], a[1], a[2]), pb = P(b[0], b[1], b[2]); parts.push({ d: (pa.d + pb.d) / 2, draw: function () { drawCapsule(ctx, pa, pb, r * S, col); } }); }
     function ell(p, rad, col, extra) {
@@ -99,7 +108,7 @@
     // legs: stride and knee lift from the walk phase
     [-1, 1].forEach(function (side) {
       var s = walking ? Math.sin(ph + (side > 0 ? Math.PI : 0)) : 0, lift = walking ? Math.max(0, Math.cos(ph + (side > 0 ? Math.PI : 0))) * 0.08 : 0;
-      var hip = [side * 0.12, 0, 0.8 + bob], foot = [side * 0.13, s * 0.22, 0.08 + lift], knee = [side * 0.13, s * 0.11 + 0.05 + lift * 0.6, 0.43 + lift * 0.8 + bob * 0.5];
+      var hip = [side * 0.12, 0, 0.8 + bob], foot = [side * (mining ? 0.17 : 0.13), mining ? side * 0.09 : s * 0.22, 0.08 + lift], knee = [side * 0.13, s * 0.11 + 0.05 + lift * 0.6, 0.43 + lift * 0.8 + bob * 0.5];
       cap(hip, knee, 0.115, COL.suit);
       ell([hip[0] + side * 0.03, hip[1] + (knee[1] - hip[1]) * 0.45 + 0.07, hip[2] + (knee[2] - hip[2]) * 0.45], [0.07, 0.05, 0.1], COL.player, 0.03);
       cap(knee, [foot[0], foot[1] - 0.02, foot[2] + 0.07], 0.1, COL.armour);
@@ -109,7 +118,7 @@
     ell([0, 0, 0.83 + bob], [0.23, 0.17, 0.12], COL.suit);
     custom([0, 0.15, 0.86 + bob], 0.05, function (p) { ctx.fillStyle = 'rgba(20,16,10,0.9)'; ctx.fillRect(p.x - 0.16 * S, p.y - 0.02 * S, 0.32 * S, 0.04 * S); });
     // torso with the chest plate and the player-colour stripe
-    ell([0, 0.01, 1.1 + bob], [0.28, 0.19, 0.27], COL.armour);
+    ell([0, 0.01 + lean * 0.6, 1.1 + bob], [0.28, 0.19, 0.27], COL.armour);
     ell([0, 0.12, 1.13 + bob], [0.18, 0.08, 0.16], COL.suit, 0.03);
     custom([0, 0.19, 1.18 + bob], 0.06, function () {
       var a = P(-0.15, 0.19, 1.2 + bob), b = P(0.15, 0.19, 1.2 + bob);
@@ -118,12 +127,43 @@
     });
     // backpack with a pickaxe and an axe
     ell([0, -0.25, 1.1 + bob], [0.22, 0.12, 0.25], COL.pack);
-    cap([0.1, -0.32, 0.9 + bob], [-0.05, -0.34, 1.6 + bob], 0.028, COL.handle);
-    cap([-0.2, -0.37, 1.55 + bob], [0.1, -0.33, 1.66 + bob], 0.036, COL.steel);
+    if (!mining) {
+      cap([0.1, -0.32, 0.9 + bob], [-0.05, -0.34, 1.6 + bob], 0.028, COL.handle);
+      cap([-0.2, -0.37, 1.55 + bob], [0.1, -0.33, 1.66 + bob], 0.036, COL.steel);
+    }
     cap([-0.12, -0.3, 0.94 + bob], [0.12, -0.34, 1.48 + bob], 0.026, COL.handle);
     ell([0.14, -0.35, 1.48 + bob], [0.06, 0.025, 0.07], COL.steel);
+    // mining: both hands on the pick handle, which turns round the shoulders in the body's
+    // forward/up plane; the head is a curved double spike at the far end
+    if (mining) {
+      var pv = [0, 0.06 + lean, 1.22 + bob], ca = Math.cos(swing), sa = Math.sin(swing);
+      var grip = [0, pv[1] + ca * 0.34, pv[2] + sa * 0.34], end = [0, pv[1] + ca * 0.86, pv[2] + sa * 0.86];
+      var nv = -sa, nz = ca; // perpendicular to the handle in that plane
+      cap([0, grip[1] - ca * 0.08, grip[2] - sa * 0.08], end, 0.03, COL.handle);
+      cap([0, end[1] + nv * 0.2 + ca * 0.03, end[2] + nz * 0.2 + sa * 0.03], [0, end[1], end[2]], 0.04, COL.steel);
+      cap([0, end[1], end[2]], [0, end[1] - nv * 0.2 + ca * 0.05, end[2] - nz * 0.2 + sa * 0.05], 0.035, COL.steel);
+      [-1, 1].forEach(function (side) {
+        var sh = [side * 0.32, lean, 1.27 + bob], ha = [side * 0.07, grip[1] + ca * (side > 0 ? 0.1 : 0), grip[2] + sa * (side > 0 ? 0.1 : 0)];
+        var el = [side * 0.34, (sh[1] + ha[1]) / 2 - 0.04, (sh[2] + ha[2]) / 2 - 0.08];
+        cap(sh, el, 0.09, COL.suit);
+        cap(el, ha, 0.085, COL.armour);
+        cap([el[0] + (ha[0] - el[0]) * 0.35, el[1] + (ha[1] - el[1]) * 0.35, el[2] + (ha[2] - el[2]) * 0.35], [el[0] + (ha[0] - el[0]) * 0.75, el[1] + (ha[1] - el[1]) * 0.75, el[2] + (ha[2] - el[2]) * 0.75], 0.09, COL.player);
+        ell(ha, [0.075, 0.075, 0.07], COL.glove, 0.02);
+        ell([side * 0.31, lean, 1.31 + bob], [0.13, 0.13, 0.09], COL.player, 0.02);
+      });
+      if (mt >= 0.75) { // chips flying off at the strike
+        var hit = P(0, pv[1] + 0.86 * Math.cos(-0.9), 0.02), k = (mt - 0.75) / 0.25 + 0.3;
+        custom([0, 0.9, 0.3], 0.5, function () {
+          for (var q = 0; q < 7; q++) {
+            var a = -Math.PI * (0.15 + q * 0.11), r = (0.06 + 0.05 * (q % 3)) * S * k;
+            ctx.fillStyle = q % 2 ? 'rgba(120,96,70,0.9)' : 'rgba(200,190,170,0.85)';
+            ctx.fillRect(hit.x + Math.cos(a) * r - 2, hit.y + Math.sin(a) * r * 0.8 - 2, 4, 4);
+          }
+        });
+      }
+    }
     // arms swinging opposite to the legs
-    [-1, 1].forEach(function (side) {
+    if (!mining) [-1, 1].forEach(function (side) {
       var s = walking ? -Math.sin(ph + (side > 0 ? Math.PI : 0)) : 0;
       var sh = [side * 0.32, 0, 1.27 + bob], el = [side * 0.36, s * 0.13 + 0.02, 1.02 + bob], ha = [side * 0.35, s * 0.22 + 0.1, 0.8 + bob];
       cap(sh, el, 0.09, COL.suit);
@@ -133,22 +173,23 @@
       ell([side * 0.31, 0, 1.31 + bob], [0.13, 0.13, 0.09], COL.player, 0.02);
     });
     // helmet, face shield and the head lamp
-    ell([0, 0.03, 1.5 + bob], [0.16, 0.16, 0.15], COL.helmet);
-    custom([0, 0.15, 1.49 + bob], 0.08, function () {
-      var fc = P(0, 0.145, 1.47 + bob), ax = ellipsoidAxes(th, 0.1, 0.025, 0.07, S);
+    ell([0, 0.03 + lean, 1.5 + bob], [0.16, 0.16, 0.15], COL.helmet);
+    custom([0, 0.15 + lean, 1.49 + bob], 0.08, function () {
+      var fc = P(0, 0.145 + lean, 1.47 + bob), ax = ellipsoidAxes(th, 0.1, 0.025, 0.07, S);
       ctx.save(); ctx.translate(fc.x, fc.y); ctx.rotate(ax.ang);
       ctx.beginPath(); ctx.ellipse(0, 0, ax.r1, ax.r2, 0, 0, Math.PI * 2); ctx.fillStyle = '#16181A'; ctx.fill();
       ctx.restore();
-      var lp = P(0, 0.16, 1.6 + bob);
+      var lp = P(0, 0.16 + lean, 1.6 + bob);
       var g = ctx.createRadialGradient(lp.x, lp.y, 0, lp.x, lp.y, 0.06 * S);
       g.addColorStop(0, '#FFFFFF'); g.addColorStop(0.5, '#FFF4C8'); g.addColorStop(1, 'rgba(255,240,200,0)');
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(lp.x, lp.y, 0.06 * S, 0, Math.PI * 2); ctx.fill();
     });
 
     // soft ground shadow, then the parts back to front
-    var shg = ctx.createRadialGradient(W / 2 + 4, H * 0.93, 0, W / 2 + 4, H * 0.93, 0.3 * S);
+    var shg = ctx.createRadialGradient(W / 2 + 4, FY, 0, W / 2 + 4, FY, 0.3 * S);
     shg.addColorStop(0, 'rgba(0,0,0,0.42)'); shg.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = shg; ctx.beginPath(); ctx.ellipse(W / 2 + 4, H * 0.93, 0.32 * S, 0.12 * S, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = shg; ctx.beginPath(); ctx.ellipse(W / 2 + 4, FY, 0.32 * S, 0.12 * S, 0, 0, Math.PI * 2); ctx.fill();
+    c.feet = FY / H; c.rel = H / H0;
     parts.sort(function (a, b) { return a.d - b.d; });
     parts.forEach(function (p) { p.draw(); });
     cache.set(key, c);

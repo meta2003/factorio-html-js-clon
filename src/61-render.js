@@ -1114,14 +1114,20 @@
     if (playerHidden()) return;
     var scr = toScreen(p.x, p.y);
     var size = F.C.TILE * camera.zoom * 1.5; // sprite height (the figure is ~1.4 tiles tall)
-    // Frame 0 is the standing pose, 1..8 the walk cycle.
+    // Frame 0 is the standing pose, 1..8 the walk cycle, 9..16 the pickaxe swing while mining
+    // (facing the tile being mined).
     var frame = moving ? 1 + Math.floor(playerAnimDist / WALK_CYCLE_TILES * 8) % 8 : 0;
+    if (!moving && p.mining && p.mining.tx != null) {
+      frame = 9 + Math.floor((F.state.tick || 0) / 4) % 8;
+      var mdx = p.mining.tx + 0.5 - p.x, mdy = p.mining.ty + 0.5 - p.y;
+      if (mdx * mdx + mdy * mdy > 0.01) playerFacing8 = ((Math.round((Math.atan2(mdy, mdx) + Math.PI / 2) / (Math.PI / 4)) % 8) + 8) % 8;
+    }
     var spr = (F.sprites && F.sprites.player) ? F.sprites.player(p.dir || 0, frame, playerFacing8) : null;
     if (spr && spr.height) {
       // Keep the sprite's aspect ratio (drawing it into a square stretched the figure) and put
       // its feet (93% down the canvas) on the player's position.
-      var w = size * spr.width / spr.height;
-      ctx.drawImage(spr, scr[0] - w / 2, scr[1] - size * 0.93, w, size);
+      var ph = size * (spr.rel || 1), w = ph * spr.width / spr.height;
+      ctx.drawImage(spr, scr[0] - w / 2, scr[1] - ph * (spr.feet || 0.93), w, ph);
     } else {
       ctx.fillStyle = '#DE8021';
       ctx.fillRect(scr[0] - size * 0.22, scr[1] - size, size * 0.44, size);
