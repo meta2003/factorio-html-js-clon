@@ -873,6 +873,16 @@
       var e = list[i];
       var def = F.data.entities[e.type];
       var frame = 0, opts = null;
+      // Electric poles stand several tiles tall (like Factorio's): drawn from their tall
+      // sprite anchored at the tile centre, shadow included.
+      if (def.layer === 'pole' && F.sprites && F.sprites.poleTall) {
+        var pt = F.sprites.poleTall(e.type);
+        if (pt) {
+          var pc = toScreen(e.x + 0.5, e.y + 0.5), ps = F.C.TILE * camera.zoom / 64;
+          ctx.drawImage(pt.canvas, pc[0] - pt.ax * ps, pc[1] - pt.ay * ps, pt.canvas.width * ps, pt.canvas.height * ps);
+          continue;
+        }
+      }
       if (def.behaviour === 'pipe' || def.behaviour === 'pipe-to-ground') {
         opts = { mask: pipeConnMask(e), variant: (e.x + e.y) & 1 };
         addFluidOpt(e, opts);
@@ -971,12 +981,19 @@
   // =====================================================================
   // Pole wires — sagging quadratic curves between wired poles (§11.4).
   // =====================================================================
-  function drawWire(c1, c2) {
-    var p1 = toScreen(c1[0], c1[1] - 0.35), p2 = toScreen(c2[0], c2[1] - 0.35);
-    var mx = (p1[0] + p2[0]) / 2, my = (p1[1] + p2[1]) / 2 + 6 * camera.zoom;
+  // Wires hang from the top of the (tall) poles; their shadow falls on the ground to the right,
+  // as far out as the attachment is high (light from the top-left).
+  function wireHeight(type) { return (F.sprites && F.sprites.poleWireHeight) ? F.sprites.poleWireHeight(type) : 0.35; }
+  function drawWire(c1, c2, h1, h2) {
+    var sag = 10 * camera.zoom;
+    var s1 = toScreen(c1[0] + h1 * 0.95, c1[1] + 0.1), s2 = toScreen(c2[0] + h2 * 0.95, c2[1] + 0.1);
     ctx.save();
-    ctx.strokeStyle = 'rgba(35,32,28,0.85)';
-    ctx.lineWidth = Math.max(1, camera.zoom);
+    ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = Math.max(1, camera.zoom);
+    ctx.beginPath(); ctx.moveTo(s1[0], s1[1]); ctx.quadraticCurveTo((s1[0] + s2[0]) / 2, (s1[1] + s2[1]) / 2 + sag * 0.5, s2[0], s2[1]); ctx.stroke();
+    var p1 = toScreen(c1[0], c1[1] - h1), p2 = toScreen(c2[0], c2[1] - h2);
+    var mx = (p1[0] + p2[0]) / 2, my = (p1[1] + p2[1]) / 2 + sag;
+    ctx.strokeStyle = 'rgba(120,70,40,0.95)';
+    ctx.lineWidth = Math.max(1, camera.zoom * 1.1);
     ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.quadraticCurveTo(mx, my, p2[0], p2[1]); ctx.stroke();
     ctx.restore();
   }
@@ -992,7 +1009,7 @@
         if (otherId <= e.id) continue; // draw each wire once
         var other = F.entities.byId ? F.entities.byId(otherId) : null;
         if (!other) continue;
-        drawWire(c1, entityCenter(other));
+        drawWire(c1, entityCenter(other), wireHeight(e.type), wireHeight(other.type));
       }
     }
   }
