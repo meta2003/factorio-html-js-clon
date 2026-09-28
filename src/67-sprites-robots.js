@@ -1,6 +1,6 @@
 // 67-sprites-robots.js — Factorio-like art for the logistic-robotics family: the roboport
-// building painter, the three logistic-chest painters (steel-chest body + coloured band/lid
-// panel + logistic symbol), the flying logistic/construction robot sprites (+ shadow), and
+// building painter (the logistic chests live in 64-sprites-chests.js), the flying
+// logistic/construction robot sprites (+ shadow), and
 // item icons for robot/robot-frame/battery-cell/engine. See design/BUILDING-ART.md for the
 // painter contract/style and design/EXPANSION.md §6.5/§7.3/§8 for the exact APIs this file must
 // expose. Registers via F.sprites.definePainter / a local F.sprites.robot·robotShadow pair /
@@ -143,71 +143,7 @@
     ctx.restore();
   }
 
-  // -----------------------------------------------------------------------
-  // Logistic chests — steel-chest silhouette (seam, corner rivets, reinforced bands) with a
-  // coloured band/lid panel per mode + a small shape-only logistic glyph on the lid.
-  // -----------------------------------------------------------------------
-  var CHEST_META = {
-    'passive-provider-chest': { band: '#C43A3A', glyph: 'out' },   // outward arrow: robots take from it
-    'storage-chest': { band: '#D9B830', glyph: 'box' },            // stacked-box glyph: bulk storage
-    'requester-chest': { band: '#3A7FD9', glyph: 'in' },           // inward arrow: robots deliver to it
-  };
-  function logisticGlyph(ctx, cx, cy, r, kind, col) {
-    ctx.save();
-    ctx.fillStyle = col; ctx.strokeStyle = 'rgba(12,12,12,0.75)'; ctx.lineWidth = Math.max(1, r * 0.12);
-    if (kind === 'box') {
-      var s = r * 1.3;
-      ctx.fillRect(cx - s / 2, cy - s * 0.32, s, s * 0.64);
-      ctx.strokeRect(cx - s / 2, cy - s * 0.32, s, s * 0.64);
-      ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = Math.max(1, r * 0.08);
-      ctx.beginPath(); ctx.moveTo(cx - s / 2, cy); ctx.lineTo(cx + s / 2, cy); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(cx, cy - s * 0.32); ctx.lineTo(cx, cy + s * 0.32); ctx.stroke();
-    } else {
-      // arrow into/out of a small ring — shape-only "logistics" glyph, no text.
-      var dirSign = kind === 'in' ? 1 : -1;
-      var ay0 = cy - r * 1.1 * dirSign, ay1 = cy + r * 0.15 * dirSign;
-      ctx.lineWidth = Math.max(1.4, r * 0.28); ctx.lineCap = 'round';
-      ctx.strokeStyle = col;
-      ctx.beginPath(); ctx.moveTo(cx, ay0); ctx.lineTo(cx, ay1); ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(cx - r * 0.5, ay1 - r * 0.5 * dirSign); ctx.lineTo(cx, ay1); ctx.lineTo(cx + r * 0.5, ay1 - r * 0.5 * dirSign);
-      ctx.stroke();
-      ctx.beginPath(); ctx.arc(cx, cy + r * 0.9 * dirSign, r * 0.36, 0, Math.PI * 2);
-      ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = 'rgba(12,12,12,0.6)'; ctx.lineWidth = 1; ctx.stroke();
-    }
-    ctx.restore();
-  }
-  function paintLogisticChest(ctx, W, H, frame, dir, def, type) {
-    var meta = CHEST_META[type] || CHEST_META['storage-chest'];
-    var steel = '#8A8F94', steelLo = '#4C5054';
-    var pad = W * 0.08, x = pad, y = pad, w = W - pad * 2, h = H - pad * 2;
-    var lidH = h * 0.34, bodyY = y + lidH + h * 0.025, bodyH = h - lidH - h * 0.025;
-
-    // lid: coloured band panel (this is the "lid panel" the brief asks for) over a steel lip.
-    L.panel(ctx, x, y, w, lidH, meta.band, { r: w * 0.06, hi: 30, lo: 22 });
-    L.panel(ctx, x, bodyY, w, bodyH, steel, { r: w * 0.06, hi: 12, lo: 32 });
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(x + w * 0.04, y + lidH - h * 0.012, w * 0.92, h * 0.028);
-
-    // steel reinforcement bands + rivets (matches the 64-sprites-logistics steel-chest look).
-    var bandCol = L.darken(steel, 22);
-    ctx.fillStyle = bandCol;
-    ctx.fillRect(x + w * 0.16, bodyY, w * 0.07, bodyH);
-    ctx.fillRect(x + w * 0.77, bodyY, w * 0.07, bodyH);
-    ctx.strokeStyle = '#141414'; ctx.lineWidth = 1;
-    ctx.strokeRect(x + w * 0.16, bodyY, w * 0.07, bodyH);
-    ctx.strokeRect(x + w * 0.77, bodyY, w * 0.07, bodyH);
-    L.rivets(ctx, [[x + w * 0.195, bodyY + bodyH * 0.18], [x + w * 0.195, bodyY + bodyH * 0.82],
-      [x + w * 0.805, bodyY + bodyH * 0.18], [x + w * 0.805, bodyY + bodyH * 0.82]], w * 0.02);
-    L.rivets(ctx, [[x + w * 0.08, y + lidH * 0.5], [x + w * 0.92, y + lidH * 0.5]], w * 0.02);
-    void steelLo;
-
-    // small logistic glyph centred on the coloured band.
-    logisticGlyph(ctx, x + w * 0.5, y + lidH * 0.5, Math.min(w, h) * 0.1, meta.glyph, L.lighten(meta.band, 55));
-  }
-
   F.sprites.definePainter(['roboport'], paintRoboport);
-  F.sprites.definePainter(['passive-provider-chest', 'storage-chest', 'requester-chest'], paintLogisticChest);
 
   // -----------------------------------------------------------------------
   // Flying robots drawn after the real Factorio sprites (base/graphics/entity/{logistic,

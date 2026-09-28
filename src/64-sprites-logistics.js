@@ -1,5 +1,5 @@
 // 64-sprites-logistics.js — painter pack overriding the flat-box placeholders for logistics
-// entities (chests, poles, stone-wall; inserters and pipes live in 64-sprites-inserters/-pipes.js) with layered, top-lit industrial
+// entities (poles, stone-wall; chests, inserters and pipes live in 64-sprites-chests/-inserters/-pipes.js) with layered, top-lit industrial
 // art. See design/BUILDING-ART.md for the painter contract/style and src/60-sprites.js "Building
 // art library" for the shared helpers (F.sprites.lib). Registers via F.sprites.definePainter;
 // never edits 60-sprites.js. Deterministic only (no Math.random — none of these entities need
@@ -8,69 +8,6 @@
   'use strict';
   if (!F.sprites || !F.sprites.definePainter) return;
   var L = F.sprites.lib;
-
-  // -----------------------------------------------------------------------
-  // Chests — inset ~84% square body (spec), lid seam ~32% down, latch/lock straddling the
-  // seam, per-material trim (wood planks+brackets / iron rivets / steel bands+lock).
-  // -----------------------------------------------------------------------
-  function paintChest(ctx, W, H, frame, dir, def, type) {
-    var col = L.entColors(def), c1 = col[0], c2 = col[1];
-    var pad = W * 0.08, x = pad, y = pad, w = W - pad * 2, h = H - pad * 2;
-    var lidH = h * 0.34, bodyY = y + lidH + h * 0.025, bodyH = h - lidH - h * 0.025;
-    L.panel(ctx, x, y, w, lidH, L.lighten(c1, 6), { r: w * 0.06, hi: 34, lo: 16 });
-    L.panel(ctx, x, bodyY, w, bodyH, c2, { r: w * 0.06, hi: 12, lo: 32 });
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(x + w * 0.04, y + lidH - h * 0.012, w * 0.92, h * 0.028);
-
-    if (type === 'wooden-chest') {
-      ctx.strokeStyle = L.darken(c1, 30); ctx.lineWidth = Math.max(1, w * 0.02);
-      for (var i = 1; i < 4; i++) {
-        var lx = x + w * i / 4;
-        ctx.beginPath(); ctx.moveTo(lx, bodyY + bodyH * 0.06); ctx.lineTo(lx, bodyY + bodyH * 0.94); ctx.stroke();
-      }
-      ctx.strokeStyle = L.darken(c1, 15); ctx.lineWidth = Math.max(1, w * 0.012);
-      ctx.beginPath(); ctx.moveTo(x + w * 0.03, y + lidH * 0.5); ctx.lineTo(x + w * 0.97, y + lidH * 0.5); ctx.stroke();
-      // iron corner brackets (L-shaped) at all four corners of the whole silhouette
-      var bs = w * 0.17, bt = bs * 0.26, bracketCol = '#4A4D50';
-      [[x, y, 1, 1], [x + w - bs, y, -1, 1], [x, y + h - bs, 1, -1], [x + w - bs, y + h - bs, -1, -1]].forEach(function (p) {
-        var bx = p[0], by = p[1];
-        ctx.fillStyle = bracketCol;
-        ctx.fillRect(bx, p[3] > 0 ? by : by + bs - bt, bs, bt);
-        ctx.fillRect(p[2] > 0 ? bx : bx + bs - bt, by, bt, bs);
-        ctx.strokeStyle = '#141414'; ctx.lineWidth = 1;
-        ctx.strokeRect(bx, p[3] > 0 ? by : by + bs - bt, bs, bt);
-        ctx.strokeRect(p[2] > 0 ? bx : bx + bs - bt, by, bt, bs);
-      });
-      L.rivets(ctx, [[x + bs * 0.5, y + bs * 0.5], [x + w - bs * 0.5, y + bs * 0.5],
-        [x + bs * 0.5, y + h - bs * 0.5], [x + w - bs * 0.5, y + h - bs * 0.5]], w * 0.018);
-    } else if (type === 'iron-chest') {
-      L.rivets(ctx, [[x + w * 0.08, y + h * 0.08], [x + w * 0.92, y + h * 0.08],
-        [x + w * 0.08, y + h * 0.92], [x + w * 0.92, y + h * 0.92],
-        [x + w * 0.08, y + lidH * 0.5], [x + w * 0.92, y + lidH * 0.5]], w * 0.026);
-    } else { // steel-chest: darker reinforced bands + lock
-      var bandCol = L.darken(c1, 22);
-      ctx.fillStyle = bandCol;
-      ctx.fillRect(x + w * 0.16, bodyY, w * 0.07, bodyH);
-      ctx.fillRect(x + w * 0.77, bodyY, w * 0.07, bodyH);
-      ctx.strokeStyle = '#141414'; ctx.lineWidth = 1;
-      ctx.strokeRect(x + w * 0.16, bodyY, w * 0.07, bodyH);
-      ctx.strokeRect(x + w * 0.77, bodyY, w * 0.07, bodyH);
-      L.rivets(ctx, [[x + w * 0.195, bodyY + bodyH * 0.18], [x + w * 0.195, bodyY + bodyH * 0.82],
-        [x + w * 0.805, bodyY + bodyH * 0.18], [x + w * 0.805, bodyY + bodyH * 0.82]], w * 0.02);
-    }
-
-    // latch (wooden/iron) or lock (steel) straddling the lid seam
-    if (type === 'steel-chest') {
-      var lr = w * 0.075;
-      L.disc(ctx, x + w * 0.5, y + lidH, lr, '#2A2C2E', { hi: 40, lo: 30, outlineWidth: 1.4 });
-      ctx.fillStyle = '#141414'; ctx.fillRect(x + w * 0.5 - lr * 0.16, y + lidH, lr * 0.32, lr * 1.1);
-    } else {
-      var lw = w * 0.16, lh = h * 0.1;
-      L.panel(ctx, x + w / 2 - lw / 2, y + lidH - lh * 0.5, lw, lh, L.darken(c1, 40), { r: lh * 0.3, rim: false, outlineWidth: 1 });
-      ctx.fillStyle = L.lighten(c1, 55);
-      ctx.beginPath(); ctx.arc(x + w / 2, y + lidH, lw * 0.13, 0, Math.PI * 2); ctx.fill();
-    }
-  }
 
   // -----------------------------------------------------------------------
   // Electric poles — small footprint, top-down: footing shadow, shaft, cross-arm with
@@ -145,7 +82,6 @@
     }
   }
 
-  F.sprites.definePainter(['wooden-chest', 'iron-chest', 'steel-chest'], paintChest);
   F.sprites.definePainter(['small-electric-pole', 'medium-electric-pole'], paintPole);
   F.sprites.definePainter(['stone-wall'], paintWall);
 })();
