@@ -37,6 +37,7 @@
   // Camera smoothing / player animation bookkeeping.
   var camInited = false;
   var playerPrev = null;   // { x, y }
+  var playerFacing8 = null; // 0 = north, clockwise; from movement, see drawPlayer
   // Walk animation is driven by distance walked, so it keeps pace with the movement speed:
   // one 8-frame cycle (two steps) per WALK_CYCLE_TILES, ~5 steps/s at full running speed.
   var WALK_CYCLE_TILES = 3.5;
@@ -1097,7 +1098,12 @@
     var dist = 0;
     if (playerPrev) { var dx = p.x - playerPrev.x, dy = p.y - playerPrev.y; dist = Math.sqrt(dx * dx + dy * dy); }
     // (a jump of 2+ tiles is a teleport, not walking)
-    if (dist > 1e-4 && dist < 2) { playerAnimDist += dist; playerStillMs = 0; } else playerStillMs += dtMs;
+    if (dist > 1e-4 && dist < 2) {
+      playerAnimDist += dist; playerStillMs = 0;
+      // 8-way facing from the actual movement (the simulation keeps a 4-way p.dir)
+      playerFacing8 = ((Math.round((Math.atan2(p.y - playerPrev.y, p.x - playerPrev.x) + Math.PI / 2) / (Math.PI / 4)) % 8) + 8) % 8;
+    } else playerStillMs += dtMs;
+    if (playerFacing8 == null || (playerFacing8 >> 1) !== ((p.dir || 0) & 3) && playerFacing8 % 2 === 0) playerFacing8 = ((p.dir || 0) & 3) * 2;
     // Stay in the walk cycle across frames that ran no simulation tick (refresh rates above
     // 60 Hz), so it doesn't flicker to the standing pose mid-stride.
     var moving = playerStillMs < 120;
@@ -1110,7 +1116,7 @@
     var size = F.C.TILE * camera.zoom * 1.5; // sprite height (the figure is ~1.4 tiles tall)
     // Frame 0 is the standing pose, 1..8 the walk cycle.
     var frame = moving ? 1 + Math.floor(playerAnimDist / WALK_CYCLE_TILES * 8) % 8 : 0;
-    var spr = (F.sprites && F.sprites.player) ? F.sprites.player(p.dir || 0, frame) : null;
+    var spr = (F.sprites && F.sprites.player) ? F.sprites.player(p.dir || 0, frame, playerFacing8) : null;
     if (spr && spr.height) {
       // Keep the sprite's aspect ratio (drawing it into a square stretched the figure) and put
       // its feet (93% down the canvas) on the player's position.
