@@ -1,5 +1,5 @@
 // 62-sprites-heavy.js — higher-detail procedural building art for a subset of production
-// entities (stone-furnace, steel-furnace, burner/electric mining drill, boiler, steam-engine,
+// entities (stone-furnace, steel-furnace, burner mining drill, boiler, steam-engine,
 // offshore-pump). Registers replacement painters via F.sprites.definePainter (design/
 // BUILDING-ART.md's contract); does not edit src/60-sprites.js. Every painter draws in local
 // "facing north" coordinates over a w0×h0 px box (px = tiles × 64) — the caller rotates the
@@ -372,71 +372,6 @@
   }
 
   // ---------------------------------------------------------------------
-  // electric-mining-drill (3x3, rotatable, output north of the centre column): heavy steel
-  // base on four hydraulic outriggers, geared turntable, tall gantry with a finned electric
-  // motor over the screw auger (same family look as the burner drill), ore chute, status
-  // LED and hazard-striped edges.
-  // ---------------------------------------------------------------------
-  function paintElectricDrillHeavy(ctx, W, H, frame, dir, def, type, opts) {
-    var working = !!(opts && opts.working);
-    var f = frame | 0, rng = seed(type, 5, 1);
-    var steel = L.entColors(def)[0] || '#5E6C7A';
-    // hydraulic outriggers to foot pads in the corners
-    var feet = [[0.1, 0.12], [0.9, 0.12], [0.1, 0.9], [0.9, 0.9]];
-    for (var i = 0; i < 4; i++) {
-      var fx = W * feet[i][0], fy = H * feet[i][1], bx = W * (feet[i][0] < 0.5 ? 0.24 : 0.76), by = H * (feet[i][1] < 0.5 ? 0.26 : 0.74);
-      ctx.strokeStyle = '#1A1C1E'; ctx.lineWidth = W * 0.05; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(fx, fy); ctx.stroke();
-      ctx.strokeStyle = '#8A949C'; ctx.lineWidth = W * 0.022;
-      ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo((bx + fx) / 2, (by + fy) / 2); ctx.stroke();
-      ctx.lineCap = 'butt';
-      L.rectBevel(ctx, fx - W * 0.055, fy - H * 0.05, W * 0.11, H * 0.1, '#35393D', { outlineColor: '#0E0E0E', outlineWidth: 1.2 });
-    }
-    // ore chute to the output tile
-    var chx = W * 0.39, chw = W * 0.22;
-    ctx.fillStyle = '#26282A';
-    ctx.beginPath(); ctx.moveTo(chx, 0); ctx.lineTo(chx + chw, 0); ctx.lineTo(chx + chw * 0.92, H * 0.2); ctx.lineTo(chx + chw * 0.08, H * 0.2); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = '#0E0E0E'; ctx.lineWidth = 1.5; ctx.stroke();
-    ctx.save(); ctx.clip(); oreInChute(ctx, chx, 0, chw, H * 0.2, f, working, seed(type, 8, 8)); ctx.restore();
-    // base housing
-    var bx0 = W * 0.14, by0 = H * 0.16, bw = W * 0.72, bd = H * 0.56, bh = H * 0.14;
-    housing(ctx, bx0, by0, bw, bd, bh, steel, W * 0.05);
-    ctx.save(); L.roundRectPath(ctx, bx0, by0, bw, bd + bh, W * 0.05); ctx.clip();
-    grime(ctx, bx0, by0, bw, bd, rng, 30);
-    streaks(ctx, bx0, by0 + bd, bw, bh, rng, 6, 'rgba(20,18,16,0.35)');
-    ctx.restore();
-    L.hazardStripe(ctx, bx0 + bw * 0.05, by0 + bd + bh * 0.3, bw * 0.9, bh * 0.45, W * 0.028);
-    // geared turntable
-    var cx = W * 0.5, cy = H * 0.46, tr = W * 0.25;
-    var ringA = working ? (f / 16) * (Math.PI * 2 / 24) * 2 : 0;
-    L.gearShape(ctx, cx, cy, tr, tr * 0.8, 24, ringA, '#6E777F', '#2B2F33');
-    L.disc(ctx, cx, cy, tr * 0.78, '#4A5158', { hi: 30, lo: 40 });
-    ctx.fillStyle = '#0D0D0D'; ctx.beginPath(); ctx.ellipse(cx, cy + H * 0.04, W * 0.08, H * 0.04, 0, 0, Math.PI * 2); ctx.fill();
-    // auger under the gantry (lifts a little while working)
-    var lift = working ? (Math.sin(f / 16 * Math.PI * 2) * 0.5 + 0.5) * H * 0.03 : 0;
-    auger(ctx, cx, H * 0.2 - lift, H * 0.3, W * 0.04, working ? (f % 4) / 4 : 0);
-    // gantry posts + beam
-    post(ctx, W * 0.29, H * 0.14, H * 0.5, W * 0.045, '#3E444A');
-    post(ctx, W * 0.71, H * 0.14, H * 0.5, W * 0.045, '#3E444A');
-    L.rectBevel(ctx, W * 0.26, H * 0.12, W * 0.48, H * 0.05, '#4C545C', { light: '#6E7880', dark: '#262A2E', outlineColor: '#0E0E0E', outlineWidth: 1.2 });
-    // finned electric motor on the beam
-    var mx = cx - W * 0.1, my = H * 0.05, mw = W * 0.2, mh = H * 0.12;
-    L.cylinder(ctx, mx, my, mw, mh, '#59636C', true, { r: mh * 0.3 });
-    for (var fin = 1; fin < 7; fin++) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(mx + mw * fin / 7 - 1, my + mh * 0.15, 2, mh * 0.7); }
-    L.hazardStripe(ctx, mx + mw * 0.3, my + mh * 0.82, mw * 0.4, mh * 0.18, W * 0.015);
-    // power cable from the motor down to the base
-    ctx.strokeStyle = '#141414'; ctx.lineWidth = W * 0.018;
-    ctx.beginPath(); ctx.moveTo(mx + mw, my + mh * 0.5); ctx.quadraticCurveTo(W * 0.84, H * 0.1, W * 0.8, H * 0.3); ctx.stroke();
-    // status LED
-    var lx = W * 0.8, ly = H * 0.34;
-    L.inset(ctx, lx - W * 0.03, ly - W * 0.03, W * 0.06, W * 0.06, '#151515', W * 0.01);
-    ctx.fillStyle = working ? '#4BE07A' : '#1F3A28';
-    ctx.beginPath(); ctx.arc(lx, ly, W * 0.018, 0, Math.PI * 2); ctx.fill();
-    if (working) L.glow(ctx, lx, ly, W * 0.07, '#5EE68A', 0.8);
-    L.rivets(ctx, [[bx0 + bw * 0.06, by0 + bd * 0.08], [bx0 + bw * 0.94, by0 + bd * 0.08], [bx0 + bw * 0.06, by0 + bd * 0.92], [bx0 + bw * 0.94, by0 + bd * 0.92]], W * 0.012);
-  }
-
-  // ---------------------------------------------------------------------
   // Shared steam-plant parts.
   // ---------------------------------------------------------------------
   // Round pressure gauge: bezel, dial face, needle (twitches with `frame` when live).
@@ -622,7 +557,6 @@
   F.sprites.definePainter(['stone-furnace'], paintStoneFurnaceHeavy);
   F.sprites.definePainter(['steel-furnace'], paintSteelFurnaceHeavy);
   F.sprites.definePainter(['burner-mining-drill'], paintBurnerDrillHeavy);
-  F.sprites.definePainter(['electric-mining-drill'], paintElectricDrillHeavy);
   F.sprites.definePainter(['boiler'], paintBoilerHeavy);
   F.sprites.definePainter(['steam-engine'], paintSteamEngineHeavy);
   F.sprites.definePainter(['offshore-pump'], paintOffshorePumpHeavy);
