@@ -428,7 +428,7 @@
         ctx.beginPath(); ctx.arc(tgt[0] + jx, tgt[1] + jy, Math.max(1.5, tilePx * 0.06), 0, Math.PI * 2); ctx.fill();
         ctx.restore();
       }
-      var spr = F.sprites.robot(ITEM, Math.floor((tick + r.id * 5) / 4) % 8);
+      var spr = F.sprites.robot(ITEM, Math.floor((tick + r.id * 5) / 4) % 8, F.sprites.robotDir ? F.sprites.robotDir(r) : 0);
       if (spr && spr.width) ctx.drawImage(spr, sp[0] - sizePx / 2, ry - sizePx / 2, sizePx, sizePx);
       var cargoItem = t && t.cargo ? (t.items && t.items.length ? t.items[0][0] : t.item) : null;
       if (cargoItem && F.sprites.item) {

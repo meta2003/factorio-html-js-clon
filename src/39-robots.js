@@ -580,7 +580,7 @@
       var shadow = F.sprites.robotShadow();
       if (shadow && shadow.width) ctx.drawImage(shadow, sp[0] - sizePx / 2, sp[1] - sizePx / 2, sizePx, sizePx);
       var frame = Math.floor((tick + r.id * 5) / 4) % 8;
-      var sprite = F.sprites.robot('logistic-robot', frame);
+      var sprite = F.sprites.robot('logistic-robot', frame, F.sprites.robotDir ? F.sprites.robotDir(r) : 0);
       if (sprite && sprite.width) ctx.drawImage(sprite, sp[0] - sizePx / 2, sp[1] - sizePx / 2 - hoverPx - bob, sizePx, sizePx);
       if (r.task && r.task.cargo && F.sprites.item) {
         try {
