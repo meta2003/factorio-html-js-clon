@@ -38,6 +38,16 @@ node build/build.js            # -> build/Factio.html (open it in a browser)
 node build/build.js --deploy   # also copies it to the Desktop
 ```
 
+## Demo save: an advanced late-game world
+
+`saves/advanced-world.json` is a ready-built late-game base: all research done, a steam plant
+(12 boilers, 24 engines) plus a solar field with accumulators, iron and copper mines feeding rows
+of electric furnaces, an assembly district of assembling machines 3 with modules, labs, an oil
+field with a refinery and chemical plants, a rail loop with an automatic train, roboports with
+logistic and construction robots, a rocket silo ready to launch and a parked spidertron (another
+one is in the inventory). Load it with Esc → *Import save*, paste the file's contents, *Load*.
+Regenerate it with `node saves/gen-advanced-world.js` (needs Playwright).
+
 ## Tests
 
 ```bash
@@ -58,6 +68,7 @@ The headless runner loads the built game with DOM stubs and runs the scenarios i
 | `design/` | game design doc, architecture/API contracts, engineering constraints, art brief |
 | `research/` | notes on Factorio mechanics used for the design |
 | `test/` | headless test runner and scenarios |
+| `saves/` | demo save (advanced world) and the script that builds it |
 
 ## Controls
 
