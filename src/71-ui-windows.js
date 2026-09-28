@@ -93,6 +93,9 @@
     // Expansion (design/EXPANSION.md §5/§6.6): tier-3/4 tech column labels and
     // the empty-fluid-box label used by the fluidBar() entity-GUI helper.
     'ui.research.tier3': 'Blue tier', 'ui.research.tier4': 'Endgame tier', 'ui.fluidEmpty': 'Empty',
+    // Shown at the foot of the help window (opens on start) and the menu.
+    'ui.disclaimer': 'Factio is an unofficial fan project, not affiliated with or endorsed by Wube Software. ' +
+      'Factorio is a trademark of Wube Software Ltd. All code and art in Factio are original.',
   });
 
   // =========================================================================
@@ -1181,6 +1184,7 @@
     chkRow.appendChild(chk);
     chkRow.appendChild(document.createTextNode(' ' + F.t('ui.showHelpOnStart')));
     root.appendChild(chkRow);
+    root.appendChild(el('div', 'f-hint', F.t('ui.disclaimer')));
   }
   registerWindow('help', {
     title: function () { return F.t('ui.instructions'); },
@@ -1355,6 +1359,8 @@
     var controlsBox = el('div', 'f-help-body f-scroll-box');
     F.t('help.controls').split('\n').forEach(function (line) { controlsBox.appendChild(el('div', 'f-help-line', line)); });
     controlsSummaryBox.appendChild(controlsBox);
+
+    root.appendChild(el('div', 'f-hint', F.t('ui.disclaimer')));
   }
   registerWindow('menu', {
     title: function () { return F.t('ui.menu'); },
