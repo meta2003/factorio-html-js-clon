@@ -443,8 +443,18 @@
     var behind = pointBehindHead(train, t + 0.2);
     var ax = ahead ? ahead.x : p.x, ay = ahead ? ahead.y : p.y;
     var bx = behind ? behind.x : p.x, by = behind ? behind.y : p.y;
-    var angle = (Math.abs(ax - bx) > 1e-9 || Math.abs(ay - by) > 1e-9) ? Math.atan2(ay - by, ax - bx) : 0;
+    var angle = (Math.abs(ax - bx) > 1e-9 || Math.abs(ay - by) > 1e-9) ? Math.atan2(ay - by, ax - bx) : restingAngle(train, p);
     return { x: p.x, y: p.y, angle: angle };
+  }
+  // Heading of a train whose path is still a single tile (just placed, never moved): the facing
+  // it was placed with, else the run of the rail under it — so a car set on a north-south track
+  // is not drawn lying across it until the train first moves.
+  function restingAngle(train, p) {
+    var head = tileCenterOf(train.path[0]);
+    if (train._prevHint) { var b = tileCenterOf(train._prevHint); return Math.atan2(head[1] - b[1], head[0] - b[0]); }
+    var tx = Math.floor(p.x), ty = Math.floor(p.y);
+    var ns = isRail(tx, ty - 1) || isRail(tx, ty + 1), ew = isRail(tx - 1, ty) || isRail(tx + 1, ty);
+    return ns && !ew ? -Math.PI / 2 : 0;
   }
 
   function tileOccupiedByOtherTrain(key, exceptId) {
@@ -788,7 +798,7 @@
       var w = 128 * scale, h = 192 * scale;
       var dv = F.util.dirVec(dir || 0);
       var ang = Math.atan2(dv[1], dv[0]) + Math.PI / 2;
-      var spr = F.sprites.vehicle(kind, 0);
+      var spr = F.sprites.vehicle(kind, 0, ang);
       ctx.save();
       ctx.translate(scr[0], scr[1]);
       ctx.rotate(ang);
@@ -959,6 +969,11 @@
   F._renderHooks.entityOpts['rail'] = function (e) { return { frame: 0, opts: { mask: e.mask || 0 } }; };
   F._renderHooks.minimapColors['rail'] = '#8a8f94';
   // Signal lamp colour rides on the sprite frame: 0 green, 1 red, 2 yellow.
+  // train-stop: tell the painter which side the station rail is on (its boom reaches over it)
+  F._renderHooks.entityOpts['train-stop'] = function (e) {
+    for (var d = 0; d < 4; d++) { var v = F.util.dirVec(d); if (isRail(e.x + v[0], e.y + v[1])) return { frame: 0, opts: { mask: 1 << d } }; }
+    return { frame: 0, opts: {} };
+  };
   F._renderHooks.entityOpts['rail-signal'] = function (e) { return { frame: signalAspect(e), opts: {} }; };
   F._renderHooks.minimapColors['rail-signal'] = '#8a8f94';
   F._renderHooks.hidePlayerFns.push(function () { return !!(F.state && F.state.player && F.state.player.ridingTrain); });
@@ -1037,12 +1052,14 @@
         ctx.save();
         ctx.translate(scr[0], scr[1]);
         ctx.rotate(tr.angle + Math.PI / 2);
-        // soft shadow, offset toward light-from-top-left convention
-        ctx.fillStyle = 'rgba(0,0,0,0.32)';
+        // soft shadow cast toward the bottom-right of the screen (light from the top-left),
+        // shaped like the long, narrow car body
+        var rot = tr.angle + Math.PI / 2, sox = (Math.cos(rot) * 0.6 + Math.sin(rot) * 0.8) * w * 0.07, soy = (-Math.sin(rot) * 0.6 + Math.cos(rot) * 0.8) * w * 0.07;
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
         ctx.beginPath();
-        ctx.ellipse(w * 0.05, h * 0.05, w * 0.30, h * 0.40, 0, 0, Math.PI * 2);
+        ctx.ellipse(sox, soy, w * 0.36, h * 0.5, 0, 0, Math.PI * 2);
         ctx.fill();
-        var spr = F.sprites.vehicle(car.kind, frame);
+        var spr = F.sprites.vehicle(car.kind, frame, rot);
         if (spr) ctx.drawImage(spr, -w / 2, -h / 2, w, h);
         ctx.restore();
         if (car.kind === 'locomotive') {
