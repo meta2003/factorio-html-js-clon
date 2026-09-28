@@ -1,4 +1,5 @@
-// 65-sprites-oil.js — procedural art for the oil-processing chain: pumpjack (the oil refinery,
+// 65-sprites-oil.js — procedural art for the oil-processing chain: the pumpjack (drawn after the
+// real Factorio sprite; the oil refinery,
 // chemical plant and storage tank live in 65-sprites-refinery.js), the crude-oil well resource
 // tile, and item icons for the new
 // intermediates (plastic, sulfur powder, solid-fuel block, rocket-fuel cell). Registers via
@@ -16,26 +17,6 @@
   // ---------------------------------------------------------------------
   // Local helpers
   // ---------------------------------------------------------------------
-  // Nodding-donkey horsehead silhouette: (x,y) is the NOSE tip (frontmost point, where the
-  // bridle cable attaches) — the northmost point of the whole mechanism, sitting right over the
-  // well. The head mass hooks DOWN and to one side from there, back toward the beam/pivot (never
-  // further north than the nose), so it never needs headroom above the beam tip. s = overall size.
-  function drawHorseHead(ctx, x, y, s) {
-    ctx.save(); ctx.translate(x, y);
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.quadraticCurveTo(s * 0.05, s * 0.3, s * 0.34, s * 0.42);
-    ctx.quadraticCurveTo(s * 0.64, s * 0.5, s * 0.6, s * 0.8);
-    ctx.quadraticCurveTo(s * 0.52, s * 1.04, s * 0.16, s * 1.0);
-    ctx.quadraticCurveTo(-s * 0.1, s * 0.92, -s * 0.08, s * 0.56);
-    ctx.quadraticCurveTo(-s * 0.1, s * 0.2, 0, 0);
-    ctx.closePath();
-    var g = ctx.createLinearGradient(-s * 0.1, 0, s * 0.5, s * 0.9);
-    g.addColorStop(0, '#5A6068'); g.addColorStop(1, '#2A2E32');
-    ctx.fillStyle = g; ctx.fill();
-    ctx.strokeStyle = 'rgba(12,12,12,0.9)'; ctx.lineWidth = Math.max(1.2, s * 0.05); ctx.stroke();
-    ctx.restore();
-  }
   // Fluid colour lookup shared by storage-tank's level window and F.sprites.fluidTint. Fluids
   // data (05-data-expansion.js) may not be loaded/populated yet, or the id may be unknown — both
   // fall back to a neutral grey per the task brief.
@@ -47,113 +28,183 @@
   }
 
   // ---------------------------------------------------------------------
-  // Pumpjack (3x3, dir 0 = north). Redesigned so the classic "nodding donkey" silhouette
-  // dominates the footprint: a long thick walking beam spans ~80% of the tile along the
-  // north-south axis (horsehead at the north end over the well head, tail/counterweight-block at
-  // the south end), a tall splay-legged samson-post A-frame stands at the centre pivot, and a
-  // small motor/gearbox skid with two rotating crank-arm counterweights sits at the south end —
-  // all on a plain concrete pad (no big flat panel) with margins for the auto shadow. Since the
-  // beam is drawn along a fixed vertical axis (no true 2D rotation, which would mostly just
-  // shift it sideways at this near-vertical rest angle), the rocking motion is instead shown as
-  // the head arm's rendered length pulsing (perspective foreshortening) plus a vertical bob of
-  // the head tip, while the crank/counterweights spin a full continuous turn — all driven by one
-  // shared phase so they read as one connected mechanism. frame 0 -> phase 0 -> rest/idle pose.
+  // Pumpjack (3x3, output at the north edge centre when facing north) drawn after the real
+  // Factorio sprite (base/graphics/entity/pumpjack: hr-pumpjack-base 261x273 per direction,
+  // shift (-2.25,-4.75); hr-pumpjack-horsehead 206x202, 40 frames, shift (-4,-24); references:
+  // the vanilla frames collected in snouz/factorio_free_graphics_for_modders and the full-size
+  // frames in raiguard/Krastorio2Assets used to align them).
+  //
+  // What the reference looks like: on the ground, a loop of rust-banded grey pipes with a red
+  // motor housing (fan on top) feeding the output; standing over it, seen from the side, a lime
+  // green walking beam on a lattice A-frame with the curved horsehead at its west end, the
+  // polished rod hanging into a green wellhead of valves and hand wheels, and at the east end a
+  // green gearbox whose crank swings two red counterweights while the beam rocks.
+  //
+  // The ground pipes turn with the facing; the machine is always the same side view (as in the
+  // game). Numbers are hr px (64 per tile) with the origin at the footprint centre. The
+  // horsehead stands ~0.4 tile higher than the footprint in the original; it is drawn a little
+  // lower so it stays on the canvas.
   // ---------------------------------------------------------------------
-  function paintPumpjack(ctx, W, H, frame, dir, def, type, opts) {
-    var minWH = Math.min(W, H);
-    L.foundation(ctx, W, H, '#6C706E'); // plain concrete pad, nothing else spans the footprint
-
-    var cx = W * 0.5, pivotY = H * 0.5;
-    var headArm0 = H * 0.36, tailArm = H * 0.42; // beam half-lengths at rest: ~0.78H span (~80%)
-    var wellY = H * 0.06;
-
-    var phase = (frame / 16) * Math.PI * 2;
-    var bob = Math.sin(phase);                     // 0 at frame 0 -> idle rest pose
-    // Head-arm "foreshortening" + a vertical bob of the tip together sell the rocking motion;
-    // amplitudes are kept small enough that even at the extremes (bob=+-1) the tip stays inside
-    // the tile and never crosses the well (bob=-1 -> nose almost touches the well = bottom of
-    // stroke; bob=+1 -> nose furthest from the well = top of stroke).
-    var headArm = headArm0 * (1 - 0.15 * bob);
-    var headTipY = pivotY - headArm + bob * (H * 0.03);
-    var tailTipY = pivotY + tailArm;
-
-    // ---- output pipe: well -> north-edge nub, drawn first so the mechanism reads on top near
-    // the well casing. ----
-    var nub = minWH * 0.095;
-    ctx.strokeStyle = '#6E7A82'; ctx.lineWidth = nub * 0.55;
-    ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, wellY); ctx.stroke();
-    L.pipeNub(ctx, cx, 0, 0, nub);
-
-    // ---- rusty well-head ring, centre-north. ----
-    var wellR = minWH * 0.095;
-    L.disc(ctx, cx, wellY, wellR, '#7A4A28', { hi: 18, lo: 32, outlineWidth: Math.max(1.4, minWH * 0.018) });
-    L.disc(ctx, cx, wellY, wellR * 0.48, '#241A14', { hi: 6, lo: 10, outlineWidth: 1.1 });
-    L.rivets(ctx, [[cx - wellR * 0.8, wellY], [cx + wellR * 0.8, wellY]], wellR * 0.16);
-
-    // ---- motor/gearbox skid + crank, south end, offset east of the beam's vertical axis. ----
-    var crankCx = cx + minWH * 0.28, crankCy = H * 0.76, crankR = minWH * 0.1;
-    var skidW = minWH * 0.34, skidH = H * 0.09;
-    L.panel(ctx, crankCx - skidW * 0.5, crankCy + crankR * 0.7, skidW, skidH, '#33383D', { r: minWH * 0.018, hi: 12, lo: 24 });
-    var mhw = minWH * 0.3, mhh = H * 0.15, mhx = crankCx - mhw * 0.5, mhy = crankCy - mhh * 0.55;
-    L.panel(ctx, mhx, mhy, mhw, mhh, '#C9A227', { r: minWH * 0.02, hi: 22, lo: 30 });
-    L.vent(ctx, mhx + mhw * 0.08, mhy + mhh * 0.6, mhw * 0.4, mhh * 0.3, 3, true);
-    L.rivets(ctx, [[mhx + mhw * 0.12, mhy + mhh * 0.14], [mhx + mhw * 0.88, mhy + mhh * 0.14]], minWH * 0.012);
-
-    // ---- samson post (A-frame): tall, splayed legs, standing at the centre pivot. ----
-    var postBaseY = pivotY + minWH * 0.2, postSpread = minWH * 0.16;
-    ctx.strokeStyle = '#2A2E32'; ctx.lineWidth = Math.max(2.4, minWH * 0.032); ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(cx - postSpread, postBaseY); ctx.lineTo(cx, pivotY); ctx.lineTo(cx + postSpread, postBaseY);
-    ctx.stroke();
-    ctx.strokeStyle = '#454C54'; ctx.lineWidth = Math.max(1.6, minWH * 0.018);
-    ctx.beginPath(); ctx.moveTo(cx - postSpread * 0.55, postBaseY - minWH * 0.06); ctx.lineTo(cx + postSpread * 0.55, postBaseY - minWH * 0.06); ctx.stroke();
-
-    // ---- crank hub + two big counterweight arms, spinning a full continuous turn. ----
-    L.disc(ctx, crankCx, crankCy, crankR * 0.36, '#454C54', { hi: 30, lo: 30, outlineWidth: 1.2 });
-    var cwR = crankR * 0.6, pin = [crankCx, crankCy];
-    [0, Math.PI].forEach(function (off) {
-      var a = phase + off;
-      var ax = crankCx + Math.cos(a) * crankR * 0.86, ay = crankCy + Math.sin(a) * crankR * 0.86;
-      ctx.strokeStyle = '#33383D'; ctx.lineWidth = Math.max(2, minWH * 0.026); ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(crankCx, crankCy); ctx.lineTo(ax, ay); ctx.stroke();
-      L.disc(ctx, ax, ay, cwR, '#2A2E32', { hi: 26, lo: 20, outlineWidth: Math.max(1.4, minWH * 0.018) });
-      ctx.strokeStyle = 'rgba(217,165,32,0.7)'; ctx.lineWidth = Math.max(1, minWH * 0.01);
-      ctx.beginPath(); ctx.arc(ax, ay, cwR * 0.6, 0, Math.PI * 2); ctx.stroke();
-      if (off === 0) pin = [crankCx + Math.cos(a) * crankR * 0.5, crankCy + Math.sin(a) * crankR * 0.5];
+  var PJ_STEEL = { d: '#161614', m: '#565652', l: '#86867E', h: '#C4C4BC' };
+  var PJ_GREEN = { d: '#14240A', m: '#46721C', l: '#6E9E30', h: '#B4D478' };
+  function pjPath(ctx, pts, rr) {
+    ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+    for (var i = 1; i < pts.length - 1; i++) ctx.arcTo(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], rr || 0);
+    ctx.lineTo(pts[pts.length - 1][0], pts[pts.length - 1][1]);
+  }
+  function pjPipe(ctx, pts, r, P, bands) {
+    ctx.save(); ctx.lineJoin = 'round';
+    pjPath(ctx, pts, r * 2); ctx.strokeStyle = P.d; ctx.lineWidth = r * 2; ctx.stroke();
+    pjPath(ctx, pts, r * 2); ctx.strokeStyle = P.m; ctx.lineWidth = r * 1.6; ctx.stroke();
+    ctx.translate(-r * 0.25, -r * 0.25); pjPath(ctx, pts, r * 2); ctx.strokeStyle = P.l; ctx.lineWidth = r * 0.7; ctx.stroke();
+    ctx.translate(-r * 0.15, -r * 0.15); pjPath(ctx, pts, r * 2); ctx.strokeStyle = P.h; ctx.globalAlpha = 0.6; ctx.lineWidth = r * 0.2; ctx.stroke();
+    ctx.restore();
+    // rusty flange bands along the run
+    if (bands) for (var i = 0; i + 1 < pts.length; i++) {
+      var a = pts[i], b = pts[i + 1], dx = b[0] - a[0], dy = b[1] - a[1], l = Math.sqrt(dx * dx + dy * dy);
+      if (l < 30) continue;
+      var mx = a[0] + dx * 0.5, my = a[1] + dy * 0.5;
+      ctx.save(); ctx.translate(mx, my); ctx.rotate(Math.atan2(dy, dx));
+      ctx.fillStyle = '#1A0E08'; ctx.fillRect(-3, -r * 1.25, 6, r * 2.5);
+      ctx.fillStyle = '#8A4A2A'; ctx.fillRect(-2.2, -r * 1.15, 4.4, r * 2.3);
+      ctx.restore();
+    }
+  }
+  function pjBox(ctx, x0, y0, x1, y1, P) {
+    ctx.fillStyle = P.d; ctx.fillRect(x0 - 1, y0 - 1, x1 - x0 + 2, y1 - y0 + 2);
+    var g = ctx.createLinearGradient(x0, y0, x1, y1); g.addColorStop(0, P.h); g.addColorStop(0.3, P.l); g.addColorStop(0.7, P.m); g.addColorStop(1, P.d);
+    ctx.fillStyle = g; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+  }
+  function pjSpots(ctx, seed, x0, y0, x1, y1, n) {
+    for (var i = 0; i < n; i++) {
+      var hx = Math.sin((seed + i) * 12.9898) * 43758.5453, hy = Math.sin((seed + i) * 78.233) * 43758.5453;
+      hx -= Math.floor(hx); hy -= Math.floor(hy);
+      ctx.fillStyle = i % 3 ? 'rgba(90,40,14,0.45)' : 'rgba(20,16,8,0.4)';
+      ctx.fillRect(x0 + (x1 - x0) * hx, y0 + (y1 - y0) * hy, 1.5 + (i % 3), 1.5 + (i % 2));
+    }
+  }
+  // ground pipe loop of the north-facing base (origin = footprint centre), turned with the facing
+  function pumpjackBase(ctx, dir) {
+    ctx.save(); ctx.rotate(dir * Math.PI / 2);
+    // sandy stains where the well works the ground
+    ctx.fillStyle = 'rgba(150,120,80,0.25)';
+    [[-40, 20, 30, 14], [10, 34, 34, 16], [-10, 60, 26, 10], [40, 10, 20, 12]].forEach(function (b) { ctx.beginPath(); ctx.ellipse(b[0], b[1], b[2], b[3], 0.3, 0, Math.PI * 2); ctx.fill(); });
+    pjPipe(ctx, [[-66, -6], [-50, -6], [-50, -56], [40, -56]], 4.5, PJ_STEEL, true);
+    pjPipe(ctx, [[-78, 44], [-60, 44], [-40, 30], [-40, -28], [40, -28], [44, -34]], 4.5, PJ_STEEL, true);
+    pjPipe(ctx, [[-66, 84], [-44, 84], [-26, 62], [80, 62], [80, -50], [66, -62]], 5, PJ_STEEL, true);
+    // output: from the top run up to the north edge, flanged at the connection
+    pjPipe(ctx, [[0, -56], [0, -94]], 4.5, PJ_STEEL, false);
+    ctx.fillStyle = '#1A0E08'; ctx.fillRect(-9, -95, 18, 7); ctx.fillStyle = '#8A4A2A'; ctx.fillRect(-8, -94, 16, 5);
+    ctx.restore();
+  }
+  // the red motor housing with its fan, placed at the base's (turned) motor spot, drawn upright
+  function pumpjackMotor(ctx, dir) {
+    var v = F.util.rotVec([66, -72], dir), x = v[0], y = v[1];
+    x = Math.max(-66, Math.min(66, x)); y = Math.max(-62, Math.min(74, y));
+    pjPipe(ctx, [[x - 12, y + 6], [x - 12, y + 22]], 4.5, PJ_GREEN, false);
+    pjPipe(ctx, [[x + 10, y + 6], [x + 10, y + 22]], 4.5, PJ_GREEN, false);
+    ctx.fillStyle = '#140606'; ctx.fillRect(x - 30, y - 16, 60, 26);
+    var g = ctx.createLinearGradient(0, y - 16, 0, y + 10); g.addColorStop(0, '#F05848'); g.addColorStop(0.5, '#C42418'); g.addColorStop(1, '#6A0E08');
+    ctx.fillStyle = g; ctx.fillRect(x - 29, y - 15, 58, 24);
+    ctx.fillStyle = 'rgba(40,6,4,0.5)'; for (var i = 0; i < 5; i++) ctx.fillRect(x - 24 + i * 11, y - 12, 2, 18);
+    ctx.fillStyle = '#1A1614'; ctx.beginPath(); ctx.ellipse(x, y - 18, 24, 8, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#6A6660'; ctx.beginPath(); ctx.ellipse(x, y - 19, 21, 6.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#2A2622'; ctx.lineWidth = 0.8;
+    for (i = 0; i < 12; i++) { var a = i / 12 * Math.PI * 2; ctx.beginPath(); ctx.moveTo(x, y - 19); ctx.lineTo(x + Math.cos(a) * 20, y - 19 + Math.sin(a) * 6); ctx.stroke(); }
+  }
+  // the machine, side view: origin = footprint centre; `rock` = beam tilt (rad), `ang` = crank
+  function pumpjackMachine(ctx, rock, ang) {
+    // horsehead-reference coordinates (entity centre at (112,144)), drawn 28 px lower
+    ctx.save(); ctx.translate(-112, -144 + 28);
+    // wellhead: green casing, grey header, valves and hand wheels
+    pjPipe(ctx, [[20, 126], [74, 126]], 6, PJ_STEEL, false);
+    pjPipe(ctx, [[46, 150], [70, 150]], 5, PJ_STEEL, false);
+    pjPipe(ctx, [[14, 118], [14, 168]], 6.5, PJ_GREEN, false);
+    pjPipe(ctx, [[40, 104], [40, 140]], 4.5, PJ_GREEN, false);
+    pjPipe(ctx, [[60, 112], [60, 164]], 5, PJ_GREEN, false);
+    [[14, 116], [40, 102], [60, 110]].forEach(function (p) { ctx.fillStyle = '#1E3A0C'; ctx.fillRect(p[0] - 7, p[1] - 3, 14, 6); ctx.fillStyle = '#8ACC3E'; ctx.fillRect(p[0] - 6, p[1] - 2.5, 12, 2.5); });
+    [[44, 138], [62, 152]].forEach(function (p) {
+      ctx.strokeStyle = '#1A1A18'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(p[0], p[1], 7, 6, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = '#E4E2DA'; ctx.lineWidth = 1.6; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(p[0] - 6, p[1]); ctx.lineTo(p[0] + 6, p[1]); ctx.moveTo(p[0], p[1] - 5); ctx.lineTo(p[0], p[1] + 5); ctx.stroke();
     });
-    L.disc(ctx, pin[0], pin[1], crankR * 0.14, '#1A1A1A', { outlineWidth: 1 });
-
-    // ---- pitman arm: static tail tip -> rotating crank pin. ----
-    ctx.strokeStyle = '#9AA3A8'; ctx.lineWidth = Math.max(1.8, minWH * 0.02); ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(cx, tailTipY); ctx.lineTo(pin[0], pin[1]); ctx.stroke();
-
-    // ---- walking beam: long, thick, dark-steel bar from the tail tip through the pivot to the
-    // animated head tip, with a brass/yellow accent stripe (Factorio palette). ----
-    var beamW = minWH * 0.115;
-    ctx.beginPath();
-    ctx.moveTo(cx - beamW * 0.5, tailTipY);
-    ctx.lineTo(cx - beamW * 0.4, headTipY + beamW * 0.35);
-    ctx.lineTo(cx, headTipY);
-    ctx.lineTo(cx + beamW * 0.4, headTipY + beamW * 0.35);
-    ctx.lineTo(cx + beamW * 0.5, tailTipY);
-    ctx.closePath();
-    var bg = ctx.createLinearGradient(cx - beamW * 0.5, 0, cx + beamW * 0.5, 0);
-    bg.addColorStop(0, '#5A6068'); bg.addColorStop(0.5, '#33383D'); bg.addColorStop(1, '#1E2124');
-    ctx.fillStyle = bg; ctx.fill();
-    ctx.strokeStyle = 'rgba(12,12,12,0.9)'; ctx.lineWidth = Math.max(1.4, minWH * 0.014); ctx.stroke();
-    ctx.strokeStyle = 'rgba(217,165,32,0.85)'; ctx.lineWidth = Math.max(1.2, minWH * 0.012);
-    ctx.beginPath(); ctx.moveTo(cx, tailTipY - minWH * 0.03); ctx.lineTo(cx, headTipY + beamW * 0.5); ctx.stroke();
-    L.disc(ctx, cx, pivotY, beamW * 0.32, '#C9A227', { hi: 45, lo: 25, outlineWidth: 1.4 }); // brass pivot bolt
-
-    // ---- counterweight block riding the beam's tail end. ----
-    L.panel(ctx, cx - beamW * 0.62, tailTipY - minWH * 0.045, beamW * 1.24, minWH * 0.07, '#2A2E32', { r: minWH * 0.014, hi: 14, lo: 24 });
-
-    // ---- horsehead at the animated head tip. ----
-    drawHorseHead(ctx, cx, headTipY, minWH * 0.3);
-
-    // ---- bridle cable: horsehead nose -> polished rod into the well. ----
-    ctx.strokeStyle = '#1C1C1C'; ctx.lineWidth = Math.max(1.4, minWH * 0.013);
-    ctx.beginPath(); ctx.moveTo(cx, headTipY); ctx.lineTo(cx, wellY - wellR * 0.1); ctx.stroke();
+    ctx.fillStyle = '#8A4A2A'; ctx.fillRect(4, 158, 22, 6); ctx.fillRect(34, 128, 10, 4);
+    // lattice A-frame (samson post) under the pivot
+    var legs = [[100, 170, 118, 44], [152, 170, 126, 44], [110, 170, 120, 50], [142, 170, 124, 50]];
+    legs.forEach(function (l, i) {
+      ctx.strokeStyle = PJ_GREEN.d; ctx.lineWidth = i < 2 ? 12 : 8; ctx.beginPath(); ctx.moveTo(l[0], l[1]); ctx.lineTo(l[2], l[3]); ctx.stroke();
+      ctx.strokeStyle = i < 2 ? PJ_GREEN.m : '#2E5212'; ctx.lineWidth = i < 2 ? 9 : 6; ctx.stroke();
+      if (i < 2) { ctx.strokeStyle = 'rgba(210,240,140,0.5)'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(l[0] - 2, l[1]); ctx.lineTo(l[2] - 2, l[3]); ctx.stroke(); }
+    });
+    ctx.strokeStyle = '#2E5414'; ctx.lineWidth = 2.4; ctx.beginPath();
+    [[104, 150, 146, 120], [148, 150, 108, 120], [108, 120, 142, 94], [140, 120, 112, 94], [112, 94, 136, 70], [134, 94, 116, 70]].forEach(function (b) { ctx.moveTo(b[0], b[1]); ctx.lineTo(b[2], b[3]); });
+    ctx.stroke();
+    // gearbox and the crank with its two red counterweights
+    pjBox(ctx, 136, 100, 176, 146, PJ_GREEN); pjSpots(ctx, 7, 136, 100, 176, 146, 14);
+    ctx.fillStyle = '#1A1A18'; ctx.beginPath(); ctx.arc(152, 126, 11, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#6A6A64'; ctx.lineWidth = 1.2; for (var s = 0; s < 6; s++) { var sa = s / 6 * Math.PI * 2 + ang; ctx.beginPath(); ctx.moveTo(152, 126); ctx.lineTo(152 + Math.cos(sa) * 10, 126 + Math.sin(sa) * 10); ctx.stroke(); }
+    var cx = 184, cy = 124;
+    [0, Math.PI].forEach(function (o) {
+      var a = ang + o, px = cx + Math.cos(a) * 16, py = cy + Math.sin(a) * 16;
+      ctx.save(); ctx.translate(px, py); ctx.rotate(a);
+      ctx.fillStyle = '#240806'; ctx.beginPath(); ctx.ellipse(0, 0, 9, 17, 0, 0, Math.PI * 2); ctx.fill();
+      var cg = ctx.createLinearGradient(-8, -16, 8, 16); cg.addColorStop(0, '#E0604A'); cg.addColorStop(0.5, '#A8281A'); cg.addColorStop(1, '#4A0C06');
+      ctx.fillStyle = cg; ctx.beginPath(); ctx.ellipse(0, 0, 7.5, 15.5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    });
+    ctx.fillStyle = '#2A2A26'; ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill();
+    // walking beam rocking on its bearing, horsehead at the west end
+    var pvx = 116, pvy = 40, cr = Math.cos(rock), sr = Math.sin(rock);
+    function R(x, y) { var dx = x - pvx, dy = y - pvy; return [pvx + dx * cr - dy * sr, pvy + dx * sr + dy * cr]; }
+    // pitman arm: beam tail -> crank pin
+    var tail = R(186, 56), pin = [cx + Math.cos(ang) * 16, cy + Math.sin(ang) * 16];
+    ctx.strokeStyle = '#141412'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(tail[0], tail[1]); ctx.lineTo(pin[0], pin[1]); ctx.stroke();
+    ctx.strokeStyle = '#9A9A92'; ctx.lineWidth = 2.6; ctx.stroke();
+    // polished rod from the horsehead into the wellhead
+    var nose = R(20, 30), noseLow = R(22, 86);
+    ctx.strokeStyle = '#2A2C2E'; ctx.lineWidth = 2.8; ctx.beginPath(); ctx.moveTo(nose[0] - 5, nose[1]); ctx.lineTo(14, 116); ctx.stroke();
+    ctx.strokeStyle = '#C8D0D8'; ctx.lineWidth = 1.2; ctx.stroke();
+    void noseLow;
+    ctx.save(); ctx.translate(pvx, pvy); ctx.rotate(rock); ctx.translate(-pvx, -pvy);
+    // beam
+    ctx.beginPath(); ctx.moveTo(44, 30); ctx.lineTo(196, 42); ctx.lineTo(196, 60); ctx.lineTo(44, 52); ctx.closePath();
+    ctx.fillStyle = PJ_GREEN.d; ctx.fill();
+    var bg = ctx.createLinearGradient(0, 30, 0, 60); bg.addColorStop(0, PJ_GREEN.h); bg.addColorStop(0.3, PJ_GREEN.l); bg.addColorStop(0.7, PJ_GREEN.m); bg.addColorStop(1, PJ_GREEN.d);
+    ctx.beginPath(); ctx.moveTo(45, 31); ctx.lineTo(195, 43); ctx.lineTo(195, 58.5); ctx.lineTo(45, 50.5); ctx.closePath(); ctx.fillStyle = bg; ctx.fill();
+    ctx.fillStyle = 'rgba(210,190,40,0.4)'; ctx.beginPath(); ctx.moveTo(60, 33); ctx.lineTo(150, 40); ctx.lineTo(150, 42.5); ctx.lineTo(60, 35.5); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(20,40,8,0.6)'; ctx.lineWidth = 1; [90, 130, 170].forEach(function (x) { ctx.beginPath(); ctx.moveTo(x, 32 + (x - 44) * 0.079); ctx.lineTo(x, 52 + (x - 44) * 0.05); ctx.stroke(); });
+    pjSpots(ctx, 3, 50, 34, 190, 56, 30);
+    // horsehead: curved plate hanging from the west end
+    ctx.beginPath(); ctx.moveTo(18, 24); ctx.lineTo(46, 20); ctx.quadraticCurveTo(52, 50, 42, 90); ctx.lineTo(28, 92); ctx.quadraticCurveTo(14, 60, 18, 24); ctx.closePath();
+    ctx.fillStyle = PJ_GREEN.d; ctx.fill();
+    var hg = ctx.createLinearGradient(16, 20, 50, 90); hg.addColorStop(0, PJ_GREEN.h); hg.addColorStop(0.35, PJ_GREEN.l); hg.addColorStop(1, PJ_GREEN.m);
+    ctx.beginPath(); ctx.moveTo(19.5, 25.5); ctx.lineTo(45, 22); ctx.quadraticCurveTo(50.5, 50, 41, 88.5); ctx.lineTo(29, 90.5); ctx.quadraticCurveTo(15.5, 60, 19.5, 25.5); ctx.closePath(); ctx.fillStyle = hg; ctx.fill();
+    ctx.fillStyle = '#D8E8C0'; ctx.fillRect(18, 22, 28, 4);
+    [[30, 40], [31, 66]].forEach(function (p) { ctx.fillStyle = '#1A1A10'; ctx.beginPath(); ctx.arc(p[0], p[1], 4, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(120,60,20,0.6)'; ctx.beginPath(); ctx.arc(p[0], p[1], 6.5, 0, Math.PI * 2); ctx.fill(); });
+    pjSpots(ctx, 11, 20, 26, 46, 88, 16);
+    ctx.restore();
+    // bearing on top of the A-frame
+    ctx.fillStyle = '#141412'; ctx.beginPath(); ctx.arc(pvx, pvy + 2, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#5A8A22'; ctx.beginPath(); ctx.arc(pvx, pvy + 2, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#C8CCC8'; ctx.beginPath(); ctx.arc(pvx + 1, pvy + 20, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  function paintPumpjack(ctx, W, H, frame, dir, def, type, opts) {
+    var k = W / 192, ph = (frame & 15) / 16 * Math.PI * 2;
+    ctx.save(); ctx.translate(W / 2, H / 2); ctx.rotate(-dir * Math.PI / 2); ctx.scale(k, k);
+    pumpjackBase(ctx, dir);
+    pumpjackMotor(ctx, dir);
+    pumpjackMachine(ctx, 0.07 * Math.sin(ph), ph);
+    ctx.restore();
+    // grime over everything (the sprites are rusty and oil-stained)
+    ctx.save(); ctx.globalCompositeOperation = 'source-atop';
+    for (var i = 0; i < 1400; i++) {
+      var hx = Math.sin(i * 12.9898) * 43758.5453, hy = Math.sin(i * 78.233) * 43758.5453, hc = Math.sin(i * 39.34) * 43758.5453;
+      hx -= Math.floor(hx); hy -= Math.floor(hy); hc -= Math.floor(hc);
+      ctx.fillStyle = hc < 0.55 ? 'rgba(14,12,6,0.3)' : (hc < 0.8 ? 'rgba(110,56,20,0.26)' : 'rgba(240,240,220,0.1)');
+      ctx.fillRect(W * hx, H * hy, k * (1 + 2 * hc), k * (1 + 2.5 * (1 - hc)));
+    }
+    ctx.restore();
   }
 
   // ---------------------------------------------------------------------
