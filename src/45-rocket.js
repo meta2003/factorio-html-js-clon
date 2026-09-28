@@ -483,7 +483,9 @@
 
   F._renderHooks.entityOpts['rocket-silo'] = function (e, def, tick) {
     var working = !!e._working || e.stage === 'launching';
-    return { frame: tick, opts: { working: working } };
+    // frame loops over 16 steps: sprites are cached per frame, so the raw tick here allocated a
+    // new 9x9 canvas every tick
+    return { frame: working ? ((tick | 0) >> 2) & 15 : 0, opts: { working: working } };
   };
 
   // Deterministic 0..1 jitter from a numeric seed (Math.sin trick) — no F.rng
