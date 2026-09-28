@@ -457,7 +457,7 @@
           }
           var oi = oly * F.C.CHUNK + olx, ores = och.res[oi];
           if (!ores) continue;
-          var ov = F.util.hash2(chunk.cx * F.C.CHUNK + lx, chunk.cy * F.C.CHUNK + ly, 9) % 4;
+          var ov = F.util.hash2(chunk.cx * F.C.CHUNK + lx, chunk.cy * F.C.CHUNK + ly, 9) % 8;
           var ospr = F.sprites.ore(ores, oreStage(och.amount[oi]), ov);
           if (ospr) c.drawImage(ospr, lx * T - T * 0.25, ly * T - T * 0.25, T * 1.5, T * 1.5);
         }

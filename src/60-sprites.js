@@ -1132,10 +1132,10 @@
   // scatter, so a rich patch reads as a "deposit" instead of confetti.
   // Ore: the canvas is 1.5 tiles (drawn centred on the tile, overhanging 0.25 tile on each
   // side) so neighbouring tiles' chunks overlap and a patch reads as one continuous field.
-  // 4 layout variants per (res, stage), picked per tile by the renderer.
+  // 8 layout variants per (res, stage), picked per tile by the renderer.
   F.sprites.ore = function (res, stage, variant) {
     if (!F.sprites.enabled) return stub();
-    variant = (variant | 0) & 3;
+    variant = (variant | 0) & 7;
     var key = res + '|' + stage + '|' + variant;
     var c = oreCache.get(key);
     if (c) return c;
