@@ -1,0 +1,53 @@
+# Builds the game on every push to main and publishes it to the gh-pages branch,
+# which GitHub Pages serves as index.html (Settings -> Pages -> Deploy from branch: gh-pages / root).
+name: Build and deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# one deploy at a time; a newer push replaces a queued one
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build
+        run: node build/build.js
+
+      - name: Test
+        run: node test/headless.js --ticks 3600 --summary
+
+      - name: Publish to gh-pages
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          cp build/Factio.html "$RUNNER_TEMP/index.html"
+          git fetch --depth=1 origin gh-pages
+          git worktree add "$RUNNER_TEMP/pages" FETCH_HEAD
+          cd "$RUNNER_TEMP/pages"
+          cp "$RUNNER_TEMP/index.html" index.html
+          touch .nojekyll
+          git add index.html .nojekyll
+          if git diff --cached --quiet; then
+            echo "gh-pages is already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update game build from main (${SHA::7})"
+          git push origin HEAD:gh-pages

@@ -44,6 +44,13 @@ node build/build.js            # -> build/Factio.html (open it in a browser)
 node build/build.js --deploy   # also copies it to the Desktop
 ```
 
+## Deploy
+
+Every push to `main` runs `.github/workflows/deploy.yml`: it builds the game, runs the headless
+tests and publishes `build/Factio.html` as `index.html` on the `gh-pages` branch (GitHub Pages
+source: *Deploy from a branch → gh-pages / root*). It can also be started by hand from the
+*Actions* tab (*Run workflow*).
+
 ## Demo save: an advanced late-game world
 
 `saves/advanced-world.json` is a ready-built late-game base: all research done, a steam plant
